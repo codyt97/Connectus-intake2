@@ -117,6 +117,99 @@ export async function listCustomersByName(q, page = 1, pageSize = 25) {
   return []; // fallback
 }
 
+/* ---------- Sales Orders helper (multi-strategy) ---------- */
+export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) {
+  assertEnv();
+
+  const {
+    q = '',
+    docNo = '',
+    customer = '',
+    status = '',
+    dateFrom = '',  // ISO 'YYYY-MM-DD' recommended
+    dateTo = '',
+  } = criteria;
+
+  // Most common SO header types I see in OT tenants.
+  const CANDIDATE_TYPES = [130, 135, 131]; // try several; first working wins
+
+  // Field name variants across tenants/schemas.
+  const F = {
+    DocNo:        ['DocNo', 'DocumentNo', 'DocNumber'],
+    CustomerName: ['CustomerName', 'Customer', 'CustName'],
+    Status:       ['Status', 'DocStatus'],
+    DocDate:      ['DocDate', 'Date', 'DocumentDate'],
+    Total:        ['Total', 'GrandTotal', 'DocTotal'],
+    Id:           ['Id', 'ID', 'id'],
+  };
+
+  // Build LIKE filters for a given prop list and a value.
+  const likeFilters = (props, val) =>
+    (!val || !String(val).trim()) ? [] :
+    props.map(p => ({ PropertyName: p, Operator: 12, FilterValueArray: String(val) }));
+
+  // Build date filters if provided (fallback to LIKE if BETWEEN isn’t supported in your tenant).
+  const dateFilters = [];
+  if (dateFrom && dateTo) {
+    // 7 := between (common), with 2-element array
+    dateFilters.push({ PropertyName: F.DocDate[0], Operator: 7, FilterValueArray: [dateFrom, dateTo] });
+  } else if (dateFrom) {
+    // 3 := >=
+    dateFilters.push({ PropertyName: F.DocDate[0], Operator: 3, FilterValueArray: dateFrom });
+  } else if (dateTo) {
+    // 5 := <=
+    dateFilters.push({ PropertyName: F.DocDate[0], Operator: 5, FilterValueArray: dateTo });
+  }
+
+  const filters =
+    [
+      ...likeFilters(F.DocNo, docNo || q),
+      ...likeFilters(F.CustomerName, customer || ''),
+      ...likeFilters(F.Status, status || ''),
+      ...(q && !docNo ? likeFilters(F.CustomerName, q) : []),
+      ...dateFilters,
+    ];
+
+  // Try each candidate type until one returns items or a definite 200
+  let lastErr = null;
+  for (const TYPE of CANDIDATE_TYPES) {
+    const body = {
+      Type: TYPE,
+      NumberOfRecords: Math.min(Math.max(Number(pageSize) || 50, 1), 100),
+      PageNumber: Number(page) || 1,
+      SortOrder: { PropertyName: F.DocNo[0], Direction: 1 },
+      Filters: filters.length ? filters : likeFilters(F.DocNo, q || ''), // default to q on DocNo
+    };
+
+    try {
+      const out = await tryPost('/list', body);
+      if (!out.ok) { lastErr = new Error(`/list ${out.status}: ${out.text.slice(0,180)}`); continue; }
+
+      const rows = normalizeListResult(out.json);
+      // Map results to a normalized shape
+      const mapped = rows.map(r => ({
+        id:        r[F.Id.find(k => k in r)] ?? null,
+        docNo:     r[F.DocNo.find(k => k in r)] ?? '',
+        customer:  r[F.CustomerName.find(k => k in r)] ?? '',
+        status:    r[F.Status.find(k => k in r)] ?? '',
+        date:      r[F.DocDate.find(k => k in r)] ?? '',
+        total:     r[F.Total.find(k => k in r)] ?? null,
+        raw:       r, // keep raw in case UI needs extra fields
+      }));
+
+      // Accept on first 200; if array is empty and you passed a non-empty query, still return (it’s a valid 200)
+      return mapped;
+    } catch (e) {
+      lastErr = e;
+      continue;
+    }
+  }
+
+  if (lastErr) throw lastErr;
+  return [];
+}
+
+
 export async function searchPartItems(q, take = 50) {
   assertEnv();
   const body = {
