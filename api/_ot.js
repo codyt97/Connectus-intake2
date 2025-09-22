@@ -14,7 +14,7 @@ function assertEnv() {
 }
 
 function authHeaders() {
-  const h = { apiKey: API_KEY, email: EMAIL };
+  const h = { ApiKey: API_KEY, Email: EMAIL };
   if (DEVKEY) h.DevKey = DEVKEY; else h.password = PASS;
   return h;
 }
