@@ -1421,6 +1421,8 @@ function applyPastedCustomer(textareaId){
 
   const r1=pick(data.rep?.primary); if(r1) selectByTextExact('rep1', r1);
   const r2=pick(data.rep?.secondary); if(r2) selectByTextExact('rep2', r2);
+  try { if (typeof showIntakeWork === 'function') showIntakeWork(true); } catch {}
+  document.querySelector('.tab[data-tab="customer"]')?.click();
 
   closeDrawer('drawerWCP');
   refreshTotals();
