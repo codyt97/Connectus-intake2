@@ -1382,6 +1382,21 @@ function applyCustomerFromApi(r){
   applyPastedCustomer('wcpPaste'); // your existing JSON→form function
 }
 
+function normalizeAddressPair(addr) {
+  // Guard
+  if (!addr) return {street:'', suite:'', city:'', state:'', zip:''};
+  let {street='', suite=''} = addr;
+
+  // Heuristic: if street looks like a unit/suite and suite looks like a street, swap.
+  const isSuiteLike = (s) => /(?:suite|ste\.?|unit|fl(?:oor)?|apt|#)/i.test(String(s));
+  const looksLikeStreetNum = (s) => /^\s*\d+(\s+\w+)/.test(String(s));
+
+  if (isSuiteLike(street) && suite && looksLikeStreetNum(suite)) {
+    const tmp = street; street = suite; suite = tmp;
+  }
+  return {...addr, street, suite};
+}
+  
 function applyPastedCustomer(textareaId){
   const raw=document.getElementById(textareaId).value.trim();
   if(!raw){ alert('Paste customer details first.'); return; }
@@ -1389,31 +1404,32 @@ function applyPastedCustomer(textareaId){
   try{ data=JSON.parse(raw); }
   catch(_){ raw.split(/\r?\n/).forEach(line=>{ const m=line.match(/^([^:]+):\s*(.*)$/); if(!m)return; setByPath(data,m[1].trim(),m[2].trim()); }); }
 
-  // ----- Billing (explicit, one-to-one mapping)
-const b = data?.billing || {};
-setVal('billCompany', pick(data?.company, b.company || ''));
-setVal('billContact', b.contact || '');
-setVal('billPhone',   b.phone   || '');
-setVal('billEmail',   b.email   || '');
-setVal('billStreet',  b.street  || '');
-setVal('billSuite',   b.suite   || '');
-setVal('billCity',    b.city    || '');
-setVal('billState',   b.state   || '');
-setVal('billZip',     b.zip     || '');
+  // ----- Billing (explicit + normalized)
+  const b = normalizeAddressPair(data?.billing || {});
+  setVal('billCompany', pick(data?.company, b.company || ''));
+  setVal('billContact', b.contact || '');
+  setVal('billPhone',   b.phone   || '');
+  setVal('billEmail',   b.email   || '');
+  setVal('billStreet',  b.street  || '');
+  setVal('billSuite',   b.suite   || '');
+  setVal('billCity',    b.city    || '');
+  setVal('billState',   b.state   || '');
+  setVal('billZip',     b.zip     || '');
 
-// ----- Shipping (explicit, one-to-one mapping)
-const s = data?.shipping || {};
-setVal('shipCompany', s.company || '');
-setVal('shipContact', s.contact || '');
-setVal('shipPhone',   s.phone   || '');
-setVal('shipEmail',   s.email   || '');
-setVal('shipStreet',  s.street  || '');
-setVal('shipSuite',   s.suite   || '');
-setVal('shipCity',    s.city    || '');
-setVal('shipState',   s.state   || '');
-setVal('shipZip',     s.zip     || '');
-const rbox = document.getElementById('resShip');
-if (rbox) { rbox.checked = !!s.residence; rbox.dispatchEvent(new Event('change',{bubbles:true})); }
+  // ----- Shipping (explicit + normalized)
+  const s = normalizeAddressPair(data?.shipping || {});
+  setVal('shipCompany', s.company || '');
+  setVal('shipContact', s.contact || '');
+  setVal('shipPhone',   s.phone   || '');
+  setVal('shipEmail',   s.email   || '');
+  setVal('shipStreet',  s.street  || '');
+  setVal('shipSuite',   s.suite   || '');
+  setVal('shipCity',    s.city    || '');
+  setVal('shipState',   s.state   || '');
+  setVal('shipZip',     s.zip     || '');
+  const rbox = document.getElementById('resShip');
+  if (rbox) { rbox.checked = !!s.residence; rbox.dispatchEvent(new Event('change',{bubbles:true})); }
+
 
 
   const pm=pick(data.payment?.method); if(pm) selectByTextExact('payMethod', pm);
