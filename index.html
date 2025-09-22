@@ -236,6 +236,50 @@
     </section>
   </section>
 
+
+  <!-- Wizard screen -->
+<section id="wizardPane">
+  <h2>Intake Wizard</h2>
+
+  <!-- 1) Sales Rep -->
+  <label>Sales Rep</label>
+  <select id="repSelect">
+    <option value="">-- Select --</option>
+    <option value="Cody T">Cody T</option>
+    <option value="Jess E">Jess E</option>
+    <!-- add your reps -->
+  </select>
+
+  <!-- 2) Customer Type -->
+  <fieldset>
+    <legend>Customer Type</legend>
+    <label><input type="radio" name="wizCustomerType" value="existing"> Existing</label>
+    <label><input type="radio" name="wizCustomerType" value="new"> New</label>
+  </fieldset>
+
+  <!-- 3) Document Type -->
+  <fieldset>
+    <legend>Document Type</legend>
+    <label><input type="radio" name="wizDocType" value="quote"> Quote</label>
+    <label><input type="radio" name="wizDocType" value="sales_order"> Sales Order</label>
+  </fieldset>
+
+  <!-- 4) Scope -->
+  <fieldset>
+    <legend>Scope</legend>
+    <label><input type="radio" name="wizScope" value="hardware"> Hardware only</label>
+    <label><input type="radio" name="wizScope" value="hardware_pro"> Hardware + Pro Services</label>
+  </fieldset>
+
+  <button id="wizDone">Finalize</button>
+  <div id="wizHint" style="margin-top:8px;color:#666"></div>
+</section>
+
+<!-- Actual intake app (hidden until wizard completes) -->
+<section id="intakePane" style="display:none">
+  <!-- your Quote / Sales Order Intake tabs + forms live here -->
+</section>
+
   <!-- ========== PANEL: INTAKE ========== -->
   <section data-mainpanel="intake">
     <!-- appbar -->
@@ -1334,9 +1378,11 @@ document.getElementById('flagNewCustomer').addEventListener('change', e=>{
 
 /* ===== WCP helper ===== */
 async function openOTSearch(){
-  const q = String(document.getElementById('wcpQuery')?.value || '').trim();
-    console.debug('[WCP] search query =', q);
-
+  const q = (document.getElementById('wcpQuery').value
+            || document.getElementById('billCompany').value || '').trim();
+  const target = document.getElementById('wcpResults');
+  …
+}
 
     // Render list; note r.*, not so.*
     target.innerHTML = results.slice(0, 25).map(r => `
@@ -1646,7 +1692,6 @@ async function openSOSearch(){
       target.innerHTML = 'No matches.'; return;
     }
     // render small cards with Preview + Apply
-    target.innerHTML = results.slice(0,25).map(so => `
       <div class="card" style="margin:6px 0;padding:10px">
         <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
         <div class="tiny">${so.date || ''} • ${so.status || ''}</div>
@@ -2520,8 +2565,12 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
 })();
 </script>
 <script>
-const list = document.getElementById('cloneResults');
-if (!list) return;
+(function () {
+  const list = document.getElementById('cloneResults');
+  if (!list) return;
+  list.addEventListener('click', (e) => { /* existing code */ });
+}());
+
 list.addEventListener('click', (e) => {
   const applyBtn = e.target.closest('button[data-so-id]');
   if (applyBtn) {
@@ -2595,5 +2644,104 @@ function addItemFromSearch(r){
   });
 }());
 </script>
+<script>
+/* ===== Wizard state helpers ===== */
+function isWizardDone(){
+  try { return sessionStorage.getItem('wiz.done') === '1'; }
+  catch { return false; }
+}
+function setWizardDone(v){
+  try { sessionStorage.setItem('wiz.done', v ? '1' : '0'); }
+  catch (e) { console.warn('[Intake] sessionStorage unavailable?', e); }
+}
+/** show/hide the wizard vs. the intake app */
+function showIntakeWork(show){
+  const wiz  = document.getElementById('wizardPane');
+  const work = document.getElementById('intakePane');
+  if (wiz)  wiz.style.display  = show ? 'none' : '';
+  if (work) work.style.display = show ? '' : 'none';
+}
+
+/* ===== Wire everything on DOM ready ===== */
+document.addEventListener('DOMContentLoaded', () => {
+  console.debug('[Intake] DOM ready → wiring wizard');
+
+  // 1) Initial show/hide based on saved state
+  try {
+    if (isWizardDone()) {
+      showIntakeWork(true);
+      console.debug('[Intake] Wizard already complete → showing tabs');
+    } else {
+      showIntakeWork(false);
+      console.debug('[Intake] Wizard not complete → hiding tabs');
+    }
+  } catch (e) {
+    console.error('[Intake] init error (isWizardDone/showIntakeWork?)', e);
+  }
+
+  // 2) Sales Rep select
+  const repSel = document.getElementById('repSelect');
+  if (repSel) {
+    repSel.addEventListener('change', () => {
+      sessionStorage.setItem('wiz.rep', repSel.value || '');
+      console.debug('[Intake] Rep selected:', repSel.value);
+    });
+  } else {
+    console.warn('[Intake] Missing #repSelect');
+  }
+
+  // 3) Customer Type radios
+  document.querySelectorAll('input[name="wizCustomerType"]').forEach(r => {
+    r.addEventListener('change', () => {
+      sessionStorage.setItem('wiz.customerType', r.value);
+      console.debug('[Intake] Customer type:', r.value);
+      // Optional: if r.value === 'new', open your "new customer" drawer
+    });
+  });
+
+  // 4) Document Type radios
+  document.querySelectorAll('input[name="wizDocType"]').forEach(r => {
+    r.addEventListener('change', () => {
+      sessionStorage.setItem('wiz.docType', r.value);
+      console.debug('[Intake] Doc type:', r.value);
+    });
+  });
+
+  // 5) Scope radios
+  document.querySelectorAll('input[name="wizScope"]').forEach(r => {
+    r.addEventListener('change', () => {
+      sessionStorage.setItem('wiz.scope', r.value);
+      console.debug('[Intake] Scope:', r.value);
+    });
+  });
+
+  // 6) Finalize button → unlock tabs
+  const doneBtn = document.getElementById('wizDone');
+  if (doneBtn) {
+    doneBtn.addEventListener('click', () => {
+      const rep   = sessionStorage.getItem('wiz.rep')          || '';
+      const ct    = sessionStorage.getItem('wiz.customerType') || '';
+      const dt    = sessionStorage.getItem('wiz.docType')      || '';
+      const scope = sessionStorage.getItem('wiz.scope')        || '';
+
+      if (!rep || !ct || !dt || !scope) {
+        const miss = ['rep','customerType','docType','scope']
+          .filter(k => !sessionStorage.getItem('wiz.'+k));
+        alert('Finish the wizard: missing ' + miss.join(', '));
+        return;
+      }
+
+      setWizardDone(true);
+      showIntakeWork(true);
+      const hint = document.getElementById('wizHint');
+      if (hint) hint.textContent = 'Wizard complete — tabs unlocked.';
+      console.debug('[Intake] Wizard COMPLETE → tabs unlocked');
+    });
+  } else {
+    console.warn('[Intake] Missing #wizDone');
+  }
+});
+</script>
+
 </body>
 </html>
