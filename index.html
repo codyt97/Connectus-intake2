@@ -1340,38 +1340,54 @@ async function openOTSearch(){
 
 
 // Map a customer result into your existing form fields
-function applyCustomerFromApi(r){
-  const data = {
-    company: r.company,
-    billing:{
-      contact: r.billingContact,
-      phone:   r.billingPhone,
-      email:   r.billingEmail,
-      street:  r.billingStreet,
-      suite:   r.billingSuite,
-      city:    r.billingCity,
-      state:   r.billingState,
-      zip:     r.billingZip
-    },
-    shipping:{
-      company: r.shipCompany,
-      contact: r.shipContact,
-      phone:   r.shipPhone,
-      email:   r.shipEmail,
-      street:  r.shipStreet,
-      suite:   r.shipSuite,
-      city:    r.shipCity,
-      state:   r.shipState,
-      zip:     r.shipZip
-    },
-    payment:{ method:r.payMethod, terms:r.payTerms, taxExempt:r.taxExempt, agreement:r.hasAgreement },
-    shippingOptions:{ pay:r.shipPay, speed:r.shipSpeed, shortShip:r.shortShip }
-  };
-  // Reuse your existing util:
-  // Simulate paste target with a temp textarea value and call existing parser
-  document.getElementById('wcpPaste').value = JSON.stringify(data, null, 2);
-  applyPastedCustomer('wcpPaste');
+async function applyCustomerFromApi(r) {
+  if (!r) return;
+
+  // optional: hydrate detail for full addresses
+  async function loadCustomerDetail(id){
+    try { return id ? await api(`/ordertime/customers/${encodeURIComponent(id)}`) : null; }
+    catch { return null; }
+  }
+  const detail = (r.id ? await loadCustomerDetail(r.id) : null) || {};
+  const pick = (...vals) => vals.find(v => v !== undefined && v !== null && String(v).trim() !== '') || '';
+
+  /* ===== Billing ===== */
+  setVal('billCompany', pick(detail.company, r.company, r.billingCompany));
+  setVal('billContact', pick(detail.billing?.contact, r.billingContact));
+  setVal('billPhone',   pick(detail.billing?.phone,   r.billingPhone));
+  setVal('billEmail',   pick(detail.billing?.email,   r.billingEmail));
+  setVal('billStreet',  pick(detail.billing?.street,  r.billingStreet));
+  setVal('billSuite',   pick(detail.billing?.suite,   r.billingSuite));
+  setVal('billCity',    pick(detail.billing?.city,    r.billingCity, r.city));
+  setVal('billState',   pick(detail.billing?.state,   r.billingState, r.state));
+  setVal('billZip',     pick(detail.billing?.zip,     r.billingZip,  r.zip));
+
+  /* ===== Shipping (fallback to billing) ===== */
+  setVal('shipCompany', pick(detail.shipping?.company, r.shipCompany, r.company, r.billingCompany));
+  setVal('shipContact', pick(detail.shipping?.contact, r.shipContact, r.billingContact));
+  setVal('shipPhone',   pick(detail.shipping?.phone,   r.shipPhone,   r.billingPhone));
+  setVal('shipEmail',   pick(detail.shipping?.email,   r.shipEmail,   r.billingEmail));
+  setVal('shipStreet',  pick(detail.shipping?.street,  r.shipStreet,  r.billingStreet));
+  setVal('shipSuite',   pick(detail.shipping?.suite,   r.shipSuite,   r.billingSuite));
+  setVal('shipCity',    pick(detail.shipping?.city,    r.shipCity,    r.billingCity, r.city));
+  setVal('shipState',   pick(detail.shipping?.state,   r.shipState,   r.billingState, r.state));
+  setVal('shipZip',     pick(detail.shipping?.zip,     r.shipZip,     r.billingZip,  r.zip));
+
+  /* ===== Payment & Options (best-effort) ===== */
+  if (detail.payment?.method) selectByTextExact('payMethod', detail.payment.method);
+  setVal('payTerms', pick(detail.payment?.terms, r.payTerms));
+  const taxEl = document.getElementById('taxExempt');       if (taxEl) taxEl.checked = !!pick(detail.payment?.taxExempt, r.taxExempt, false);
+  const agrEl = document.getElementById('hasAgreement');    if (agrEl) agrEl.checked = !!pick(detail.payment?.agreement, r.hasAgreement, false);
+  if (detail.shippingOptions?.pay)   selectByTextExact('shipPay',   detail.shippingOptions.pay);
+  if (detail.shippingOptions?.speed) selectByTextExact('shipSpeed', detail.shippingOptions.speed);
+  if (r.shortShip || detail.shippingOptions?.shortShip)     selectByTextExact('shortShip', pick(detail.shippingOptions?.shortShip, r.shortShip));
+
+  /* ===== UX: show the filled form ===== */
+  document.querySelector('.tab[data-tab="customer"]')?.click();
+  // if your UI gates the intake until wizard complete:
+  try { if (typeof showIntakeWork === 'function') showIntakeWork(true); } catch {}
 }
+
 
 function applyPastedCustomer(textareaId){
   const raw=document.getElementById(textareaId).value.trim();
@@ -2228,9 +2244,34 @@ document.getElementById('btnDemoFlow').addEventListener('click', ()=>{
 /* ===== Utilities ===== */
 function setByPath(obj,path,val){ const ks=path.split('.'); let r=obj; ks.slice(0,-1).forEach(k=>{ if(!(k in r)) r[k]={}; r=r[k]; }); r[ks.pop()]=val; }
 function pick(...vals){ return vals.find(v=>v!==undefined && v!==null && String(v).length>0) || ''; }
-function setVal(id,v){ if(document.getElementById(id) && v!==undefined) document.getElementById(id).value=v; }
+function setVal(id, v) {
+  const el = document.getElementById(id);
+  if (!el || v === undefined || v === null) return;
+  const prev = el.value;
+  el.value = v;
+  if (prev !== v) {
+    el.dispatchEvent(new Event('input',  { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+  }
+}
+
 function selectByText(id,txt){ const sel=document.getElementById(id); if(!sel) return; [...sel.options].forEach((o,i)=>{ if(o.text.trim().toLowerCase()===String(txt).trim().toLowerCase()) sel.selectedIndex=i; }); }
-function selectByTextExact(id,txt){ const sel=document.getElementById(id); if(!sel||!txt) return; [...sel.options].forEach((o,i)=>{ if(o.text.trim()===String(txt).trim()) sel.selectedIndex=i; }); }
+function selectByTextExact(id, text) {
+  const s = document.getElementById(id);
+  if (!s || text == null) return;
+  const t = String(text).trim().toLowerCase();
+  let done = false;
+  for (const o of s.options) {
+    if (o.text.trim().toLowerCase() === t) { s.value = o.value; done = true; break; }
+  }
+  if (!done) {
+    for (const o of s.options) {
+      if (String(o.value).trim().toLowerCase() === t) { s.value = o.value; break; }
+    }
+  }
+  s.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 
 /* ===== Autosize Inputs (Items table) ===== */
 const __fitMeasure = document.createElement('span');
