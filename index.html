@@ -1334,19 +1334,9 @@ document.getElementById('flagNewCustomer').addEventListener('change', e=>{
 
 /* ===== WCP helper ===== */
 async function openOTSearch(){
-  const q = (document.getElementById('wcpQuery').value
-            || document.getElementById('billCompany').value
-            || '').trim();
-  const target = document.getElementById('wcpResults');
-  if (!q){ target.innerHTML = 'Enter a query first.'; return; }
-  target.innerHTML = 'Searching…';
+  const q = String(document.getElementById('wcpQuery')?.value || '').trim();
+    console.debug('[WCP] search query =', q);
 
-  try {
-    const results = await api(`/ordertime/customers/search?q=${encodeURIComponent(q)}`);
-    if (!Array.isArray(results) || results.length === 0){
-      target.innerHTML = 'No matches.'; 
-      return;
-    }
 
     // Render list; note r.*, not so.*
     target.innerHTML = results.slice(0, 25).map(r => `
