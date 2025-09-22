@@ -1399,16 +1399,32 @@ function applyPastedCustomer(textareaId){
   try{ data=JSON.parse(raw); }
   catch(_){ raw.split(/\r?\n/).forEach(line=>{ const m=line.match(/^([^:]+):\s*(.*)$/); if(!m)return; setByPath(data,m[1].trim(),m[2].trim()); }); }
 
-  setVal('billCompany', pick(data.company, data.billing?.company));
-  setVal('billContact', pick(data.billing?.contact)); setVal('billPhone', pick(data.billing?.phone));
-  setVal('billEmail', pick(data.billing?.email)); setVal('billStreet', pick(data.billing?.street));
-  setVal('billSuite', pick(data.billing?.suite)); setVal('billCity', pick(data.billing?.city));
-  setVal('billState', pick(data.billing?.state)); setVal('billZip', pick(data.billing?.zip));
+  // ----- Billing (explicit, one-to-one mapping)
+const b = data?.billing || {};
+setVal('billCompany', pick(data?.company, b.company || ''));
+setVal('billContact', b.contact || '');
+setVal('billPhone',   b.phone   || '');
+setVal('billEmail',   b.email   || '');
+setVal('billStreet',  b.street  || '');
+setVal('billSuite',   b.suite   || '');
+setVal('billCity',    b.city    || '');
+setVal('billState',   b.state   || '');
+setVal('billZip',     b.zip     || '');
 
-  setVal('shipCompany', pick(data.shipping?.company)); setVal('shipContact', pick(data.shipping?.contact));
-  setVal('shipPhone', pick(data.shipping?.phone)); setVal('shipEmail', pick(data.shipping?.email));
-  setVal('shipStreet', pick(data.shipping?.street)); setVal('shipSuite', pick(data.shipping?.suite));
-  setVal('shipCity', pick(data.shipping?.city)); setVal('shipState', pick(data.shipping?.state)); setVal('shipZip', pick(data.shipping?.zip));
+// ----- Shipping (explicit, one-to-one mapping)
+const s = data?.shipping || {};
+setVal('shipCompany', s.company || '');
+setVal('shipContact', s.contact || '');
+setVal('shipPhone',   s.phone   || '');
+setVal('shipEmail',   s.email   || '');
+setVal('shipStreet',  s.street  || '');
+setVal('shipSuite',   s.suite   || '');
+setVal('shipCity',    s.city    || '');
+setVal('shipState',   s.state   || '');
+setVal('shipZip',     s.zip     || '');
+const rbox = document.getElementById('resShip');
+if (rbox) { rbox.checked = !!s.residence; rbox.dispatchEvent(new Event('change',{bubbles:true})); }
+
 
   const pm=pick(data.payment?.method); if(pm) selectByTextExact('payMethod', pm);
   setVal('payTerms', pick(data.payment?.terms));
@@ -1467,16 +1483,35 @@ async function openItemSearch(){
 
 // Map a found item into your Items table
 function addItemFromSearch(r){
+  // Infer a few obvious things from text; safe defaults
+  const txt = [r.name, r.description, r.mfgPart].filter(Boolean).join(' ').toUpperCase();
+  const net = txt.includes('LTE') && (txt.includes('WI-FI') || txt.includes('WIFI')) ? 'Both'
+            : txt.includes('LTE') ? 'LTE'
+            : (txt.includes('WI-FI') || txt.includes('WIFI')) ? 'Wi-Fi'
+            : '';
+
+  const carrier =
+      /VERIZON|VZW/.test(txt) ? 'Verizon' :
+      /AT&T|ATT\b/.test(txt) ? 'AT&T' :
+      /T[- ]?MOBILE|TMO/.test(txt) ? 'T-Mobile' :
+      /US ?CELLULAR|USC/.test(txt) ? 'US Cellular' : '';
+
+  const cond = /CPO|REFURB|CERTIFIED PRE[- ]?OWNED/i.test(r.description || '') ? 'CPO' : '';
+
   addRow({
-    desc: r.description || r.name || '',
+    desc:  r.description || r.name || '',
     model: r.mfgPart || '',
-    sku: r.sku || '',
-    qty: 1,
-    msrp: r.price || '',
-    sell: r.price || ''
+    sku:   r.sku || '',        // <- this now always comes from backend Number
+    qty:   1,
+    msrp:  r.price || '',
+    sell:  r.price || '',
+    net,
+    carrier,
+    cond
   });
   closeDrawer('drawerItems');
 }
+
 // Pull 1 SO and show JSON in the Clone drawer textarea
 async function loadSO(id){
   try{
