@@ -1395,10 +1395,7 @@ function applyPastedCustomer(textareaId){
   const raw = (ta?.value || '').trim();
   if (!raw) { alert('Paste customer details first.'); return; }
 
-  const pick = (...vals) => vals.find(v => v !== undefined && v !== null && String(v).trim() !== '') || '';
-  const setBool = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
-
-  // try JSON first; fallback to key: value parsing
+  // Parse: JSON first, else "key: value" lines (supports nested like "billing.street")
   let data = {};
   try {
     data = JSON.parse(raw);
@@ -1406,67 +1403,66 @@ function applyPastedCustomer(textareaId){
     raw.split(/\r?\n/).forEach(line => {
       const m = line.match(/^\s*([^:]+)\s*:\s*(.+)\s*$/);
       if (!m) return;
-      // support nested keys like "billing.street"
-      const path = m[1].trim().split('.');
-      let cur = data;
-      path.forEach((k, i) => {
-        if (i === path.length - 1) cur[k] = m[2].trim();
-        else cur = (cur[k] = cur[k] || {});
-      });
+      // rely on your existing setByPath helper
+      setByPath(data, m[1].trim(), m[2].trim());
     });
   }
 
-  // ===== Billing =====
-  setVal('billCompany', pick(data.company, data.billing?.company));
-  setVal('billContact', pick(data.billing?.contact));
-  setVal('billPhone',   pick(data.billing?.phone));
-  setVal('billEmail',   pick(data.billing?.email));
-  setVal('billStreet',  pick(data.billing?.street));
-  setVal('billSuite',   pick(data.billing?.suite));
-  setVal('billCity',    pick(data.billing?.city));
-  setVal('billState',   pick(data.billing?.state));
-  setVal('billZip',     pick(data.billing?.zip));
+  // Short-hands + safe pick
+  const b = data.billing  || {};
+  const s = data.shipping || {};
+  const so = data.shippingOptions || {};
+  const pay = data.payment || {};
+  const pickVal = (...vals) => vals.find(v => v !== undefined && v !== null && String(v).trim() !== '') || '';
 
-  // ===== Shipping (fallback to billing) =====
-  setVal('shipCompany', pick(data.shipping?.company, data.company, data.billing?.company));
-  setVal('shipContact', pick(data.shipping?.contact, data.billing?.contact));
-  setVal('shipPhone',   pick(data.shipping?.phone,   data.billing?.phone));
-  setVal('shipEmail',   pick(data.shipping?.email,   data.billing?.email));
-  setVal('shipStreet',  pick(data.shipping?.street,  data.billing?.street));
-  setVal('shipSuite',   pick(data.shipping?.suite,   data.billing?.suite));
-  setVal('shipCity',    pick(data.shipping?.city,    data.billing?.city));
-  setVal('shipState',   pick(data.shipping?.state,   data.billing?.state));
-  setVal('shipZip',     pick(data.shipping?.zip,     data.billing?.zip));
+  /* ===== Billing ===== */
+  setVal('billCompany', pickVal(data.company, b.company));
+  setVal('billContact', pickVal(b.contact));
+  setVal('billPhone',   pickVal(b.phone));
+  setVal('billEmail',   pickVal(b.email));
+  setVal('billStreet',  pickVal(b.street));
+  setVal('billSuite',   pickVal(b.suite));
+  setVal('billCity',    pickVal(b.city));
+  setVal('billState',   pickVal(b.state));
+  setVal('billZip',     pickVal(b.zip));
 
-  // ===== Payment / options =====
-  const pm = pick(data.payment?.method);
+  /* ===== Shipping (fallbacks to billing when missing) ===== */
+  setVal('shipCompany', pickVal(s.company, data.company, b.company));
+  setVal('shipContact', pickVal(s.contact, b.contact));
+  setVal('shipPhone',   pickVal(s.phone,   b.phone));
+  setVal('shipEmail',   pickVal(s.email,   b.email));
+  setVal('shipStreet',  pickVal(s.street,  b.street));
+  setVal('shipSuite',   pickVal(s.suite,   b.suite));
+  setVal('shipCity',    pickVal(s.city,    b.city));
+  setVal('shipState',   pickVal(s.state,   b.state));
+  setVal('shipZip',     pickVal(s.zip,     b.zip));
+
+  /* ===== Payment / Options ===== */
+  const pm = pickVal(pay.method);
   if (pm) selectByTextExact('payMethod', pm);
-  setVal('payTerms', pick(data.payment?.terms));
-  setBool('taxExempt',   pick(data.payment?.taxExempt, false));
-  setBool('hasAgreement',pick(data.payment?.agreement, false));
+  setVal('payTerms', pickVal(pay.terms));
 
-  const shipPay   = pick(data.shippingOptions?.pay);
-  const shipSpeed = pick(data.shippingOptions?.speed);
-  const shortShip = pick(data.shippingOptions?.shortShip);
-  if (shipPay)   selectByTextExact('shipPay',   shipPay);
-  if (shipSpeed) selectByTextExact('shipSpeed', shipSpeed);
-  if (shortShip) selectByTextExact('shortShip', shortShip);
+  const taxEl = document.getElementById('taxExempt');
+  if (taxEl) taxEl.checked = !!pay.taxExempt;
+  const agrEl = document.getElementById('hasAgreement');
+  if (agrEl) agrEl.checked = !!pay.agreement;
 
-  // ===== UX: ensure the user sees the filled form =====
-  try { closeDrawer && closeDrawer('drawerWCP'); } catch {}
+  if (pickVal(so.pay))      selectByTextExact('shipPay',   pickVal(so.pay));
+  if (pickVal(so.speed))    selectByTextExact('shipSpeed', pickVal(so.speed));
+  if (pickVal(so.shortShip))selectByTextExact('shortShip', pickVal(so.shortShip));
+
+  /* ===== Reps (optional) ===== */
+  setVal('carrierRepName',  pickVal(data.carrierRep?.name));
+  setVal('carrierRepEmail', pickVal(data.carrierRep?.email));
+  const r1 = pickVal(data.rep?.primary);   if (r1) selectByTextExact('rep1', r1);
+  const r2 = pickVal(data.rep?.secondary); if (r2) selectByTextExact('rep2', r2);
+
+  /* ===== UX: make the filled form visible ===== */
   try { if (typeof showIntakeWork === 'function') showIntakeWork(true); } catch {}
   document.querySelector('.tab[data-tab="customer"]')?.click();
-}
-function applyCustomerFromApi(r){
-  const data = {
-    company: r.company,
-    billing: r.billing,
-    shipping: r.shipping,
-    payment: r.payment,
-    shippingOptions: r.shippingOptions
-  };
-  document.getElementById('wcpPaste').value = JSON.stringify(data, null, 2);
-  applyPastedCustomer('wcpPaste');
+
+  try { closeDrawer('drawerWCP'); } catch {}
+  try { refreshTotals(); } catch {}
 }
 
 
