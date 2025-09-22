@@ -1389,45 +1389,74 @@ async function applyCustomerFromApi(r) {
 }
 
 
+// ---- apply customer from textarea paste (JSON or key: value lines)
 function applyPastedCustomer(textareaId){
-  const raw=document.getElementById(textareaId).value.trim();
-  if(!raw){ alert('Paste customer details first.'); return; }
-  let data={};
-  try{ data=JSON.parse(raw); }
-  catch(_){ raw.split(/\r?\n/).forEach(line=>{ const m=line.match(/^([^:]+):\s*(.*)$/); if(!m)return; setByPath(data,m[1].trim(),m[2].trim()); }); }
+  const ta = document.getElementById(textareaId);
+  const raw = (ta?.value || '').trim();
+  if (!raw) { alert('Paste customer details first.'); return; }
 
+  const pick = (...vals) => vals.find(v => v !== undefined && v !== null && String(v).trim() !== '') || '';
+  const setBool = (id, val) => { const el = document.getElementById(id); if (el) el.checked = !!val; };
+
+  // try JSON first; fallback to key: value parsing
+  let data = {};
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    raw.split(/\r?\n/).forEach(line => {
+      const m = line.match(/^\s*([^:]+)\s*:\s*(.+)\s*$/);
+      if (!m) return;
+      // support nested keys like "billing.street"
+      const path = m[1].trim().split('.');
+      let cur = data;
+      path.forEach((k, i) => {
+        if (i === path.length - 1) cur[k] = m[2].trim();
+        else cur = (cur[k] = cur[k] || {});
+      });
+    });
+  }
+
+  // ===== Billing =====
   setVal('billCompany', pick(data.company, data.billing?.company));
-  setVal('billContact', pick(data.billing?.contact)); setVal('billPhone', pick(data.billing?.phone));
-  setVal('billEmail', pick(data.billing?.email)); setVal('billStreet', pick(data.billing?.street));
-  setVal('billSuite', pick(data.billing?.suite)); setVal('billCity', pick(data.billing?.city));
-  setVal('billState', pick(data.billing?.state)); setVal('billZip', pick(data.billing?.zip));
+  setVal('billContact', pick(data.billing?.contact));
+  setVal('billPhone',   pick(data.billing?.phone));
+  setVal('billEmail',   pick(data.billing?.email));
+  setVal('billStreet',  pick(data.billing?.street));
+  setVal('billSuite',   pick(data.billing?.suite));
+  setVal('billCity',    pick(data.billing?.city));
+  setVal('billState',   pick(data.billing?.state));
+  setVal('billZip',     pick(data.billing?.zip));
 
-  setVal('shipCompany', pick(data.shipping?.company)); setVal('shipContact', pick(data.shipping?.contact));
-  setVal('shipPhone', pick(data.shipping?.phone)); setVal('shipEmail', pick(data.shipping?.email));
-  setVal('shipStreet', pick(data.shipping?.street)); setVal('shipSuite', pick(data.shipping?.suite));
-  setVal('shipCity', pick(data.shipping?.city)); setVal('shipState', pick(data.shipping?.state)); setVal('shipZip', pick(data.shipping?.zip));
+  // ===== Shipping (fallback to billing) =====
+  setVal('shipCompany', pick(data.shipping?.company, data.company, data.billing?.company));
+  setVal('shipContact', pick(data.shipping?.contact, data.billing?.contact));
+  setVal('shipPhone',   pick(data.shipping?.phone,   data.billing?.phone));
+  setVal('shipEmail',   pick(data.shipping?.email,   data.billing?.email));
+  setVal('shipStreet',  pick(data.shipping?.street,  data.billing?.street));
+  setVal('shipSuite',   pick(data.shipping?.suite,   data.billing?.suite));
+  setVal('shipCity',    pick(data.shipping?.city,    data.billing?.city));
+  setVal('shipState',   pick(data.shipping?.state,   data.billing?.state));
+  setVal('shipZip',     pick(data.shipping?.zip,     data.billing?.zip));
 
-  const pm=pick(data.payment?.method); if(pm) selectByTextExact('payMethod', pm);
+  // ===== Payment / options =====
+  const pm = pick(data.payment?.method);
+  if (pm) selectByTextExact('payMethod', pm);
   setVal('payTerms', pick(data.payment?.terms));
-  document.getElementById('taxExempt').checked=!!data.payment?.taxExempt;
-  document.getElementById('hasAgreement').checked=!!data.payment?.agreement;
+  setBool('taxExempt',   pick(data.payment?.taxExempt, false));
+  setBool('hasAgreement',pick(data.payment?.agreement, false));
 
-  const so=data.shippingOptions||{};
-  if(so.pay) selectByTextExact('shipPay', so.pay);
-  if(so.speed) selectByTextExact('shipSpeed', so.speed);
-  if(so.shortShip) selectByTextExact('shortShip', so.shortShip);
+  const shipPay   = pick(data.shippingOptions?.pay);
+  const shipSpeed = pick(data.shippingOptions?.speed);
+  const shortShip = pick(data.shippingOptions?.shortShip);
+  if (shipPay)   selectByTextExact('shipPay',   shipPay);
+  if (shipSpeed) selectByTextExact('shipSpeed', shipSpeed);
+  if (shortShip) selectByTextExact('shortShip', shortShip);
 
-  setVal('carrierRepName', pick(data.carrierRep?.name)); setVal('carrierRepEmail', pick(data.carrierRep?.email));
-
-  const r1=pick(data.rep?.primary); if(r1) selectByTextExact('rep1', r1);
-  const r2=pick(data.rep?.secondary); if(r2) selectByTextExact('rep2', r2);
+  // ===== UX: ensure the user sees the filled form =====
+  try { closeDrawer && closeDrawer('drawerWCP'); } catch {}
   try { if (typeof showIntakeWork === 'function') showIntakeWork(true); } catch {}
   document.querySelector('.tab[data-tab="customer"]')?.click();
-
-  closeDrawer('drawerWCP');
-  refreshTotals();
 }
-
 function applyCustomerFromApi(r){
   const data = {
     company: r.company,
