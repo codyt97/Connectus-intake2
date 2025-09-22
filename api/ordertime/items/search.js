@@ -1,5 +1,5 @@
 // /api/ordertime/items/search.js
-import { otPost } from '../..//_ot';
+import { otPost } from '../../_ot';   // <- ensure single ../../ (no double slash)
 
 export default async function handler(req, res) {
   try {
@@ -14,25 +14,29 @@ export default async function handler(req, res) {
       FilterValueArray: [q]
     });
 
-    const calls = [
-      otPost('/list', { Type: 115, NumberOfRecords: 50, PageNumber: 1, Filters: [like('Number')] }),
-      otPost('/list', { Type: 115, NumberOfRecords: 50, PageNumber: 1, Filters: [like('Name')] }).catch(() => []),
-      otPost('/list', { Type: 115, NumberOfRecords: 50, PageNumber: 1, Filters: [like('Description')] }).catch(() => []),
-      otPost('/list', { Type: 115, NumberOfRecords: 50, PageNumber: 1, Filters: [like('ManufacturerPartNo')] }).catch(() => []),
-      otPost('/list', { Type: 115, NumberOfRecords: 50, PageNumber: 1, Filters: [like('UPC')] }).catch(() => []),
-    ];
+    // Different tenants expose items under different Types; sweep a few common ones:
+    const types = [115, 114, 116, 118]; // 115=Item, 114=Assembly/Kit, 116=Non-Inv, 118=Service (varies by tenant)
+    const calls = [];
+
+    for (const t of types) {
+      calls.push(otPost('/list', { Type: t, NumberOfRecords: 50, PageNumber: 1, Filters: [like('Number')] }).catch(()=>[]));
+      calls.push(otPost('/list', { Type: t, NumberOfRecords: 50, PageNumber: 1, Filters: [like('Name')] }).catch(()=>[]));
+      calls.push(otPost('/list', { Type: t, NumberOfRecords: 50, PageNumber: 1, Filters: [like('Description')] }).catch(()=>[]));
+      calls.push(otPost('/list', { Type: t, NumberOfRecords: 50, PageNumber: 1, Filters: [like('ManufacturerPartNo')] }).catch(()=>[]));
+      calls.push(otPost('/list', { Type: t, NumberOfRecords: 50, PageNumber: 1, Filters: [like('UPC')] }).catch(()=>[]));
+    }
 
     const results = await Promise.all(calls);
     const rows = [].concat(...results.map(r => (r?.result || r?.Items || r || [])));
 
+    // crude relevance
     const norm = q.toLowerCase();
     const score = (x) => {
-      const fields = [
-        x.Number, x.Name, x.Description, x.ManufacturerPartNo, x.UPC
-      ].map(v => String(v || '').toLowerCase());
+      const fields = [x.Number, x.Name, x.Description, x.ManufacturerPartNo, x.UPC]
+        .map(v => String(v || '').toLowerCase());
       let s = 0;
-      if (fields[0].includes(norm)) s += 5;  // Number hit
-      if (fields[1].includes(norm)) s += 4;  // Name hit
+      if (fields[0].includes(norm)) s += 5;
+      if (fields[1].includes(norm)) s += 4;
       if (fields.some(f => f.includes(norm))) s += 1;
       return s;
     };
@@ -48,7 +52,7 @@ export default async function handler(req, res) {
         mfgPart: x.ManufacturerPartNo || '',
         upc: x.UPC || '',
         price: x.SalesPrice ?? x.Price ?? 0,
-        sku: x.Number || ''    // <- critical for applying to the line
+        sku: x.Number || ''    // critical for “OrderTime SKU”
       }));
 
     res.status(200).json(out);
