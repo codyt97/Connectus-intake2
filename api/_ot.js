@@ -15,9 +15,10 @@ function assertEnv() {
 
 function authHeaders() {
   const h = { ApiKey: API_KEY, Email: EMAIL };
-  if (DEVKEY) h.DevKey = DEVKEY; else h.password = PASS;
+  if (DEVKEY) h.DevKey = DEVKEY; else h.Password = PASS;
   return h;
 }
+
 
 async function tryPost(path, body) {
   const url = `${BASE}${path}`;
@@ -33,12 +34,39 @@ async function tryPost(path, body) {
 
 function safeJSON(t) { try { return JSON.parse(t); } catch { return null; } }
 
+// Replace the whole function with this:
 function normalizeListResult(data) {
   if (!data) return [];
+
+  // Common direct array
   if (Array.isArray(data)) return data;
-  if (Array.isArray(data.Items)) return data.Items;
+
+  // Common container keys (handle many tenants)
+  const keys = [
+    'Items', 'items',
+    'List', 'list',
+    'Results', 'results',
+    'Rows', 'rows'
+  ];
+  for (const k of keys) {
+    if (Array.isArray(data[k])) return data[k];
+  }
+
+  // Sometimes wrapped as { Data: { Items: [...] } } or { data: { List: [...] } }
+  const containers = ['Data', 'data', 'Result', 'result', 'Payload', 'payload'];
+  for (const c of containers) {
+    const v = data[c];
+    if (v && typeof v === 'object') {
+      for (const k of keys) {
+        if (Array.isArray(v[k])) return v[k];
+      }
+      if (Array.isArray(v)) return v;
+    }
+  }
+
   return [];
 }
+
 
 /* ---------- Public helpers ---------- */
 
@@ -88,6 +116,37 @@ export async function listCustomersByName(q, page = 1, pageSize = 25) {
   if (lastErr) throw lastErr;
   return []; // fallback
 }
+
+export async function searchPartItems(q, take = 50) {
+  assertEnv();
+  const body = {
+    Type: 115, // Items
+    NumberOfRecords: Number(take) || 50,
+    PageNumber: 1,
+    SortOrder: { PropertyName: 'Name', Direction: 1 }, // Asc
+    Filters: [
+      { PropertyName: 'Name',               Operator: 12, FilterValueArray: q },
+      { PropertyName: 'Description',        Operator: 12, FilterValueArray: q },
+      { PropertyName: 'ManufacturerPartNo', Operator: 12, FilterValueArray: q },
+      { PropertyName: 'UPC',                Operator: 12, FilterValueArray: q },
+    ],
+  };
+
+  const out = await tryPost('/list', body);
+  if (!out.ok) throw new Error(`/list ${out.status}: ${out.text.slice(0,180)}`);
+
+  const rows = normalizeListResult(out.json);
+  return rows.map(r => ({
+    id:   r.Id ?? r.ID ?? r.id,
+    name: r.Name ?? '',
+    description: r.Description ?? '',
+    mfgPartNo:   r.ManufacturerPartNo ?? '',
+    upc:         r.UPC ?? '',
+    uom:         r.UomRef?.Name ?? r.UOM ?? r.uom ?? '',
+    price:       r.Price ?? r.price ?? null,
+  }));
+}
+
 
 export async function getCustomerById(id) {
   assertEnv();
