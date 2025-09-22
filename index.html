@@ -1,0 +1,2453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>ConnectUS — Sales Reps • Intake</title>
+
+<style>
+  /* ===== White + Green theme ===== */
+  :root{
+    /* palette */
+    --bg:#ffffff;                /* page background */
+    --ink:#0b1b12;               /* primary text (very dark green) */
+    --muted:#5b6b61;             /* secondary text */
+    --line:#e6efe9;              /* subtle borders */
+    --card:#ffffff;              /* cards/drawers */
+    --accent:#16a34a;            /* primary green */
+    --accent-600:#15803d;        /* hover/active green */
+    --accent-50:#ecfdf5;         /* faint green background */
+    --danger:#dc2626;            /* remove buttons */
+    --warn:#b45309;              /* warning */
+    --ok:#15803d;                /* success */
+  }
+
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:ui-sans-serif,system-ui,Segoe UI,Roboto,Helvetica,Arial;
+  }
+  .wrap{max-width:1240px;margin:24px auto;padding:0 16px}
+  h1{font-size:28px;margin:0 0 10px}
+  h3{margin:0 0 8px}
+  .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+
+  /* ===== Main Tabs (2 big sections) ===== */
+  .maintabs{
+    position:sticky; top:0; z-index:50;
+    display:flex; gap:10px; align-items:center;
+    padding:10px 16px; margin:-10px -16px 14px;
+    background:#fffffff2; backdrop-filter:saturate(1.1) blur(6px);
+    border-bottom:1px solid var(--line);
+  }
+  .mtab{
+    padding:10px 14px; border:1px solid var(--line); border-radius:999px;
+    background:#fff; color:var(--ink); cursor:pointer; font-weight:600;
+  }
+  .mtab.active{ background:var(--accent); color:#fff; border-color:var(--accent); }
+  [data-mainpanel]{ display:none; }
+  [data-mainpanel].active{ display:block; }
+
+  /* Header bar + stepper (inside Intake panel) */
+  .appbar{
+    position:sticky;top:54px;z-index:40;
+    display:flex;align-items:center;justify-content:space-between;
+    padding:10px 16px;margin:-10px -16px 12px;
+    background:#fffffff2; backdrop-filter:saturate(1.1) blur(6px);
+    border-bottom:1px solid var(--line);
+  }
+  .brandmark{display:flex;gap:10px;align-items:center}
+  .brandmark .logo{width:28px;height:28px;border-radius:8px;background:conic-gradient(from 210deg,#22c55e,#86efac);border:1px solid #bbf7d0}
+  .brandmark .t{font-weight:700;letter-spacing:.2px}
+
+  .stepper{display:flex;gap:8px;flex-wrap:wrap}
+  .step{
+    display:flex;gap:8px;align-items:center;
+    padding:6px 10px;border-radius:999px;
+    border:1px solid var(--line); background:#fff; color:var(--ink); cursor:pointer;
+  }
+  .step .dot{width:8px;height:8px;border-radius:50%;background:#9ca3af}
+  .step.active{background:var(--accent); border-color:var(--accent); color:#fff}
+  .step.active .dot{background:#fff}
+
+  /* Chips / tabs / buttons */
+  .bar{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+  .chip{
+    border:1px solid var(--line); background:#fff; color:var(--ink);
+    padding:7px 10px;border-radius:999px;font-size:12px;display:flex;align-items:center;gap:8px
+  }
+  .chip input{accent-color:var(--accent);transform:scale(1.05)}
+  .tabs{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}
+  .tab{
+    padding:8px 12px;border:1px solid var(--line);border-radius:999px;background:#fff;color:var(--ink);
+    cursor:pointer;font-size:13px
+  }
+  .tab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  button{
+    border:1px solid var(--accent); background:var(--accent); color:#fff;
+    border-radius:10px; padding:10px 14px; font-size:14px; cursor:pointer
+  }
+  button:hover{background:var(--accent-600); border-color:var(--accent-600)}
+  .ghost{background:#fff;color:var(--accent);border-color:var(--accent)}
+  .ghost:hover{background:var(--accent-50)}
+  .ok{background:var(--ok); border-color:var(--ok); color:#fff}
+  .warn{background:#fff;border-color:var(--warn); color:var(--warn)}
+  .bad{background:#fff;border-color:var(--danger); color:var(--danger)}
+  .pill{font-size:12px;padding:4px 8px;border-radius:999px;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .tiny{font-size:11px;color:var(--muted)}
+  .divider{height:1px;background:var(--line);margin:8px 0 14px}
+
+  /* Cards & inputs */
+  .card{
+    background:var(--card); border:1px solid var(--line); border-radius:14px; padding:16px;
+    box-shadow:0 1px 0 #edf2f7;
+  }
+  .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
+  .two{grid-column:span 12}@media(min-width:780px){.two{grid-column:span 6}}
+  .three{grid-column:span 12}@media(min-width:980px){.three{grid-column:span 4}}
+  .full{grid-column:1 / -1}
+  label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
+  input,select,textarea{
+    width:100%; background:#fff; border:1px solid #d9e6de; color:var(--ink);
+    border-radius:10px; padding:10px 12px; font-size:14px; outline:none
+  }
+  input:focus,select:focus,textarea:focus{
+    border-color:var(--accent); box-shadow:0 0 0 3px #22c55e22;
+  }
+  .row{display:flex;gap:10px}.row>*{flex:1}
+
+  /* Items table */
+  .table{width:100%;border-collapse:separate;border-spacing:0 8px}
+  .table th{font-size:12px;color:var(--muted);text-align:left;padding:6px 8px}
+  .table td{
+    background:#fff;border:1px solid var(--line);border-left:none;border-right:none;
+    padding:8px;font-size:13px;vertical-align:top
+  }
+  .table tr td:first-child{border-radius:10px 0 0 10px;border-left:1px solid var(--line)}
+  .table tr td:last-child{border-radius:0 10px 10px 0;border-right:1px solid var(--line)}
+
+  /* Subtabs */
+  .subtabs{display:flex;gap:6px;margin:10px 0;flex-wrap:wrap}
+  .subtab{
+    font-size:12px;border:1px solid var(--line);border-radius:999px;padding:6px 12px;background:#fff;color:var(--ink);cursor:pointer
+  }
+  .subtab.active{background:var(--accent);border-color:var(--accent);color:#fff}
+
+  /* Drawers */
+  .drawer{
+    position:fixed;top:0;right:0;height:100%;width:min(560px,96vw);
+    transform:translateX(100%);transition:transform .25s ease;z-index:60;
+    background:#fff;border-left:1px solid var(--line);box-shadow:-8px 0 20px rgba(0,0,0,.06)
+  }
+  .drawer.active{transform:translateX(0)}
+  .drawer header{
+    display:flex;align-items:center;justify-content:space-between;padding:12px 14px;border-bottom:1px solid var(--line);
+    background:#fff
+  }
+  .drawer .content{padding:14px;overflow:auto;height:calc(100% - 54px)}
+
+  /* Summary */
+  .summary-box{
+    white-space:pre-wrap;background:#fff;border:1px dashed var(--line);border-radius:12px;padding:12px;
+    font-family:ui-monospace,Consolas,monospace;font-size:13px;color:var(--ink)
+  }
+
+  /* CSV drawer bits */
+  .emailPreview .muted, .muted{color:var(--muted);font-size:12px}
+
+  /* Totals card */
+  .totals{margin-top:12px;border:1px solid var(--line);border-radius:14px;background:#fff;padding:12px}
+  .totals h4{margin:0 0 8px;font-size:14px;letter-spacing:.2px}
+  .totals .rowline{display:flex;justify-content:space-between;margin:4px 0}
+  
+  /* ===== Intake Wizard ===== */
+.wizard{ border:1px solid var(--line); border-radius:14px; padding:12px; background:#fff; margin:10px 0 14px }
+.wiz-row{ display:flex; align-items:center; gap:12px; padding:8px 0 }
+.wiz-row + .wiz-row{ border-top:1px dashed var(--line) }
+.wiz-label{ min-width:180px; font-weight:700; font-size:13px }
+.wiz-opts{ display:flex; gap:8px; flex-wrap:wrap }
+.wiz-opts .chip{ cursor:pointer }
+.wiz-hint{ color:var(--muted); font-size:12px; margin-top:6px }
+.locked{ opacity:.55; pointer-events:none }
+
+/* ---- Autosizing inputs in Items table ---- */
+.table td input.autosize{
+  width:auto !important;          /* override global 100% */
+  min-width:72px;                 /* sensible floor so blank fields aren’t tiny */
+  max-width:560px;                /* cap so they don’t blow up the row */
+  display:inline-block;           /* needed so width can shrink/grow */
+  box-sizing:content-box;         /* width reflects text content */
+  transition:width .08s ease;     /* subtle smoothing */
+}
+
+.actions{ display:flex; gap:10px; flex-wrap:wrap; margin:6px 0 12px; }
+@media (min-width:900px){ .actions{ justify-content:flex-end } }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== MAIN TABS ===== -->
+  <nav class="maintabs" id="maintabs">
+    <button class="mtab active" data-main="reps">Sales Rep Management</button>
+    <button class="mtab" data-main="intake">Quote / Sales Order Intake</button>
+  </nav>
+
+  <!-- ========== PANEL: SALES REPS ========== -->
+  <section data-mainpanel="reps" class="active">
+    <h1>Sales Rep Management</h1>
+    <div class="sub">Maintain the sales rep roster + email templates used by the New Customer flow.</div>
+
+    <section class="card">
+      <div class="grid">
+        <section class="three">
+          <h3>Add / Update Rep</h3>
+          <label>Rep Name</label><input id="repNameInput" placeholder="e.g., Lucas Currin" />
+          <label style="margin-top:10px">Email</label><input id="repEmailInput" type="email" placeholder="e.g., lucas.currin@connectuscorp.com" />
+          <label style="margin-top:10px">Portal Slug (salep-rep)</label><input id="repSlugInput" placeholder="e.g., lucas-currin" />
+          <label style="margin-top:10px">Template</label>
+          <select id="repTemplatePick">
+            <option value="custom">Custom (use editor below)</option>
+            <option>Lucas Currin</option>
+            <option>Anthony Liace</option>
+            <option>John Tropeano</option>
+            <option>Greg Flannigan</option>
+            <option>Heath Pospisil</option>
+            <option>Orlando</option>
+          </select>
+          <label style="margin-top:10px">Template Editor</label>
+          <textarea id="repTemplateText" rows="12" placeholder="Template text with {{ Customer First Name }} and {{Current Email}} placeholders"></textarea>
+          <div class="row" style="margin-top:10px">
+            <button class="ok" id="btnSaveRep">Save / Update Rep</button>
+            <button class="ghost" id="btnResetRepForm">Reset</button>
+          </div>
+        </section>
+
+        <section class="full">
+          <h3>Current Reps</h3>
+          <div class="tiny">These populate the Primary/Secondary Rep dropdowns in the Intake tab and power the New Customer invite.</div>
+          <div id="repList" style="margin-top:8px"></div>
+        </section>
+      </div>
+    </section>
+  </section>
+
+  <!-- ========== PANEL: INTAKE ========== -->
+  <section data-mainpanel="intake">
+    <!-- appbar -->
+    <div class="appbar">
+      <div class="brandmark">
+        <div class="logo"></div><div class="t">ConnectUS — Quote / Sales Order</div>
+      </div>
+      <div class="stepper" id="stepper" style="display:none">
+        <div class="step active" data-goto="customer"><div class="dot"></div>Customer</div>
+        <div class="step" data-goto="shipping"><div class="dot"></div>Shipping</div>
+        <div class="step" data-goto="items"><div class="dot"></div>Items</div>
+        <div class="step" data-goto="mdm"><div class="dot"></div>MDM</div>
+      </div>
+    </div>
+
+    <h1>Quote / Sales Order Intake</h1>
+    <div class="sub">Tabs: <span class="pill">Customer</span> · <span class="pill">Shipping</span> · <span class="pill">Items</span> · <span class="pill">MDM</span></div>
+    <!-- ===== INTAKE WIZARD (gates the rest) ===== -->
+<section class="card wizard" id="intakeWizard">
+      <!-- Step 1 -->
+  <div class="wiz-row" id="wizStepRep">
+    <div class="wiz-label">1) Sales Rep</div>
+    <div class="wiz-opts" style="min-width:260px">
+      <select id="wizRepPick" style="min-width:240px;padding:8px;border:1px solid var(--line);border-radius:10px">
+        <option value="">Select Primary Sales Rep…</option>
+      </select>
+    </div>
+  </div>
+
+    
+  <!-- Step 2 -->
+  <div class="wiz-row" id="wizStep1">
+    <div class="wiz-label">2) Customer Type</div>
+    <div class="wiz-opts">
+      <label class="chip"><input type="radio" name="wizCustomerType" value="new"> New customer</label>
+      <label class="chip"><input type="radio" name="wizCustomerType" value="existing"> Current customer</label>
+    </div>
+  </div>
+
+  <!-- Step 3 -->
+  <div class="wiz-row" id="wizStep2" style="display:none">
+  <div class="wiz-label">3) Document Type</div>
+  <div class="wiz-opts" id="wizDocTypeOpts">
+      <label class="chip"><input type="radio" name="wizDocType" value="QUOTE" checked> QUOTE</label>
+      <label class="chip"><input type="radio" name="wizDocType" value="SALES ORDER"> SALES ORDER</label>
+      <!-- 👇 New option for current-customer only -->
+      <label class="chip" id="wizCloneRow" style="display:none">
+        <input type="radio" name="wizDocType" value="CLONE"> Clone Existing Order
+      </label>
+  </div>
+</div>
+
+
+  <!-- Step 4 -->
+  <div class="wiz-row" id="wizStep3" style="display:none">
+    <div class="wiz-label">4) Scope</div>
+    <div class="wiz-opts">
+      <label class="chip"><input type="radio" name="wizScope" value="hardware"> Hardware only</label>
+      <label class="chip"><input type="radio" name="wizScope" value="hardware+pro"> Hardware + Pro services</label>
+    </div>
+  </div>
+
+  <div class="wiz-hint" id="wizHint">Complete steps 1–4 to unlock the intake tabs.</div>
+</section>
+
+
+    <!-- toggles -->
+    <div class="bar" id="toggleBar" style="display:none" aria-hidden="true">
+      <label class="chip"><input type="checkbox" id="flagNewCustomer"> NEW Customer</label>
+      <label class="chip"><input type="checkbox" id="flagWCP"> WCP</label>
+      <label class="chip"><input type="checkbox" id="flagCurrentCustomer"> Current Customer</label>
+      <label class="chip"><input type="checkbox" id="flag3PL"> 3PL Restock Order</label>
+      <label class="chip"><input type="radio" name="doctype" value="QUOTE" checked> QUOTE</label>
+      <label class="chip"><input type="radio" name="doctype" value="SALES ORDER"> SALES ORDER</label>
+      <button class="ghost" id="btnDemoFlow" title="Runs a full current-customer example">Demo: Current Customer Flow</button>
+    </div>
+
+    <!-- tabs -->
+    <div class="tabs" id="intakeTabs" style="display:none">
+      <button class="tab active" data-tab="customer">Customer</button>
+      <button class="tab" data-tab="shipping">Shipping</button>
+      <button class="tab" data-tab="items">Items</button>
+      <button class="tab" data-tab="mdm">MDM</button>
+    </div>
+    <!-- Global action: keep original format/logic, always visible -->
+<div class="actions">
+  <button class="ghost" id="btnOpenEmail" onclick="openDrawer('drawerEmail')">Email Order Management</button>
+  <button class="ok" id="btnSubmitIntake">Submit Intake</button>
+  <span id="submitStatus" class="tiny" style="margin-left:10px"></span>
+</div>
+
+
+    <!-- CUSTOMER -->
+    <section class="card" data-panel="customer">
+      <div class="grid">
+        <section class="three">
+          <h3>Sales & Partner</h3>
+          <label>Primary Sales Rep</label>
+          <select id="rep1"></select>
+          <label style="margin-top:10px">Secondary Sales Rep</label>
+          <select id="rep2"></select>
+          <div class="divider"></div>
+          <label>Referral Partner</label>
+          <select id="refPartner"><option>None</option><option>AT&T</option><option>Verizon</option><option>T-Mobile</option><option>Other</option></select>
+        </section>
+
+        <section class="three">
+          <h3>Carrier / Activation</h3>
+          <label>Carrier Rep Name</label><input id="carrierRepName" placeholder="First Last" />
+          <label style="margin-top:10px">Carrier Rep Email</label><input id="carrierRepEmail" type="email" placeholder="rep@carrier.com" />
+          <label style="margin-top:10px">Internal Activation CUC Rep</label><input id="cucRep" placeholder="Name / Team" />
+        </section>
+
+        <section class="two">
+          <h3>Billing Info</h3>
+          <label>Company Name</label><input id="billCompany" />
+          <div class="row"><div><label>Contact Name</label><input id="billContact" /></div><div><label>Contact Phone</label><input id="billPhone" /></div></div>
+          <label>Email</label><input id="billEmail" type="email" />
+          <div class="row"><div><label>Street Address</label><input id="billStreet" /></div><div><label>Floor / Suite</label><input id="billSuite" /></div></div>
+          <div class="row"><div><label>City</label><input id="billCity" /></div><div><label>State</label><input id="billState" /></div><div><label>Zip Code</label><input id="billZip" /></div></div>
+        </section>
+
+        <section class="two">
+          <h3>Payment & Tax</h3>
+          <label>Payment Method</label>
+          <select id="payMethod"><option value="">Select Payment Method</option><option>ACH</option><option>Wire</option><option>Credit Card</option><option>Net Terms</option></select>
+          <label style="margin-top:10px">Payment Terms Procedure</label><input id="payTerms" placeholder="e.g., Net 30, upfront %" />
+          <label class="chip" style="margin-top:10px"><input type="checkbox" id="hasAgreement"> Purchase Agreement (no POs)</label>
+          <label class="chip" style="margin-top:6px"><input type="checkbox" id="taxExempt"> Tax Exempt? (attach certificate)</label>
+        </section>
+      </div>
+    </section>
+
+    <!-- SHIPPING -->
+    <section class="card" data-panel="shipping" style="display:none">
+      <div class="grid">
+        <section class="two">
+          <h3>Shipping Info <label class="chip" style="margin-left:6px"><input type="checkbox" id="resShip"> Residence</label></h3>
+          <label>Company Name / Care Of</label><input id="shipCompany" />
+          <div class="row"><div><label>Contact Name</label><input id="shipContact" /></div><div><label>Contact Phone</label><input id="shipPhone" /></div></div>
+          <label>Email</label><input id="shipEmail" type="email" />
+          <div class="row"><div><label>Street Address</label><input id="shipStreet" /></div><div><label>Floor / Suite</label><input id="shipSuite" /></div></div>
+          <div class="row"><div><label>City</label><input id="shipCity" /></div><div><label>State</label><input id="shipState" /></div><div><label>Zip Code</label><input id="shipZip" /></div></div>
+          <div class="row"><div><label>Customer Requested Ship Date</label><input id="reqShipDate" type="date" /></div><div><label>Expected Ship Date (Ops/Purchasing)</label><input id="expShipDate" type="date" /></div></div>
+        </section>
+
+        <section class="three">
+          <h3>Shipping Options</h3>
+          <label>Shipping Payment Method</label>
+          <select id="shipPay"><option value="">Select Shipping Pmt Method</option><option>Prepaid</option><option>Collect</option><option>3rd Party</option></select>
+          <label style="margin-top:10px">Shipping Speed</label>
+          <select id="shipSpeed"><option value="">Select Shipping Speed</option><option>Ground</option><option>2-Day</option><option>Overnight</option></select>
+          <label style="margin-top:10px">Short Ship?</label>
+          <select id="shortShip"><option value="">Select</option><option>No</option><option>Yes (Backorder OK)</option></select>
+        </section>
+
+        <section class="full">
+          <h3>Internal Notes</h3>
+          <textarea id="notes" rows="4" placeholder="Any Tech Zone scope, PS details, or routing notes"></textarea>
+        </section>
+      </div>
+    </section>
+
+    <!-- ITEMS -->
+    <section class="card" data-panel="items" style="display:none">
+      <h3>Items</h3>
+      <div class="grid">
+        <section class="three">
+          <label>Quote Request ID (Sales → Purchasing)</label>
+          <div class="row"><input id="qrid" placeholder="e.g., QR-2025-00123" /><button class="ghost" id="btnLoadQR">Load by ID</button></div>
+          <div class="tiny">Enter a QR ID to prefill the line. Subtabs appear for Accessory, Insurance, SIM/Pairing, and Licenses.</div>
+        </section>
+        <section class="full" id="itemsCard">
+          <div class="row" style="gap:10px;margin-bottom:6px"><button onclick="addRow()">+ Add Line</button><button class="ghost" onclick="autoExample()">Load Example</button></div>
+          <div class="table-wrap" style="overflow:auto;margin-top:8px">
+            <table class="table" id="itemsTbl"><thead><tr>
+              <th>Description (Mfg / Model / Size / Color)</th>
+              <th>Model / Part #</th>
+              <th>Color</th>
+              <th>OrderTime SKU</th>
+              <th>Qty</th>
+              <th>LTE / Wi-Fi / Both</th>
+              <th>Carrier</th>
+              <th>Act Payout $</th>
+              <th>MSRP</th>
+              <th>Disc %</th>
+              <th>Sell Price</th>
+              <th>New / CPO</th>
+              <th>In Stock?</th>
+              <th>Vendor</th>
+              <th>Quoted Cost</th>
+              <th>DLL / SPA Price / Deal Reg #</th>
+              <th>Hold/Reservation #</th>
+              <th>Delivery Lead Time</th>
+              <th>EOL Confirm</th>
+              <th>Remove</th>
+            </tr></thead><tbody id="itemsBody"></tbody></table>
+          </div>
+
+          <!-- Subtabs -->
+          <div id="subtabsArea" class="subtabs" style="display:none">
+            <button class="subtab active" data-sub="accessory">Accessory</button>
+            <button class="subtab" data-sub="insurance">Insurance</button>
+            <button class="subtab" data-sub="sim">SIM / Pairing</button>
+            <button class="subtab" data-sub="licenses">Licenses</button>
+          </div>
+
+          <!-- Subtab panels -->
+          <div id="subtabPanels" style="margin-top:8px;display:none">
+            <!-- Accessory -->
+            <div data-subpanel="accessory">
+              <div class="grid">
+                <section class="three">
+                  <label>Accessory SKU</label><input id="accSku" />
+                  <label style="margin-top:8px">Accessory Description</label><input id="accDesc" />
+                  <label class="chip" style="margin-top:10px"><input type="checkbox" id="bcInclude"> Include Brick + Cable kit</label>
+                </section>
+                <section class="three">
+                  <label>Accessory Qty (per unit)</label><input id="accQty" type="number" min="0" value="0" />
+                  <label style="margin-top:8px">Accessory Sell Price</label><input id="accSell" type="number" step="0.01" />
+                </section>
+              </div>
+            </div>
+
+    
+
+            <!-- Insurance -->
+            <div data-subpanel="insurance" style="display:none">
+              <div class="grid">
+                <section class="three">
+                  <label>Insurance Plan</label><select id="insPlan"><option>None</option><option>AKKO</option><option>Other</option></select>
+                  <label style="margin-top:8px">Deductible</label><select id="insDed"><option>$0</option><option>$50</option><option>$100</option></select>
+                </section>
+                <section class="three">
+                  <label>Coverage Length</label><select id="insTerm"><option>0 year</option><option>1 year</option><option>2 year</option><option>3 year</option></select>
+                  <label style="margin-top:8px">Insurance Sell Price</label><input id="insSell" type="number" step="0.01" />
+                </section>
+              </div>
+            </div>
+
+            <!-- SIM / Pairing -->
+<div data-subpanel="sim" style="display:none">
+  <div class="grid">
+    <section class="three">
+      <label>SIM Card</label>
+      <select id="simCard"></select>
+
+      <label style="margin-top:8px">Pairing Option</label>
+      <select id="pairingOption"></select>
+    </section>
+    <section class="three">
+      <label>SIM Handling</label>
+      <select id="simHandling"></select>
+    </section>
+  </div>
+</div>
+
+
+            <!-- Licenses -->
+            <div data-subpanel="licenses" style="display:none">
+              <div class="grid">
+                <section class="three">
+                  <label>License Vendor</label><input id="licVendor" />
+                  <label style="margin-top:8px">License Duration</label><input id="licDuration" placeholder="e.g., 1 year, 3 years" />
+                  <label style="margin-top:8px">Prorated Price</label><input id="licProrated" type="number" step="0.01" />
+                </section>
+                <section class="three">
+                  <label>License Key / Simba Code</label><input id="licKey" />
+                  <label style="margin-top:8px">New SKU Contact</label><input id="licContact" placeholder="Name / email" />
+                </section>
+              </div>
+            </div>
+          </div>
+
+          <!-- Totals -->
+          <div class="totals" id="totalsBox" style="display:none">
+            <h4>Totals (current document)</h4>
+            <div class="rowline"><span>Lines Subtotal</span><strong id="tLines">$0.00</strong></div>
+            <div class="rowline"><span>Accessories</span><strong id="tAcc">$0.00</strong></div>
+            <div class="rowline"><span>Services</span><strong id="tSvc">$0.00</strong></div>
+            <div class="rowline"><span>Insurance</span><strong id="tIns">$0.00</strong></div>
+            <div class="rowline"><span>Tax</span><strong id="tTax">$0.00</strong></div>
+            <div class="divider"></div>
+            <div class="rowline"><span><strong>Grand Total</strong></span><strong id="tGrand">$0.00</strong></div>
+            <div class="tiny" id="taxNote"></div>
+          </div>
+        </section>
+      </div>
+    </section>
+
+    <!-- MDM -->
+    <section class="card" data-panel="mdm" style="display:none">
+      <div class="grid">
+        <section class="three">
+          <h3>MDM & Carrier Subsidy</h3>
+          <label class="chip"><input type="checkbox" id="carrierSPF"> Carrier SPF Subsidy</label>
+          <label style="margin-top:8px">Business Internet Plan Code</label><input id="planCode" />
+          <label class="chip" style="margin-top:8px"><input type="checkbox" id="subsidyNote"> Include Subsidy Verbiage</label>
+        </section>
+        <section class="three">
+          <h3 style="visibility:hidden">.</h3>
+          <label class="chip"><input type="checkbox" id="mdmABM"> ABM (Apple Business Manager)</label>
+          <label class="chip" style="margin-top:6px"><input type="checkbox" id="mdmKnox"> Samsung Knox (KME)</label>
+          <label style="margin-top:8px">Knox Account #</label><input id="knoxAccount" />
+          <label class="chip" style="margin-top:8px"><input type="checkbox" id="mdmZeroTouch"> Android Zero Touch Enrollment</label>
+        </section>
+        <!-- 🔁 MOVED HERE from Items: Services (same IDs preserved) -->
+<section class="full">
+  <h3>Pro Services (per device)</h3>
+  <div class="grid">
+    <section class="three">
+      <label class="chip"><input type="checkbox" id="svcEnabled"> Include Services for this item</label>
+      <label style="margin-top:10px">Tier</label>
+      <select id="svcTier">
+        <option value="0">Tier 0 (under ~5 min)</option>
+        <option value="1">Tier 1 (≤ 15 min)</option>
+        <option value="2">Tier 2 (≤ 30 min)</option>
+        <option value="3">Tier 3 (≤ 45 min)</option>
+        <option value="4">Tier 4 (≤ 60 min)</option>
+      </select>
+      <label style="margin-top:10px">SKU</label>
+      <input id="svcSKU" readonly />
+    </section>
+    <section class="three">
+      <label>Minutes (per device)</label>
+      <input id="svcMinutes" type="number" min="1" value="5" />
+      <label style="margin-top:10px">Cost per device ($0.80/min)</label>
+      <input id="svcCostPer" type="number" step="0.01" readonly />
+      <label style="margin-top:10px">Total Services Cost</label>
+      <input id="svcCostTotal" type="number" step="0.01" readonly />
+    </section>
+  </div>
+  <div class="tiny">Tier 0 defaults to 5 minutes. Tiers 1–4 auto-set minutes = tier × 15.</div>
+</section>
+
+        <section class="full">
+          <label class="chip"><input type="checkbox" id="mdmPro"> MDM Pro-Services</label>
+          <label style="margin-top:8px">MDM Notes / Description</label><textarea id="mdmNotes" rows="4"></textarea>
+        </section>
+        <section class="full">
+          <div class="row" style="gap:10px">
+            <button class="ok" onclick="buildSummary()">Generate Summary</button>
+            <button class="ghost" onclick="copySummary()">Copy Summary</button>
+            <button class="warn" onclick="validateForm()">Quick Validate</button>
+            <button class="bad" onclick="clearAll()">Clear Form</button>
+          </div>
+          <div id="summary" class="summary-box" style="margin-top:12px"></div>
+        </section>
+      </div>
+    </section>
+  </section>
+</div>
+
+<!-- ===== DRAWERS ===== -->
+
+<!-- WCP helper -->
+<aside class="drawer" id="drawerWCP" aria-label="WCP Drawer">
+  <header><strong>Current Customer — OrderTime Search</strong><button class="ghost" onclick="closeDrawer('drawerWCP')">Close</button></header>
+  <div class="content">
+    <label class="tiny">Search in OrderTime (opens in a new tab)</label>
+    <div class="row"><input id="wcpQuery" placeholder="Type company name…" /><button onclick="openOTSearch()" class="ghost">Search</button></div>
+    <div id="wcpResults" class="tiny" style="margin-top:8px"></div>
+    <div class="divider"></div>
+    <div class="tiny">After selecting the customer in OrderTime, paste the exported details below (JSON or key:value). Supports billing, shipping, payment, shipping options.</div>
+    <div id="wcpResults" class="tiny" style="margin-top:8px"></div>
+    <textarea id="wcpPaste" rows="10" style="width:100%;margin-top:8px" placeholder='{
+  "company":"Acme Corp",
+  "billing":{"contact":"John","phone":"555-1111","email":"billing@acme.com","street":"1 Main","suite":"Ste 100","city":"Phila","state":"PA","zip":"19104"},
+  "shipping":{"company":"Acme WH","contact":"Jane","phone":"555-2222","email":"wh@acme.com","street":"500 Dock","suite":"","city":"Phila","state":"PA","zip":"19112"},
+  "payment":{"method":"Net Terms","terms":"Net 30","taxExempt":true,"agreement":false},
+  "shippingOptions":{"pay":"Prepaid","speed":"Ground","shortShip":"No"},
+  "carrierRep":{"name":"Verizon Rep","email":"vrep@vz.com"},
+  "rep":{"primary":"Chris Samaras","secondary":"—"}
+}'></textarea>
+    <div class="row" style="gap:10px;margin-top:8px"><button class="ok" onclick="applyPastedCustomer('wcpPaste')">Apply to Form</button><button class="ghost" onclick="fillWCPExample()">Load Example</button></div>
+  </div>
+</aside>
+
+<!-- Clone Existing Order -->
+<aside class="drawer" id="drawerClone" aria-label="Clone Sales Order Drawer">
+  <header>
+    <strong>Clone Existing Order — OrderTime</strong>
+    <button class="ghost" onclick="closeDrawer('drawerClone')">Close</button>
+  </header>
+  <div class="content">
+    <label class="tiny">Search Sales Orders in OrderTime (opens in a new tab)</label>
+    <div class="row">
+      <input id="cloneQuery" placeholder="Type customer name, SO number, etc." />
+      <button class="ghost" onclick="openSOSearch()">Search</button>
+    </div>
+    <div id="cloneResults" class="tiny" style="margin-top:8px"></div>
+
+
+    <div class="divider"></div>
+
+    <div class="tiny">
+      After selecting a Sales Order in OrderTime, paste the exported details below (JSON).
+      Supports <em>customer</em>, <em>shipping</em>, <em>payment</em>, <em>shippingOptions</em>,
+      <em>items</em> (array), and <em>mdm</em>.
+    </div>
+
+    <textarea id="clonePaste" rows="12" style="width:100%;margin-top:8px" placeholder='{
+  "so":"SO-2025-00456",
+  "customer":{
+    "company":"Acme Corp",
+    "billing":{"contact":"John","phone":"555-1111","email":"john@acme.com","street":"1 Main","suite":"Ste 100","city":"Philadelphia","state":"PA","zip":"19104"}
+  },
+  "shipping":{
+    "company":"Acme Warehouse",
+    "contact":"Jane","phone":"555-2222","email":"wh@acme.com",
+    "street":"500 Dock Rd","suite":"","city":"Philadelphia","state":"PA","zip":"19112",
+    "residence":false
+  },
+  "payment":{"method":"Net Terms","terms":"Net 30","taxExempt":true,"agreement":false},
+  "shippingOptions":{"pay":"Prepaid","speed":"Ground","shortShip":"No"},
+  "items":[
+    {
+      "desc":"Apple iPad 10.2\" 128GB — Silver", "model":"MK2K3LL/A", "color":"Silver", "sku":"IPAD10-128-SLV",
+      "qty":25, "net":"LTE", "carrier":"AT&T", "payout":50, "msrp":429.99, "disc":10, "sell":386.99,
+      "cond":"New", "stock":"Yes", "vendor":"Ingram", "cost":330.00,
+      "deal":"DLL-$310 / DR-12345", "hold":"RES-9981", "leadtime":"2-3 wks", "eol":"No",
+      "accessory":{"sku":"CASE-IPAD10-RUG","desc":"Rugged Case","qty":1,"sell":29.99},
+      "insurance":{"plan":"AKKO","ded":"$100","term":"2 year","sell":69.00},
+      "services":{"enabled":true,"tier":1},
+      "sim":{"card":"AT-SIM3IN1","pairing":"SIM PAIR ONLY","handling":"Install SIM Card"},
+      "lic":{"vendor":"Jamf","duration":"1 year","prorated":"12.00","key":"SIMBA-ABC123","contact":"licenses@vendor.com"}
+    }
+  ],
+  "mdm":{"carrierSPF":false,"planCode":"","subsidyNote":false,"abm":true,"knox":false,"knoxAccount":"","zeroTouch":true,"pro":true,"notes":"Clone from SO"}
+}'></textarea>
+
+    <div class="row" style="gap:10px;margin-top:8px">
+      <button class="ok" onclick="applyClonedOrder()">Apply to Form</button>
+      <button class="ghost" onclick="fillCloneExample()">Load Example</button>
+    </div>
+  </div>
+</aside>
+
+<!-- NEW Customer invite -->
+<!-- NEW Customer invite -->
+<aside class="drawer" id="drawerNew" aria-label="New Customer Drawer">
+  <header><strong>NEW Customer — SSP Invite</strong><button class="ghost" onclick="closeDrawer('drawerNew')">Close</button></header>
+  <div class="content">
+    <label>Customer Email To:</label><input id="sspTo" type="email" placeholder="customer@email.com" />
+    <label style="margin-top:8px">Subject</label><input id="sspSubject" />
+    <label style="margin-top:8px">Body</label><textarea id="sspBody" rows="12"></textarea>
+
+    <div class="row" style="gap:10px;margin-top:8px">
+      <button class="ok" onclick="copySSP()">Copy to Clipboard</button>
+      <button class="ghost" onclick="composeSSP()">Open Mail Client</button>
+      <!-- ✨ Add this new Gmail button -->
+      <button class="ok" onclick="composeSSPInGmail()">Open in Gmail</button>
+    </div>
+
+    <div class="tiny">Primary Rep & Billing Contact should be set. Template auto-fills from the rep database.</div>
+  </div>
+</aside>
+
+
+<!-- Email OM with CSV -->
+<aside class="drawer" id="drawerEmail" aria-label="Email OM Drawer">
+  <header><strong>Email Order Management — CSV Summary</strong><button class="ghost" onclick="closeDrawer('drawerEmail')">Close</button></header>
+  <div class="content">
+    <label>To</label>
+    <input id="emailTo" type="email" value="service@connectuscorp.com" />
+    <label style="margin-top:8px">Subject</label>
+    <input id="emailSubject" value="New Intake — CSV Summary" />
+
+    <div class="divider"></div>
+    <label>CSV Preview (included in email body)</label>
+    <textarea id="csvPreview" rows="14" style="width:100%;font-family:ui-monospace,Consolas,monospace"></textarea>
+
+    <div class="row" style="gap:10px;margin-top:12px">
+  <button class="ok" onclick="copyCSVToClipboard()">Copy CSV</button>
+  <button class="ghost" onclick="downloadCSVFile()">Download CSV</button>
+  <!-- Add these two -->
+<button class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
+<button class="ghost" onclick="openGmailNoCSV()">Open in Gmail (no CSV)</button>
+
+</div>
+
+
+    <div class="tiny" style="margin-top:8px">
+      Or use a direct mailto link:
+      <a id="mailtoHref" href="#" target="_blank" rel="noopener">Open in default mail app</a>
+    </div>
+  </div>
+</aside>
+
+<script>
+    // ---------- Gmail compose helpers ----------
+function openGmailCompose({to, subject, body}) {
+  // Gmail web compose URL
+  const base = "https://mail.google.com/mail/?view=cm&fs=1";
+  const url = `${base}&to=${encodeURIComponent(to || "")}` +
+              `&su=${encodeURIComponent(subject || "")}` +
+              `&body=${encodeURIComponent(body || "")}`;
+
+  // Open in a new tab/window
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    alert("Popup blocked. Please allow popups for this site to open Gmail.");
+  }
+}
+
+function openGmailWithCSV() {
+  const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
+  const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
+  const csv     = document.getElementById('csvPreview')?.value || buildCSV();
+
+  const header = `Hello Order Management,\n\nPlease find the intake details below in CSV format.\n\n`;
+  const footer = `\n\n— ConnectUS Intake`;
+  const body   = `${header}${csv}${footer}`;
+
+  openGmailCompose({ to: toRaw, subject: subjRaw, body });
+}
+
+function openGmailNoCSV() {
+  const toRaw     = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
+  const subjRaw   = document.getElementById('emailSubject')?.value || 'New Intake — Summary';
+  const summary   = (document.getElementById('summary')?.textContent || '').trim() || '(no summary available)';
+  const company   = (document.getElementById('billCompany')?.value || '').trim();
+  const header    = `Hello Order Management,\n\n${company ? `Company: ${company}\n` : ''}Below is the intake summary:\n\n`;
+  const footer    = `\n\n— ConnectUS Intake`;
+  const body      = `${header}${summary}${footer}`;
+
+  openGmailCompose({ to: toRaw, subject: subjRaw, body });
+}
+
+// Reliable mailto opener
+function openMailto(url){
+  const a = document.createElement('a');
+  a.href = url;
+  a.style.display = 'none';
+  a.setAttribute('target', '_self'); // ensure same window
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
+/* ===== CONFIG ===== */
+// Browser never talks to OrderTime directly. Use same-origin proxy.
+const API_BASE = '/api';
+const TAX_RATE = 0.08;
+const RATE_PER_MIN = 0.80;
+const SSP_INVITE_SUBJECT = "Set up your ConnectUS Self-Service Portal (SSP)";
+
+async function api(path, { method='GET', headers={}, body } = {}){
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { 'Content-Type':'application/json', ...headers },
+    credentials: 'include',
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if(!res.ok){
+    const text = await res.text().catch(()=> '');
+    throw new Error(`API ${method} ${path} failed: ${res.status} ${text}`);
+  }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('application/json') ? res.json() : res.text();
+}
+
+
+
+
+/* ===== SIM / Pairing option catalogs ===== */
+// Seeded from your template screenshot. Add/adjust as needed.
+const SIM_CARD_OPTIONS = [
+  'VZ-SIM3IN1',
+  'AT-SIM3IN1',
+  'AT-FIRSTSIMA00',
+  'TM-SIM3IN14G',
+  'HE-HELIXTRIAA00',
+  'Helix eSIM(TriA) ',
+  'HE TRI-B Static IP Helix',
+  'MW-SIMVZTMATT-E',
+  'US-SIM3IN15G',
+  'eSim Embendded in the phone',
+  'NO SIM CARD',
+];
+
+// If your Word template has the full lists, add them here later.
+const SIM_HANDLING_OPTIONS = [
+  'Install SIM Card',
+  'Tape SIM Card to Box',
+  'Embedded SIM',
+  'No Sim Card',
+];
+
+const PAIRING_OPTIONS = [
+  'SIM PAIR ONLY',
+  'SIM PAIR & CARRIER ACTIVATION',
+  'SIM PAIR, BENCH TEST / ACTIVE TO ENSURE OPTIMAL PERFORMANCE',
+  'VERIZON eSIM PAIRING',
+  'SIM PAIR w/ STATIC IP & DEVICE ACTIVATIO< BENCH TEST TO ENSURE OPTIOMAL PERFORMANCE',
+  'CUSTOM CONFIG DEVICE ACTIVATIO, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE/sow REQUIRED',
+  'iNTERNAL cuc sIM pAIR & ACTIVATION',
+];
+
+/* Build the three selects and keep prior values (if any) */
+function populateSimDropdowns(){
+  const map = [
+    { id:'simCard',        opts: SIM_CARD_OPTIONS,        placeholder: 'Select SIM card' },
+    { id:'pairingOption',  opts: PAIRING_OPTIONS,         placeholder: 'Select Pairing option' },
+    { id:'simHandling',    opts: SIM_HANDLING_OPTIONS,    placeholder: 'Select SIM handling' }
+  ];
+  map.forEach(({id, opts, placeholder})=>{
+    const sel = document.getElementById(id);
+    if(!sel) return;
+
+    // Preserve any pre-existing value (e.g., from QR load)
+    const prev = (sel.value || '').trim();
+
+    sel.innerHTML = '';
+    const ph = document.createElement('option');
+    ph.value = '';
+    ph.textContent = placeholder;
+    ph.disabled = false; ph.selected = !prev;
+    sel.appendChild(ph);
+
+    opts.forEach(v=>{
+      const o = document.createElement('option');
+      o.value = v;
+      o.textContent = v;
+      sel.appendChild(o);
+    });
+
+    // If prior value matches a known option, select it
+    if(prev){
+      const match = [...sel.options].find(o => o.value === prev);
+      if(match) sel.value = prev;
+    }
+  });
+}
+
+/* ===== Rep Database (localStorage-backed) ===== */
+const LS_REPS_KEY = "CUC_REPS_V1";
+
+const BASE_TEMPLATES = {
+  "Lucas Currin": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=lucas-currin 
+
+{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+ Lucas Currin `,
+  "Anthony Liace": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=anthony.liace 
+
+{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+Anthony Liace
+
+ `,
+  "John Tropeano": `  Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=john-tropeano 
+
+{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+John Tropeano
+
+ `,
+  "Greg Flannigan": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=greg-flannigan 
+
+{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+Greg Flannigan
+
+ `,
+  "Heath Pospisil": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=heath-pospisil 
+
+{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+Heath Pospisil
+
+ `,
+  "Orlando": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=orlando-calderon 
+
+{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+Orlando
+
+ `
+};
+
+function loadReps(){
+  let reps = [];
+  try{ reps = JSON.parse(localStorage.getItem(LS_REPS_KEY)||"[]"); }catch(_){}
+  if(!reps || reps.length===0){
+    // Seed with reps
+    reps = [
+      {name:"Lucas Currin", email:"lucas.currin@connectuscorp.com", slug:"lucas-currin", template:BASE_TEMPLATES["Lucas Currin"]},
+      {name:"Anthony Liace", email:"anthony.liace@connectuscorp.com", slug:"anthony.liace", template:BASE_TEMPLATES["Anthony Liace"]},
+      {name:"John Tropeano", email:"john.tropeano@connectuscorp.com", slug:"john-tropeano", template:BASE_TEMPLATES["John Tropeano"]},
+      {name:"Greg Flannigan", email:"greg.flannigan@connectuscorp.com", slug:"greg-flannigan", template:BASE_TEMPLATES["Greg Flannigan"]},
+      {name:"Heath Pospisil", email:"heath.pospisil@connectuscorp.com", slug:"heath-pospisil", template:BASE_TEMPLATES["Heath Pospisil"]},
+      {name:"Orlando", email:"orlando.calderon@connectuscorp.com", slug:"orlando-calderon", template:BASE_TEMPLATES["Orlando"]}
+    ];
+    localStorage.setItem(LS_REPS_KEY, JSON.stringify(reps));
+  }
+  return reps;
+}
+function saveReps(reps){ localStorage.setItem(LS_REPS_KEY, JSON.stringify(reps||[])); }
+function getReps(){ return loadReps(); }
+function getRepByName(name){ return getReps().find(r=>r.name===name); }
+
+/* ===== Main Tabs ===== */
+document.querySelectorAll('.mtab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.mtab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('[data-mainpanel]').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.querySelector(`[data-mainpanel="${btn.dataset.main}"]`).classList.add('active');
+    if(btn.dataset.main==='reps') renderRepList();
+  });
+});
+
+/* ===== Intake Tabs + Stepper ===== */
+document.querySelectorAll('.tab').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.tab').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('[data-panel]').forEach(p=>p.style.display='none');
+    btn.classList.add('active');
+    document.querySelector(`[data-panel="${btn.dataset.tab}"]`).style.display='';
+    document.querySelectorAll('#stepper .step').forEach(x=>x.classList.toggle('active', x.getAttribute('data-goto')===btn.dataset.tab));
+  });
+});
+document.querySelectorAll('#stepper .step').forEach(s=>{
+  s.addEventListener('click', ()=>document.querySelector(`.tab[data-tab="${s.getAttribute('data-goto')}"]`)?.click());
+});
+
+/* ===== Wizard Gate ===== */
+const WIZ_DONE_KEY = "CUC_WIZ_DONE_V1";
+
+function setWizardDone(isDone){
+  sessionStorage.setItem(WIZ_DONE_KEY, isDone ? "1" : "0");
+}
+<!-- After renderRepList() in init() -->
+populateWizardRepSelect();
+
+
+/* ===== Wizard: Step 1 (Sales Rep) ===== */
+function populateWizardRepSelect(){
+  const sel = document.getElementById('wizRepPick');
+  if(!sel) return;
+  // clear except placeholder
+  sel.innerHTML = '<option value="">Select Primary Sales Rep…</option>';
+  const reps = getReps(); // already defined in your file
+  reps.forEach(r => {
+    const opt = document.createElement('option');
+    opt.value = r.name;
+    opt.textContent = r.name;
+    sel.appendChild(opt);
+  });
+  // add Other at the end
+  const other = document.createElement('option');
+  other.value = 'Other';
+  other.textContent = 'Other';
+  sel.appendChild(other);
+}
+
+
+function isWizardDone(){
+  return sessionStorage.getItem(WIZ_DONE_KEY) === "1";
+}
+
+function showIntakeWork(show){
+  const tabs = document.getElementById('intakeTabs');
+  const stepper = document.getElementById('stepper');
+
+  if(show){
+    if(tabs) tabs.style.display = '';
+    if(stepper) stepper.style.display = '';
+    document.querySelector('.tab[data-tab="customer"]')?.click();
+  }else{
+    if(tabs) tabs.style.display = 'none';
+    if(stepper) stepper.style.display = 'none';
+    document.querySelectorAll('[data-panel]').forEach(p => p.style.display='none');
+  }
+}
+
+function showMDM(show){
+  const mdmTab   = document.querySelector('.tab[data-tab="mdm"]');
+  const mdmPanel = document.querySelector('[data-panel="mdm"]');
+  const mdmStep  = document.querySelector('#stepper .step[data-goto="mdm"]');
+
+  if (show) {
+    if (mdmTab)  mdmTab.style.display = '';
+    if (mdmStep) mdmStep.style.display = '';
+    // don't auto-switch tabs here; we only reveal it
+  } else {
+    // if user was on MDM, push them back to Items
+    if (mdmTab && mdmTab.classList.contains('active')) {
+      document.querySelector('.tab[data-tab="items"]')?.click();
+    }
+    if (mdmPanel) mdmPanel.style.display = 'none';
+    if (mdmTab)   mdmTab.style.display = 'none';
+    if (mdmStep)  mdmStep.style.display = 'none';
+  }
+}
+
+
+
+/* ===== Wizard Behavior ===== */
+// Step index meanings now:
+// 1 = Sales Rep, 2 = Customer Type, 3 = Document Type, 4 = Scope
+
+function resetWizardBelow(step){
+  // Hide/clear anything below the given step
+  if(step <= 1){
+    document.getElementById('wizStep1').style.display = 'none';   // Customer Type row (now Step 2)
+    document.getElementById('wizStep2').style.display = 'none';   // Document Type row (now Step 3)
+    document.getElementById('wizStep3').style.display = 'none';   // Scope row (now Step 4)
+    document.querySelectorAll('input[name="wizCustomerType"]').forEach(i=>i.checked=false);
+    document.querySelectorAll('input[name="wizDocType"]').forEach(i=>i.checked=false);
+    document.querySelectorAll('input[name="wizScope"]').forEach(i=>i.checked=false);
+  }else if(step === 2){
+    document.getElementById('wizStep2').style.display = 'none';
+    document.getElementById('wizStep3').style.display = 'none';
+    document.querySelectorAll('input[name="wizDocType"]').forEach(i=>i.checked=false);
+    document.querySelectorAll('input[name="wizScope"]').forEach(i=>i.checked=false);
+  }else if(step === 3){
+    document.getElementById('wizStep3').style.display = 'none';
+    document.querySelectorAll('input[name="wizScope"]').forEach(i=>i.checked=false);
+  }
+  setWizardDone(false);
+  showIntakeWork(false);
+}
+
+function onWizardStepRep(repName){
+  // Mirror to the real Primary Sales Rep <select id="rep1">
+  const repSel = document.getElementById('rep1');
+  if(repSel){
+    // try to select exact text match; fall back to 'Other'
+    let matched = false;
+    [...repSel.options].forEach((o,i)=>{
+      if(o.text.trim() === repName.trim()){ repSel.selectedIndex = i; matched = true; }
+    });
+    if(!matched){
+      // ensure 'Other' exists in the real select
+      let otherIndex = -1;
+      [...repSel.options].forEach((o,i)=>{ if(o.text.trim()==='Other') otherIndex = i; });
+      if(otherIndex >= 0) repSel.selectedIndex = otherIndex;
+    }
+  }
+  // Unlock next step (Customer Type)
+  document.getElementById('wizStep1').style.display = ''; // Customer Type row (now Step 2)
+  resetWizardBelow(2);
+}
+
+function onWizardStep1(val){ // Customer Type (Step 2)
+  // Sync to existing flags + open drawers
+  document.getElementById('flagNewCustomer').checked = false;
+  document.getElementById('flagCurrentCustomer').checked = false;
+  document.getElementById('flag3PL').checked = false;
+  document.getElementById('flagWCP').checked = false;
+
+  const cloneRow = document.getElementById('wizCloneRow');
+  if(val === 'new'){
+    document.getElementById('flagNewCustomer').checked = true;
+    refreshSSPTemplate();
+    openDrawer('drawerNew');
+    if(cloneRow) cloneRow.style.display = 'none';
+  }else if(val === 'existing'){
+    document.getElementById('flagCurrentCustomer').checked = true;
+    openDrawer('drawerWCP');
+    if(cloneRow) cloneRow.style.display = '';
+  }else{
+    if(cloneRow) cloneRow.style.display = 'none';
+  }
+
+  document.getElementById('wizStep2').style.display = ''; // Document Type (now Step 3)
+  resetWizardBelow(3);
+}
+
+function onWizardStep2(val){ // Document Type (Step 3)
+  // Mirror QUOTE/SALES ORDER/CLONE to underlying doc type radios
+  const radios = document.querySelectorAll('input[name="doctype"]');
+  let matched = false;
+  radios.forEach(r => { r.checked = (r.value === val); if(r.checked) matched = true; });
+
+  if(val === 'CLONE'){
+    sessionStorage.setItem('CUC_CLONE_MODE','1');
+    openDrawer('drawerClone'); // 👈 open the new drawer
+  }else{
+    sessionStorage.removeItem('CUC_CLONE_MODE');
+  }
+
+  document.getElementById('wizStep3').style.display = ''; // Scope (now Step 4)
+  resetWizardBelow(4);
+}
+
+
+function onWizardComplete(scope){ // Scope (Step 4)
+  // Mirror services toggle to scope
+  if (scope === 'hardware') {
+    document.getElementById('svcEnabled').checked = false;
+    tierToMinutes();
+    recalcServices();
+    showMDM(false);                 // HIDE MDM for hardware-only
+  } else {
+    document.getElementById('svcEnabled').checked = true;
+    document.getElementById('svcTier').value = '1';
+    tierToMinutes();
+    recalcServices();
+    showSubtabs();
+    showMDM(true);                  // SHOW MDM for hardware + pro
+  }
+
+  setWizardDone(true);
+  showIntakeWork(true);
+  document.getElementById('wizHint').textContent = 'Wizard complete — tabs unlocked.';
+}
+
+
+/* Wire listeners */
+(function wireWizard(){
+  // Step 1 (Rep)
+  const wizRep = document.getElementById('wizRepPick');
+  if(wizRep){
+    wizRep.addEventListener('change', e=>{
+      const v = (e.target.value || '').trim();
+      if(!v) { resetWizardBelow(1); return; }
+      onWizardStepRep(v);
+      // Default: hide MDM until wizard scope = hardware+pro
+     showMDM(false);
+
+    });
+  }
+  // Step 2 (Customer Type)
+  document.querySelectorAll('input[name="wizCustomerType"]').forEach(i=>{
+    i.addEventListener('change', e => onWizardStep1(e.target.value));
+  });
+  // Step 3 (Doc Type)
+  document.querySelectorAll('input[name="wizDocType"]').forEach(i=>{
+    i.addEventListener('change', e => onWizardStep2(e.target.value));
+  });
+  // Step 4 (Scope)
+  document.querySelectorAll('input[name="wizScope"]').forEach(i=>{
+    i.addEventListener('change', e => onWizardComplete(e.target.value));
+  });
+})();
+
+
+
+/* ===== Drawers ===== */
+function openDrawer(id){ document.getElementById(id).classList.add('active'); }
+function closeDrawer(id){ document.getElementById(id).classList.remove('active'); }
+
+/* WCP open behavior */
+document.getElementById('flagWCP').addEventListener('change', e=>{ /* no-op */ });
+document.getElementById('flagCurrentCustomer').addEventListener('change', e=>{ if(e.target.checked) openDrawer('drawerWCP'); });
+document.getElementById('flag3PL').addEventListener('change', e=>{ if(e.target.checked) openDrawer('drawerWCP'); });
+
+/* NEW CUSTOMER: open drawer + auto-build + compose */
+document.getElementById('flagNewCustomer').addEventListener('change', e=>{
+  if(e.target.checked){
+    refreshSSPTemplate();
+    openDrawer('drawerNew');
+    tryAutoComposeSSP();
+  }
+});
+
+/* ===== WCP helper ===== */
+async function openOTSearch(){
+  const q=(document.getElementById('wcpQuery').value||document.getElementById('billCompany').value||'').trim();
+  const target=document.getElementById('wcpResults');
+  if(!q){ target.innerHTML='Enter a query first.'; return; }
+  target.innerHTML='Searching…';
+  try{
+    const results = await api(`/ordertime/customers/search?q=${encodeURIComponent(q)}`);
+    if(!Array.isArray(results) || results.length===0){ target.innerHTML='No matches.'; return; }
+    target.innerHTML = results.slice(0,25).map(r=>`
+      <div class="card" style="margin:6px 0;padding:10px">
+        <div><strong>${r.company||'—'}</strong></div>
+        <div class="tiny">${r.city||''} ${r.state||''} ${r.zip||''}</div>
+        <div class="row" style="margin-top:6px">
+          <button class="ghost" onclick='applyCustomerFromApi(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
+        </div>
+      </div>
+    `).join('');
+  }catch(err){
+    target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
+  }
+}
+
+
+// Map a customer result into your existing form fields
+function applyCustomerFromApi(r){
+  const data = {
+    company: r.company,
+    billing:{
+      contact: r.billingContact,
+      phone:   r.billingPhone,
+      email:   r.billingEmail,
+      street:  r.billingStreet,
+      suite:   r.billingSuite,
+      city:    r.billingCity,
+      state:   r.billingState,
+      zip:     r.billingZip
+    },
+    shipping:{
+      company: r.shipCompany,
+      contact: r.shipContact,
+      phone:   r.shipPhone,
+      email:   r.shipEmail,
+      street:  r.shipStreet,
+      suite:   r.shipSuite,
+      city:    r.shipCity,
+      state:   r.shipState,
+      zip:     r.shipZip
+    },
+    payment:{ method:r.payMethod, terms:r.payTerms, taxExempt:r.taxExempt, agreement:r.hasAgreement },
+    shippingOptions:{ pay:r.shipPay, speed:r.shipSpeed, shortShip:r.shortShip }
+  };
+  // Reuse your existing util:
+  // Simulate paste target with a temp textarea value and call existing parser
+  document.getElementById('wcpPaste').value = JSON.stringify(data, null, 2);
+  applyPastedCustomer('wcpPaste');
+}
+
+function applyPastedCustomer(textareaId){
+  const raw=document.getElementById(textareaId).value.trim();
+  if(!raw){ alert('Paste customer details first.'); return; }
+  let data={};
+  try{ data=JSON.parse(raw); }
+  catch(_){ raw.split(/\r?\n/).forEach(line=>{ const m=line.match(/^([^:]+):\s*(.*)$/); if(!m)return; setByPath(data,m[1].trim(),m[2].trim()); }); }
+
+  setVal('billCompany', pick(data.company, data.billing?.company));
+  setVal('billContact', pick(data.billing?.contact)); setVal('billPhone', pick(data.billing?.phone));
+  setVal('billEmail', pick(data.billing?.email)); setVal('billStreet', pick(data.billing?.street));
+  setVal('billSuite', pick(data.billing?.suite)); setVal('billCity', pick(data.billing?.city));
+  setVal('billState', pick(data.billing?.state)); setVal('billZip', pick(data.billing?.zip));
+
+  setVal('shipCompany', pick(data.shipping?.company)); setVal('shipContact', pick(data.shipping?.contact));
+  setVal('shipPhone', pick(data.shipping?.phone)); setVal('shipEmail', pick(data.shipping?.email));
+  setVal('shipStreet', pick(data.shipping?.street)); setVal('shipSuite', pick(data.shipping?.suite));
+  setVal('shipCity', pick(data.shipping?.city)); setVal('shipState', pick(data.shipping?.state)); setVal('shipZip', pick(data.shipping?.zip));
+
+  const pm=pick(data.payment?.method); if(pm) selectByTextExact('payMethod', pm);
+  setVal('payTerms', pick(data.payment?.terms));
+  document.getElementById('taxExempt').checked=!!data.payment?.taxExempt;
+  document.getElementById('hasAgreement').checked=!!data.payment?.agreement;
+
+  const so=data.shippingOptions||{};
+  if(so.pay) selectByTextExact('shipPay', so.pay);
+  if(so.speed) selectByTextExact('shipSpeed', so.speed);
+  if(so.shortShip) selectByTextExact('shortShip', so.shortShip);
+
+  setVal('carrierRepName', pick(data.carrierRep?.name)); setVal('carrierRepEmail', pick(data.carrierRep?.email));
+
+  const r1=pick(data.rep?.primary); if(r1) selectByTextExact('rep1', r1);
+  const r2=pick(data.rep?.secondary); if(r2) selectByTextExact('rep2', r2);
+
+  closeDrawer('drawerWCP');
+  refreshTotals();
+}
+
+function applyCustomerFromApi(r){
+  const data = {
+    company: r.company,
+    billing: r.billing,
+    shipping: r.shipping,
+    payment: r.payment,
+    shippingOptions: r.shippingOptions
+  };
+  document.getElementById('wcpPaste').value = JSON.stringify(data, null, 2);
+  applyPastedCustomer('wcpPaste');
+}
+
+
+// Search sales orders for cloning
+async function openSOSearch(){
+  const q = (document.getElementById('cloneQuery').value || '').trim();
+  const target = document.getElementById('cloneResults');
+  if(!q){ target.innerHTML = 'Enter a query first.'; return; }
+  target.innerHTML = 'Searching…';
+  try{
+    const results = await api(`/ordertime/sales-orders/search?q=${encodeURIComponent(q)}`);
+    if(!Array.isArray(results) || results.length === 0){
+      target.innerHTML = 'No matches.'; return;
+    }
+    target.innerHTML = results.slice(0,25).map(so => `
+      <div class="card" style="margin:6px 0;padding:10px">
+        <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
+        <div class="tiny">${so.date || ''} • ${so.status || ''}</div>
+        <div class="row" style="margin-top:6px">
+          <button class="ghost" onclick="loadSO('${so.id || so.number}')">Preview</button>
+          <button class="ok" onclick="applySO('${so.id || so.number}')">Apply</button>
+        </div>
+      </div>
+    `).join('');
+  }catch(err){
+    target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
+  }
+}
+
+// Pull 1 SO and show JSON in the Clone drawer textarea
+async function loadSO(id){
+  try{
+    const so = await api(`/ordertime/sales-orders/${encodeURIComponent(id)}`);
+    document.getElementById('clonePaste').value = JSON.stringify(so, null, 2);
+  }catch(err){
+    alert(`Load SO failed: ${err.message}`);
+  }
+}
+
+// Pull + apply (uses your existing applyClonedOrder mapper)
+async function applySO(id){
+  await loadSO(id);
+  applyClonedOrder(); // your JSON→form function already in the file
+}
+
+function fillWCPExample(){
+  document.getElementById('wcpQuery').value='Acme Corp';
+  document.getElementById('wcpPaste').value = JSON.stringify(DEMO_CUSTOMER_FULL, null, 2);
+}
+
+function applyClonedOrder(){
+  const raw = (document.getElementById('clonePaste').value || '').trim();
+  if(!raw){ alert('Paste a Sales Order export JSON first.'); return; }
+
+  let data = {};
+  try{ data = JSON.parse(raw); }
+  catch(_){ alert('Invalid JSON. Make sure you pasted a valid Sales Order JSON.'); return; }
+
+  // ----- Customer / Billing
+  setVal('billCompany', data.customer?.company || data.company || '');
+  const b = data.customer?.billing || data.billing || {};
+  setVal('billContact', b.contact || ''); setVal('billPhone', b.phone || '');
+  setVal('billEmail', b.email || ''); setVal('billStreet', b.street || '');
+  setVal('billSuite', b.suite || ''); setVal('billCity', b.city || '');
+  setVal('billState', b.state || ''); setVal('billZip', b.zip || '');
+
+  // ----- Shipping
+  const s = data.shipping || {};
+  setVal('shipCompany', s.company || ''); setVal('shipContact', s.contact || '');
+  setVal('shipPhone', s.phone || ''); setVal('shipEmail', s.email || '');
+  setVal('shipStreet', s.street || ''); setVal('shipSuite', s.suite || '');
+  setVal('shipCity', s.city || ''); setVal('shipState', s.state || ''); setVal('shipZip', s.zip || '');
+  document.getElementById('resShip').checked = !!s.residence;
+
+  // ----- Payment & Shipping Options
+  const p = data.payment || {};
+  if(p.method) selectByTextExact('payMethod', p.method);
+  setVal('payTerms', p.terms || '');
+  document.getElementById('taxExempt').checked = !!p.taxExempt;
+  document.getElementById('hasAgreement').checked = !!p.agreement;
+
+  const so = data.shippingOptions || {};
+  if(so.pay) selectByTextExact('shipPay', so.pay);
+  if(so.speed) selectByTextExact('shipSpeed', so.speed);
+  if(so.shortShip) selectByTextExact('shortShip', so.shortShip);
+
+  // ----- Items (replace current rows with cloned items)
+  document.getElementById('itemsBody').innerHTML = '';
+  const lines = Array.isArray(data.items) ? data.items : [];
+  if(lines.length === 0) addRow(); // keep one blank if no items
+
+  lines.forEach((l, idx)=>{
+    const prefill = {
+      desc:l.desc, model:l.model, color:l.color, sku:l.sku, qty:l.qty,
+      net:l.net, carrier:l.carrier, payout:l.payout, msrp:l.msrp, disc:l.disc, sell:l.sell,
+      cond:l.cond, stock:l.stock, vendor:l.vendor, cost:l.cost,
+      deal:l.deal, hold:l.hold, leadtime:l.leadtime, eol:l.eol
+    };
+    addRow(prefill);
+
+    // Accessory / Insurance / Services / SIM / Licences → most-recent item panels
+    if(l.accessory){ setVal('accSku', l.accessory.sku || ''); setVal('accDesc', l.accessory.desc || ''); setVal('accQty', l.accessory.qty || 0); setVal('accSell', l.accessory.sell || ''); }
+    if(l.insurance){ selectByTextExact('insPlan', l.insurance.plan || 'None'); selectByTextExact('insDed', l.insurance.ded || '$0'); selectByTextExact('insTerm', l.insurance.term || '1 year'); setVal('insSell', l.insurance.sell || ''); }
+
+    if(l.services){
+      document.getElementById('svcEnabled').checked = !!l.services.enabled;
+      document.getElementById('svcTier').value = String(l.services.tier ?? 0);
+      tierToMinutes(); recalcServices();
+    }
+
+    if(l.sim){
+      // these are dropdowns now
+      if(l.sim.card)      document.getElementById('simCard').value = l.sim.card;
+      if(l.sim.pairing)   document.getElementById('pairingOption').value = l.sim.pairing;
+      if(l.sim.handling)  document.getElementById('simHandling').value = l.sim.handling;
+    }
+
+    if(l.lic){
+      setVal('licVendor', l.lic.vendor || ''); setVal('licDuration', l.lic.duration || '');
+      setVal('licProrated', l.lic.prorated || ''); setVal('licKey', l.lic.key || '');
+      setVal('licContact', l.lic.contact || '');
+    }
+  });
+
+  // ----- MDM
+  const m = data.mdm || {};
+  document.getElementById('carrierSPF').checked = !!m.carrierSPF;
+  setVal('planCode', m.planCode || '');
+  document.getElementById('subsidyNote').checked = !!m.subsidyNote;
+  document.getElementById('mdmABM').checked = !!m.abm;
+  document.getElementById('mdmKnox').checked = !!m.knox;
+  setVal('knoxAccount', m.knoxAccount || '');
+  document.getElementById('mdmZeroTouch').checked = !!m.zeroTouch;
+  document.getElementById('mdmPro').checked = !!m.pro;
+  setVal('mdmNotes', m.notes || '');
+
+  // ----- Wrap up
+  closeDrawer('drawerClone');
+  refreshTotals();
+  buildSummary();       // keep Summary and CSV in sync
+  refreshCSVPreview();
+}
+
+/* ===== Clone Existing Order helper ===== */
+// ---------- Clone Existing Sales Order (OrderTime) ----------
+async function openSOSearch(){
+  const q = (document.getElementById('cloneQuery').value || '').trim();
+  const target = document.getElementById('cloneResults');
+  if(!q){ target.innerHTML = 'Enter a query first.'; return; }
+  target.innerHTML = 'Searching…';
+  try{
+    // hit your proxy: GET /api/ordertime/sales-orders/search?q=...
+    const results = await api(`/ordertime/sales-orders/search?q=${encodeURIComponent(q)}`);
+    if(!Array.isArray(results) || results.length === 0){
+      target.innerHTML = 'No matches.'; return;
+    }
+    // render small cards with Preview + Apply
+    target.innerHTML = results.slice(0,25).map(so => `
+      <div class="card" style="margin:6px 0;padding:10px">
+        <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
+        <div class="tiny">${so.date || ''} • ${so.status || ''}</div>
+        <div class="row" style="margin-top:6px">
+          <button class="ghost" onclick="loadSO('${so.id || so.number}')">Preview</button>
+          <button class="ok" onclick="applySO('${so.id || so.number}')">Apply</button>
+        </div>
+      </div>
+    `).join('');
+  }catch(err){
+    target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
+  }
+}
+
+async function loadSO(id){
+  try{
+    // GET /api/ordertime/sales-orders/:id
+    const so = await api(`/ordertime/sales-orders/${encodeURIComponent(id)}`);
+    // show JSON in the drawer textarea so the user can review/edit
+    document.getElementById('clonePaste').value = JSON.stringify(so, null, 2);
+  }catch(err){
+    alert(`Load SO failed: ${err.message}`);
+  }
+}
+
+async function applySO(id){
+  await loadSO(id);     // puts the JSON into #clonePaste
+  applyClonedOrder();   // reuses your existing JSON→form mapper
+}
+
+
+
+function fillCloneExample(){
+  document.getElementById('cloneQuery').value = 'Acme Corp';
+  document.getElementById('clonePaste').value = JSON.stringify(CLONE_ORDER_EXAMPLE, null, 2);
+}
+
+/* ===== SSP invite ===== */
+function sspInviteBody(rep,company){
+  return `Hi there,
+
+We’re getting your account set up with ConnectUS. Please register in our Self-Service Portal (SSP) so we can finalize your quote/order.
+
+Registration link:
+https://connectuscorp.com/my-account/?salep-rep=${encodeURIComponent((rep||'').toLowerCase().replace(/\s+/g,'-'))}
+
+Company: ${company||""}
+
+Thanks,
+${rep||"ConnectUS Sales"}
+ConnectUS Corp`;
+}
+function getCustomerFirstName(){
+  const full=(document.getElementById('billContact')?.value||'').trim();
+  if(!full) return '';
+  const parts=full.split(/\s+/);
+  return parts[0]||'';
+}
+function refreshSSPTemplate(){
+  const repName=(document.getElementById('rep1').value||'').trim();
+  const rep = getRepByName(repName);
+  const firstName = getCustomerFirstName() || 'there';
+  const custEmail = (document.getElementById('billEmail').value||'').trim();
+
+  let body;
+  if(rep){
+    body = (rep.template||'')
+      .replace(/\{\{\s*Customer First Name\s*\}\}/g, firstName)
+      .replace(/\{\{\s*Current Email\s*\}\}/g, custEmail || '(your email)');
+    if(rep.slug){
+      body = body.replace(/(my-account\/\?salep-rep=)[^\s]+/g, `$1${rep.slug}`);
+    }
+  }else{
+    body = sspInviteBody(repName, (document.getElementById('billCompany').value||''));
+  }
+
+  document.getElementById('sspSubject').value=SSP_INVITE_SUBJECT;
+  document.getElementById('sspBody').value=body;
+  document.getElementById('sspTo').value=custEmail;
+}
+function tryAutoComposeSSP(){
+  const to=(document.getElementById('billEmail').value||'').trim();
+  const repName=(document.getElementById('rep1').value||'').trim();
+  if(!repName){ alert('Select a Primary Sales Rep first.'); return; }
+  if(!to){ alert('Add Billing Email before sending the invite.'); return; }
+  refreshSSPTemplate();
+  composeSSP();
+}
+function copySSP(){
+  const text=`To: ${document.getElementById('sspTo').value||'(add recipient)'}\nSubject: ${document.getElementById('sspSubject').value}\n\n${document.getElementById('sspBody').value}`;
+  navigator.clipboard.writeText(text);
+  alert('SSP email copied.');
+}
+function composeSSP(){
+  const to=encodeURIComponent(document.getElementById('sspTo').value||'');
+  const subj=encodeURIComponent(document.getElementById('sspSubject').value||'');
+  const body=encodeURIComponent(document.getElementById('sspBody').value||'');
+  window.location.href=`mailto:${to}?subject=${subj}&body=${body}`;
+}
+
+function composeSSPInGmail(){
+  const to = (document.getElementById('sspTo')?.value || '').trim();
+  const subject = (document.getElementById('sspSubject')?.value || SSP_INVITE_SUBJECT).trim();
+  const body = (document.getElementById('sspBody')?.value || '').trim();
+
+  if(!to){
+    alert('Add a recipient email first.');
+    return;
+  }
+
+  // Gmail web compose URL
+  const gmailUrl =
+    `https://mail.google.com/mail/?view=cm&fs=1` +
+    `&to=${encodeURIComponent(to)}` +
+    `&su=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+
+  // Open in a new tab (avoids navigating away)
+  window.open(gmailUrl, '_blank', 'noopener');
+}
+
+
+/* ===== Items & example ===== */
+const QUOTE_REQUEST_MAP={
+  "QR-2025-00123":{
+    desc:'Apple iPad 10.2" 128GB — Silver', model:'MK2K3LL/A', color:'Silver', sku:'IPAD10-128-SLV', qty:25, net:'LTE', carrier:'AT&T',
+    payout:50, msrp:429.99, disc:10, sell:386.99, cond:'New', stock:'Yes', vendor:'Ingram', cost:330.00,
+    deal:'DLL-$310 / DR-12345', hold:'RES-9981', leadtime:'2-3 wks', eol:'No',
+    accessory:{ sku:'CASE-IPAD10-RUG', desc:'Rugged Case', qty:1, sell:29.99 },
+    insurance:{ plan:'AKKO', ded:'$100', term:'2 year', sell:69.00 },
+    services:{ enabled:true, tier:1 },
+    sim:{ card:'n/a', pairing:'Option 1', handling:'Preinstall', questionnaire:'https://example.com/helix' },
+    lic:{ vendor:'Jamf', duration:'1 year', prorated:'12.00', key:'SIMBA-ABC123', contact:'licenses@vendor.com' }
+  }
+};
+function el(tag,attrs={},children=[]){const e=document.createElement(tag);Object.entries(attrs).forEach(([k,v])=>{if(k==='class')e.className=v;else if(k==='html')e.innerHTML=v;else if(k==='onclick')e.onclick=v;else e.setAttribute(k,v)});children.forEach(c=>e.appendChild(c));return e;}
+function addRow(prefill){
+  const tr=el('tr');
+  const cols=[
+    {key:'desc', ph:'e.g., Apple iPad 256GB Space Gray'},
+    {key:'model', ph:'Model / Part #'},
+    {key:'color', ph:'Color'},
+    {key:'sku', ph:'ORDERTIME-SKU'},
+    {key:'qty', ph:'Qty', type:'number', min:1, val:1},
+    {key:'net', ph:'LTE / Wi-Fi / Both'},
+    {key:'carrier', ph:'Carrier'},
+    {key:'payout', ph:'$', type:'number', step:'0.01'},
+    {key:'msrp', ph:'$', type:'number', step:'0.01'},
+    {key:'disc', ph:'%', type:'number', step:'0.01'},
+    {key:'sell', ph:'$', type:'number', step:'0.01'},
+    {key:'cond', ph:'New / CPO'},
+    {key:'stock', ph:'Yes/No'},
+    {key:'vendor', ph:'Vendor'},
+    {key:'cost', ph:'$', type:'number', step:'0.01'},
+    {key:'deal', ph:'DLL/SPA Price / Deal Reg #'},
+    {key:'hold', ph:'Hold/Reservation #'},
+    {key:'leadtime', ph:'Delivery Lead Time'},
+    {key:'eol', ph:'EOL Confirm (Yes/No)'}
+  ];
+  cols.forEach(c=>{
+  const td = el('td');
+  const inp = el('input',{placeholder:c.ph});
+  inp.dataset.key = c.key;
+  if(c.type) inp.type = c.type;
+  if(c.min!==undefined) inp.min = c.min;
+  if(c.step) inp.step = c.step;
+  if(c.val!==undefined) inp.value = c.val;
+
+  // existing totals wiring
+  inp.addEventListener('input', refreshTotals);
+
+  // NEW: autosize wiring
+  wireAutosize(inp);
+
+  td.appendChild(inp);
+  tr.appendChild(td);
+});
+
+  const rm=el('td',{},[el('button',{class:'bad',onclick:()=>{tr.remove(); refreshTotals();}},[document.createTextNode('Remove')])]); tr.appendChild(rm);
+  document.getElementById('itemsBody').appendChild(tr);
+
+  if(prefill){
+    [...tr.querySelectorAll('input')].forEach(inp=>{ const k=inp.dataset.key; if(prefill[k]!==undefined) inp.value=prefill[k]; });
+    showSubtabs();
+    if(prefill.accessory){ setVal('accSku',prefill.accessory.sku); setVal('accDesc',prefill.accessory.desc); setVal('accQty',prefill.accessory.qty); setVal('accSell',prefill.accessory.sell); }
+    if(prefill.insurance){ selectByTextExact('insPlan',prefill.insurance.plan); selectByTextExact('insDed',prefill.insurance.ded); selectByTextExact('insTerm',prefill.insurance.term); setVal('insSell',prefill.insurance.sell); }
+    if(prefill.services){ document.getElementById('svcEnabled').checked=!!prefill.services.enabled; document.getElementById('svcTier').value=String(prefill.services.tier||0); tierToMinutes(); recalcServices(); }
+    if(prefill.sim){ setVal('simCard',prefill.sim.card); setVal('pairingOption',prefill.sim.pairing); setVal('simHandling',prefill.sim.handling); setVal('simQuestionnaire',prefill.sim.questionnaire); }
+    if(prefill.lic){ setVal('licVendor',prefill.lic.vendor); setVal('licDuration',prefill.lic.duration); setVal('licProrated',prefill.lic.prorated); setVal('licKey',prefill.lic.key); setVal('licContact',prefill.lic.contact); }
+  }
+  document.getElementById('totalsBox').style.display='';
+  refreshTotals();
+}
+function getItems(){
+  const rows=[...document.querySelectorAll('#itemsBody tr')];
+  return rows.map(r=>{
+    const obj={}; [...r.querySelectorAll('input')].forEach(i=>obj[i.dataset.key]=i.value.trim());
+    return obj;
+  }).filter(o=>Object.values(o).some(v=>v));
+}
+function getCurrentRowQty(){
+  const lastRow=document.querySelector('#itemsBody tr:last-child');
+  const qty=lastRow?parseFloat(lastRow.querySelector('input[data-key="qty"]')?.value||'0'):0;
+  return isFinite(qty)?qty:0;
+}
+function autoExample(){ addRow(QUOTE_REQUEST_MAP["QR-2025-00123"]); }
+document.getElementById('btnLoadQR').addEventListener('click', ()=>{
+  const id=(document.getElementById('qrid').value||'').trim();
+  if(!id){ alert('Enter a Quote Request ID.'); return; }
+  const data = QUOTE_REQUEST_MAP[id];
+  if(!data){ alert('No mapping found for that ID.'); return; }
+  addRow(data);
+});
+
+/* ===== Subtabs ===== */
+function showSubtabs(){ document.getElementById('subtabsArea').style.display=''; document.getElementById('subtabPanels').style.display=''; }
+document.querySelectorAll('.subtab').forEach(s=>{
+  s.addEventListener('click',()=>{
+    document.querySelectorAll('.subtab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('[data-subpanel]').forEach(p=>p.style.display='none');
+    s.classList.add('active');
+    document.querySelector(`[data-subpanel="${s.dataset.sub}"]`).style.display='';
+  });
+});
+
+/* ===== Accessory Brick + Cable ===== */
+document.getElementById('bcInclude').addEventListener('change', e=>{
+  if(e.target.checked){
+    if(!val('accSku')) setVal('accSku','PWR-BRICK-CABLE');
+    if(!val('accDesc')) setVal('accDesc','Power Brick + Cable Kit');
+    if(!val('accQty')) setVal('accQty','1');
+    if(!val('accSell')) setVal('accSell','0.00');
+  }
+  refreshTotals();
+});
+
+/* ===== Services logic ===== */
+document.getElementById('svcTier').addEventListener('change', ()=>{ tierToMinutes(); recalcServices(); });
+document.getElementById('svcMinutes').addEventListener('input', recalcServices);
+document.getElementById('svcEnabled').addEventListener('change', recalcServices);
+document.getElementById('itemsBody').addEventListener('input', e=>{
+  if(e.target?.dataset?.key==='qty') recalcServices();
+});
+function tierToMinutes(){
+  const tier=parseInt(document.getElementById('svcTier').value||'0',10);
+  const minutes = tier===0 ? 5 : tier*15;
+  document.getElementById('svcMinutes').value = minutes;
+  document.getElementById('svcSKU').value = `PROSERV-TIER-${tier}`;
+}
+function recalcServices(){
+  const enabled = document.getElementById('svcEnabled').checked;
+  const minutes = parseFloat(document.getElementById('svcMinutes').value||'0');
+  const per = enabled ? minutes * RATE_PER_MIN : 0;
+  setVal('svcCostPer', per.toFixed(2));
+  const qty = getCurrentRowQty();
+  setVal('svcCostTotal', (per*qty).toFixed(2));
+  if(enabled && !document.getElementById('svcSKU').value){
+    document.getElementById('svcSKU').value=`PROSERV-TIER-${parseInt(document.getElementById('svcTier').value||'0',10)}`;
+  }
+  refreshTotals();
+}
+
+/* ===== Totals ===== */
+function parseNum(x){ const n=parseFloat(String(x).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; }
+function fmt(n){ return `$${(Math.round(n*100)/100).toFixed(2)}`; }
+
+function computeTotals(){
+  const items=getItems();
+  let linesSubtotal=0;
+  items.forEach(l=>{
+    const qty=parseNum(l.qty), price=parseNum(l.sell);
+    linesSubtotal += qty*price;
+  });
+
+  const qty = getCurrentRowQty();
+  const accQty=parseNum(val('accQty')); const accSell=parseNum(val('accSell'));
+  const accTotal = accQty*accSell*qty;
+
+  const svcEnabled=document.getElementById('svcEnabled').checked;
+  const svcPer=parseNum(val('svcCostPer'));
+  const svcTotal = svcEnabled ? svcPer*qty : 0;
+
+  const insSell=parseNum(val('insSell'));
+  const insTotal = insSell*qty;
+
+  const taxExempt = document.getElementById('taxExempt').checked;
+  const taxable = linesSubtotal + accTotal + svcTotal + insTotal;
+  const tax = taxExempt ? 0 : taxable*TAX_RATE;
+  const grand = taxable + tax;
+
+  return {linesSubtotal, accTotal, svcTotal, insTotal, tax, grand, taxable, taxExempt};
+}
+function refreshTotals(){
+  const t=computeTotals();
+  document.getElementById('tLines').textContent=fmt(t.linesSubtotal);
+  document.getElementById('tAcc').textContent=fmt(t.accTotal);
+  document.getElementById('tSvc').textContent=fmt(t.svcTotal);
+  document.getElementById('tIns').textContent=fmt(t.insTotal);
+  document.getElementById('tTax').textContent=fmt(t.tax);
+  document.getElementById('tGrand').textContent=fmt(t.grand);
+  document.getElementById('totalsBox').style.display='';
+  document.getElementById('taxNote').textContent = t.taxExempt ? 'Tax Exempt: tax not applied.' : `Tax rate: ${(TAX_RATE*100).toFixed(2)}%`;
+}
+
+/* ===== Summary / Validation ===== */
+function val(id){return (document.getElementById(id)?.value||'').trim()}
+function bool(id){return document.getElementById(id)?.checked}
+function buildSummary(){
+  const docType=[...document.querySelectorAll('input[name="doctype"]')].find(x=>x.checked)?.value||'QUOTE';
+  const lines=getItems();
+  const t=computeTotals();
+  const parts=[];
+  parts.push(`DOCUMENT: ${docType}`);
+  parts.push(`Flags: ${bool('flagNewCustomer')?'NEW Customer; ':''}${bool('flagWCP')?'WCP; ':''}${bool('flagCurrentCustomer')?'Current Customer; ':''}${bool('flag3PL')?'3PL; ':''}`.replace(/; $/,''));
+  parts.push('');
+  parts.push('SALES / PARTNER');
+  parts.push(`- Primary Rep: ${val('rep1')||'—'}; Secondary: ${val('rep2')||'—'}; Referral: ${val('refPartner')||'—'}`);
+  parts.push(`- Carrier Rep: ${val('carrierRepName')} <${val('carrierRepEmail')||'—'}>; CUC Rep: ${val('cucRep')||'—'}`);
+  parts.push('');
+  parts.push('BILLING');
+  parts.push(`- ${val('billCompany')} — ${val('billContact')} (${val('billPhone')}) <${val('billEmail')}>`);
+  parts.push(`- ${val('billStreet')} ${val('billSuite')}, ${val('billCity')}, ${val('billState')} ${val('billZip')}`);
+  parts.push('');
+  parts.push('PAYMENT');
+  parts.push(`- Method: ${val('payMethod')||'—'}; Terms: ${val('payTerms')||'—'}; Agreement: ${bool('hasAgreement')?'Yes':'No'}; Tax Exempt: ${bool('taxExempt')?'Yes':'No'}`);
+  parts.push('');
+  parts.push('SHIPPING');
+  parts.push(`- ${val('shipCompany')} — ${val('shipContact')} (${val('shipPhone')}) <${val('shipEmail')}> ${bool('resShip')?'[Residence]':''}`);
+  parts.push(`- ${val('shipStreet')} ${val('shipSuite')}, ${val('shipCity')}, ${val('shipState')} ${val('shipZip')}`);
+  parts.push(`- Options: Pay ${val('shipPay')||'—'}; Speed ${val('shipSpeed')||'—'}; Short Ship ${val('shortShip')||'—'}; Req ${val('reqShipDate')||'—'}; Expected ${val('expShipDate')||'—'}`);
+  parts.push('');
+  parts.push('LINES');
+  if(lines.length===0){ parts.push('  (none)'); }
+  lines.forEach((l,i)=>parts.push(`  ${i+1}. ${l.desc||'—'} | Model ${l.model||'—'} | Color ${l.color||'—'} | SKU ${l.sku||'—'} | Qty ${l.qty||'—'} | ${l.net||'—'} | ${l.carrier||'—'} | Sell $${l.sell||'—'} | ${l.cond||'—'} | In-Stock ${l.stock||'—'} | Vendor ${l.vendor||'—'} | Cost $${l.cost||'—'} | Deal ${l.deal||'—'} | Hold ${l.hold||'—'} | Lead ${l.leadtime||'—'} | EOL ${l.eol||'—'}`));
+  parts.push('');
+  parts.push('ACCESSORY / SERVICES / INSURANCE (most-recent item)');
+  parts.push(`- Acc: Brick+Cable ${document.getElementById('bcInclude').checked?'Yes':'No'} | SKU ${val('accSku')||'—'} | ${val('accDesc')||'—'} | Qty/Unit ${val('accQty')||0} | Sell $${val('accSell')||'—'}`);
+  parts.push(`- Svc: Included ${bool('svcEnabled')?'Yes':'No'} | Tier ${val('svcTier')||'0'} | Minutes ${val('svcMinutes')||'0'} | SKU ${val('svcSKU')||'—'} | $/device ${val('svcCostPer')||'0.00'}`);
+  parts.push(`- Ins: Plan ${val('insPlan')||'None'} | Ded ${val('insDed')||'—'} | Term ${val('insTerm')||'—'} | Sell $${val('insSell')||'—'}`);
+  parts.push('');
+  parts.push('SIM / PAIRING (most-recent item)');
+  parts.push(`- SIM ${val('simCard')||'—'} | Pairing ${val('pairingOption')||'—'} | Handling ${val('simHandling')||'—'} | Helix ${val('simQuestionnaire')||'—'}`);
+  parts.push('');
+  parts.push('LICENSES (most-recent item)');
+  parts.push(`- Vendor ${val('licVendor')||'—'} | Duration ${val('licDuration')||'—'} | Prorated $${val('licProrated')||'—'} | Key ${val('licKey')||'—'} | Contact ${val('licContact')||'—'}`);
+  parts.push('');
+  parts.push('MDM & CARRIER SUBSIDY');
+  parts.push(`- Carrier SPF: ${bool('carrierSPF')?'Yes':'No'} | Plan Code: ${val('planCode')||'—'} | Subsidy Verbiage: ${bool('subsidyNote')?'Yes':'No'}`);
+  parts.push(`- ABM: ${bool('mdmABM')?'Yes':'No'} | Knox (KME): ${bool('mdmKnox')?'Yes':'No'} | Knox Account #: ${val('knoxAccount')||'—'} | Zero Touch: ${bool('mdmZeroTouch')?'Yes':'No'} | MDM Pro: ${bool('mdmPro')?'Yes':'No'}`);
+  parts.push(`- MDM Notes: ${val('mdmNotes')||'—'}`);
+  parts.push('');
+  parts.push('TOTALS');
+  parts.push(`- Lines Subtotal: ${fmt(t.linesSubtotal)}`);
+  parts.push(`- Accessories: ${fmt(t.accTotal)}; Services: ${fmt(t.svcTotal)}; Insurance: ${fmt(t.insTotal)}`);
+  parts.push(`- Tax: ${fmt(t.tax)} ${t.taxExempt?'(Exempt)':''}`);
+  parts.push(`= GRAND TOTAL: ${fmt(t.grand)}`);
+
+  document.getElementById('summary').textContent=parts.join('\n');
+
+  // keep CSV preview in sync with latest values
+  refreshCSVPreview();
+}
+
+
+function buildIntakePayload(){
+  const docType = [...document.querySelectorAll('input[name="doctype"]')].find(x=>x.checked)?.value || 'QUOTE';
+  const t = computeTotals();
+  return {
+    wizard: {
+      rep: document.getElementById('rep1')?.value || '',
+      customerType: document.querySelector('input[name="wizCustomerType"]:checked')?.value || '',
+      docType,
+      scope: document.querySelector('input[name="wizScope"]:checked')?.value || ''
+    },
+    sales: {
+      primary: document.getElementById('rep1')?.value || '',
+      secondary: document.getElementById('rep2')?.value || '',
+      referral: document.getElementById('refPartner')?.value || '',
+      carrierRep: { name: val('carrierRepName'), email: val('carrierRepEmail') },
+      cucRep: val('cucRep')
+    },
+    billing: {
+      company: val('billCompany'), contact: val('billContact'), phone: val('billPhone'), email: val('billEmail'),
+      street: val('billStreet'), suite: val('billSuite'), city: val('billCity'), state: val('billState'), zip: val('billZip')
+    },
+    payment: { method: val('payMethod'), terms: val('payTerms'), agreement: bool('hasAgreement'), taxExempt: bool('taxExempt') },
+    shipping: {
+      company: val('shipCompany'), contact: val('shipContact'), phone: val('shipPhone'), email: val('shipEmail'),
+      street: val('shipStreet'), suite: val('shipSuite'), city: val('shipCity'), state: val('shipState'), zip: val('shipZip'),
+      residence: bool('resShip')
+    },
+    shippingOptions: { pay: val('shipPay'), speed: val('shipSpeed'), shortShip: val('shortShip'),
+      req: val('reqShipDate'), expected: val('expShipDate') },
+    items: getItems(),
+    accessory: {
+      includeBC: document.getElementById('bcInclude')?.checked || false,
+      sku: val('accSku'), desc: val('accDesc'),
+      perUnitQty: val('accQty'), perUnitSell: val('accSell')
+    },
+    insurance: { plan: val('insPlan'), ded: val('insDed'), term: val('insTerm'), sell: val('insSell') },
+    sim: { card: val('simCard'), handling: val('simHandling'), pairing: val('pairingOption') },
+    licenses: { vendor: val('licVendor'), duration: val('licDuration'), prorated: val('licProrated'), key: val('licKey'), contact: val('licContact') },
+    mdm: {
+      carrierSPF: bool('carrierSPF'), planCode: val('planCode'), subsidyNote: bool('subsidyNote'),
+      abm: bool('mdmABM'), knox: bool('mdmKnox'), knoxAccount: val('knoxAccount'), zeroTouch: bool('mdmZeroTouch'),
+      proServices: bool('mdmPro'),
+      services: {
+        enabled: bool('svcEnabled'),
+        tier: val('svcTier'),
+        minutes: val('svcMinutes'),
+        sku: val('svcSKU'),
+        costPer: val('svcCostPer'),
+        total: val('svcCostTotal')
+      },
+      notes: val('mdmNotes')
+    },
+    totals: {
+      linesSubtotal: t.linesSubtotal, accessories: t.accTotal, services: t.svcTotal, insurance: t.insTotal, tax: t.tax, grand: t.grand, taxExempt: t.taxExempt
+    }
+  };
+}
+
+
+function copySummary(){ if(!document.getElementById('summary').textContent) buildSummary(); navigator.clipboard.writeText(document.getElementById('summary').textContent||''); }
+function validateForm(){
+  const errs=[];
+  if(!val('billCompany')) errs.push('Billing: Company Name');
+  if(!val('billEmail')) errs.push('Billing: Email');
+  if(!val('shipStreet')) errs.push('Shipping: Street');
+  if(!val('shipCity')||!val('shipState')||!val('shipZip')) errs.push('Shipping: City/State/Zip');
+  if(!val('payMethod')) errs.push('Payment: Method');
+  const lines=getItems();
+  lines.forEach((l,idx)=>{
+    if(!(l.sku&&l.qty&&l.sell)) errs.push(`Line ${idx+1}: SKU, Qty, and Sell are required`);
+  });
+  alert(errs.length?`❌ ${errs.length} issue(s):\n- ${errs.join('\n- ')}`:'✅ Looks good.');
+}
+
+/* ===== CSV for OM Email ===== */
+function csvEscape(v){
+  const s = String(v ?? '');
+  if (/[",\r\n]/.test(s)) return `"${s.replace(/"/g,'""')}"`;
+  return s;
+}
+function buildCSV(){
+  const t = computeTotals();
+  const lines = getItems();
+
+  const top = [
+    ['Document Type', [...document.querySelectorAll('input[name="doctype"]')].find(x=>x.checked)?.value || 'QUOTE'],
+    ['New Customer', bool('flagNewCustomer') ? 'Yes' : 'No'],
+    ['WCP', bool('flagWCP') ? 'Yes' : 'No'],
+    ['Current Customer', bool('flagCurrentCustomer') ? 'Yes' : 'No'],
+    ['3PL Restock', bool('flag3PL') ? 'Yes' : 'No'],
+  ];
+
+  const sales = [
+    ['Primary Rep', val('rep1')], ['Secondary Rep', val('rep2')], ['Referral Partner', val('refPartner')],
+    ['Carrier Rep Name', val('carrierRepName')], ['Carrier Rep Email', val('carrierRepEmail')], ['CUC Rep', val('cucRep')]
+  ];
+
+  const billing = [
+    ['Company', val('billCompany')], ['Billing Contact', val('billContact')], ['Billing Phone', val('billPhone')], ['Billing Email', val('billEmail')],
+    ['Billing Street', val('billStreet')], ['Billing Suite', val('billSuite')], ['Billing City', val('billCity')], ['Billing State', val('billState')], ['Billing Zip', val('billZip')]
+  ];
+
+  const payment = [
+    ['Payment Method', val('payMethod')], ['Payment Terms', val('payTerms')],
+    ['Purchase Agreement', bool('hasAgreement') ? 'Yes' : 'No'], ['Tax Exempt', bool('taxExempt') ? 'Yes' : 'No']
+  ];
+
+  const shipping = [
+    ['Ship Company/Care Of', val('shipCompany')], ['Ship Contact', val('shipContact')], ['Ship Phone', val('shipPhone')], ['Ship Email', val('shipEmail')],
+    ['Ship Street', val('shipStreet')], ['Ship Suite', val('shipSuite')], ['Ship City', val('shipCity')], ['Ship State', val('shipState')], ['Ship Zip', val('shipZip')],
+    ['Residence', bool('resShip') ? 'Yes' : 'No'],
+    ['Ship Pay Method', val('shipPay')], ['Ship Speed', val('shipSpeed')], ['Short Ship', val('shortShip')],
+    ['Requested Ship Date', val('reqShipDate')], ['Expected Ship Date', val('expShipDate')],
+    ['Internal Notes', document.getElementById('notes')?.value || '']
+  ];
+
+  const itemsHeader = [
+    'Line','Description','Model / Part #','Color','SKU','Qty','Network','Carrier','Act Payout $','MSRP','Disc %','Sell Price','Condition','In Stock','Vendor','Quoted Cost','DLL/SPA / Deal Reg #','Hold/Reservation #','Delivery Lead Time','EOL Confirm'
+  ];
+  const itemsRows = lines.length ? lines.map((l,i)=>[
+    i+1, l.desc, l.model, l.color, l.sku, l.qty, l.net, l.carrier, l.payout, l.msrp, l.disc, l.sell, l.cond, l.stock, l.vendor, l.cost, l.deal, l.hold, l.leadtime, l.eol
+  ]) : [['(no items)']];
+
+  const accessory = [
+    ['Accessory SKU', val('accSku')], ['Accessory Description', val('accDesc')],
+    ['Accessory Qty (per unit)', val('accQty')], ['Accessory Sell Price', val('accSell')],
+    ['Include Brick + Cable', document.getElementById('bcInclude')?.checked ? 'Yes' : 'No']
+  ];
+
+  const services = [
+    ['Services Included', bool('svcEnabled') ? 'Yes' : 'No'], ['Services Tier', val('svcTier')],
+    ['Services Minutes (per device)', val('svcMinutes')], ['Services SKU', val('svcSKU')], ['Services $/device', val('svcCostPer')], ['Services Total', val('svcCostTotal')]
+  ];
+
+  const insurance = [
+    ['Insurance Plan', val('insPlan')], ['DecomposeOMEmail()ductible', val('insDed')], ['Coverage Term', val('insTerm')], ['Insurance Sell Price', val('insSell')]
+  ];
+
+  const sim = [
+    ['SIM Card', val('simCard')], ['Pairing Option', val('pairingOption')], ['SIM Handling', val('simHandling')], ['Helix SIM Questionnaire', val('simQuestionnaire')]
+  ];
+
+  const licenses = [
+    ['License Vendor', val('licVendor')], ['License Duration', val('licDuration')], ['Prorated Price', val('licProrated')], ['License Key / Simba Code', val('licKey')], ['New SKU Contact', val('licContact')]
+  ];
+
+  const mdm = [
+    ['Carrier SPF Subsidy', bool('carrierSPF')?'Yes':'No'], ['Business Internet Plan Code', val('planCode')], ['Subsidy Verbiage', bool('subsidyNote')?'Yes':'No'],
+    ['ABM Enrollment', bool('mdmABM')?'Yes':'No'], ['Knox Enrollment (KME)', bool('mdmKnox')?'Yes':'No'], ['Knox Account #', val('knoxAccount')],
+    ['Android Zero Touch', bool('mdmZeroTouch')?'Yes':'No'], ['MDM Pro Services', bool('mdmPro')?'Yes':'No'], ['MDM Notes', val('mdmNotes')]
+  ];
+
+  const totals = [
+    ['Lines Subtotal', fmt(t.linesSubtotal)],
+    ['Accessories', fmt(t.accTotal)], ['Services', fmt(t.svcTotal)], ['Insurance', fmt(t.insTotal)],
+    ['Tax', `${fmt(t.tax)}${t.taxExempt ? ' (Exempt)' : ''}`],
+    ['Grand Total', fmt(t.grand)]
+  ];
+
+  const chunks = [];
+  function pushSection(title, rows){
+    chunks.push([title]);
+    rows.forEach(r=>chunks.push(r));
+    chunks.push(['']);
+  }
+  pushSection('DOCUMENT', top);
+  pushSection('SALES / PARTNER', sales);
+  pushSection('BILLING', billing);
+  pushSection('PAYMENT', payment);
+  pushSection('SHIPPING', shipping);
+
+  chunks.push(['ITEMS']);
+  chunks.push(itemsHeader);
+  itemsRows.forEach(r=>chunks.push(r));
+  chunks.push(['']);
+
+  pushSection('ACCESSORY', accessory);
+  pushSection('SERVICES', services);
+  pushSection('INSURANCE', insurance);
+  pushSection('SIM / PAIRING', sim);
+  pushSection('LICENSES', licenses);
+  pushSection('MDM & CARRIER SUBSIDY', mdm);
+  pushSection('TOTALS', totals);
+
+  return chunks.map(row => row.map(csvEscape).join(',')).join('\r\n');
+}
+function refreshCSVPreview(){
+  const csv = buildCSV();
+  const ta = document.getElementById('csvPreview');
+  if(ta){ ta.value = csv; }
+  updateMailtoLink(); // keep mailto fresh
+}
+function copyCSVToClipboard(){
+  const ta = document.getElementById('csvPreview');
+  const txt = ta?.value || buildCSV();
+  navigator.clipboard.writeText(txt);
+  alert('CSV copied to clipboard.');
+}
+function downloadCSVFile(){
+  const csv = document.getElementById('csvPreview')?.value || buildCSV();
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const company = (val('billCompany') || 'intake').replace(/[^\w.-]+/g,'_');
+  a.href = url;
+  a.download = `connectus_intake_${company}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(()=>{ URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+function composeOMEmail(){
+  const to = encodeURIComponent(document.getElementById('emailTo')?.value || 'service@connectuscorp.com');
+  const subj = encodeURIComponent(document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary');
+  const csv = document.getElementById('csvPreview')?.value || buildCSV();
+  const bodyText = `Hello Order Management,\r\n\r\nPlease find the intake details below in CSV format.\r\n\r\n${csv}\r\n\r\n— ConnectUS Intake`;
+  const body = encodeURIComponent(bodyText);
+  window.location.href = `mailto:${to}?subject=${subj}&body=${body}`;
+}
+// Utility: cap body length so mail clients don't choke
+function truncateForMailto(str, max = 6000){
+  if (str.length <= max) return str;
+  return str.slice(0, max - 80) + "\n\n…(truncated)";
+}
+
+// Open mail with the human-readable Summary instead of CSV
+function composeOMEmailNoCSV(){
+  const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
+  const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — Summary';
+
+  const summaryText = (document.getElementById('summary')?.textContent || '').trim() || '(no summary available)';
+  const company = (document.getElementById('billCompany')?.value || '').trim();
+
+  const header  = `Hello Order Management,\n\n${company ? `Company: ${company}\n` : ''}Below is the intake summary:\n\n`;
+  const footer  = `\n\n— ConnectUS Intake`;
+  const bodyText = header + summaryText + footer;
+
+  const to   = encodeURIComponent(toRaw);
+  const subj = encodeURIComponent(subjRaw);
+  const body = encodeURIComponent(bodyText);
+
+  const href = `mailto:${to}?subject=${subj}&body=${body}`;
+  console.log("Opening:", href); // debug
+  openMailto(href);
+}
+
+
+function buildMailtoHref(){
+  const to = encodeURIComponent(document.getElementById('emailTo')?.value || 'service@connectuscorp.com');
+  const subj = encodeURIComponent(document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary');
+  const csv = document.getElementById('csvPreview')?.value || buildCSV();
+  const bodyText = `Hello Order Management,\r\n\r\nPlease find the intake details below in CSV format.\r\n\r\n${csv}\r\n\r\n— ConnectUS Intake`;
+  const body = encodeURIComponent(bodyText);
+  return `mailto:${to}?subject=${subj}&body=${body}`;
+}
+function updateMailtoLink(){
+  const a = document.getElementById('mailtoHref');
+  if(!a) return;
+  a.href = buildMailtoHref();
+  a.textContent = 'Open in default mail app';
+}
+
+/* ===== Demo flow ===== */
+const DEMO_CUSTOMER_FULL={
+  "company":"Acme Corp",
+  "billing":{"contact":"John Doe","phone":"555-1111","email":"john@acme.com","street":"1 Main St","suite":"Ste 100","city":"Philadelphia","state":"PA","zip":"19104"},
+  "shipping":{"company":"Acme Warehouse","contact":"Jane Smith","phone":"555-2222","email":"wh@acme.com","street":"500 Dock Rd","suite":"","city":"Philadelphia","state":"PA","zip":"19112"},
+  "payment":{"method":"Credit Card","terms":"Due on receipt","taxExempt":true,"agreement":false},
+  "shippingOptions":{"pay":"Prepaid","speed":"Ground","shortShip":"No"},
+  "carrierRep":{"name":"Verizon Biz Rep","email":"vrep@vz.com"},
+  "rep":{"primary":"Lucas Currin","secondary":"—"}
+};
+document.getElementById('btnDemoFlow').addEventListener('click', ()=>{
+  openDrawer('drawerWCP');
+  document.getElementById('wcpQuery').value='Acme Corp';
+  document.getElementById('wcpPaste').value=JSON.stringify(DEMO_CUSTOMER_FULL,null,2);
+  applyPastedCustomer('wcpPaste');
+  addRow(QUOTE_REQUEST_MAP["QR-2025-00123"]);
+  document.getElementById('svcEnabled').checked = true; document.getElementById('svcTier').value = '1'; tierToMinutes(); recalcServices();
+  document.querySelector('.tab[data-tab="shipping"]').click();
+  buildSummary();
+  openDrawer('drawerEmail');
+});
+
+/* ===== Utilities ===== */
+function setByPath(obj,path,val){ const ks=path.split('.'); let r=obj; ks.slice(0,-1).forEach(k=>{ if(!(k in r)) r[k]={}; r=r[k]; }); r[ks.pop()]=val; }
+function pick(...vals){ return vals.find(v=>v!==undefined && v!==null && String(v).length>0) || ''; }
+function setVal(id,v){ if(document.getElementById(id) && v!==undefined) document.getElementById(id).value=v; }
+function selectByText(id,txt){ const sel=document.getElementById(id); if(!sel) return; [...sel.options].forEach((o,i)=>{ if(o.text.trim().toLowerCase()===String(txt).trim().toLowerCase()) sel.selectedIndex=i; }); }
+function selectByTextExact(id,txt){ const sel=document.getElementById(id); if(!sel||!txt) return; [...sel.options].forEach((o,i)=>{ if(o.text.trim()===String(txt).trim()) sel.selectedIndex=i; }); }
+
+/* ===== Autosize Inputs (Items table) ===== */
+const __fitMeasure = document.createElement('span');
+__fitMeasure.style.cssText = [
+  'position:absolute','visibility:hidden','white-space:pre','top:-9999px','left:-9999px',
+  'font:inherit','letter-spacing:inherit'
+].join(';');
+document.body.appendChild(__fitMeasure);
+
+function autosizeWidth(el){
+  if(!el) return;
+  const txt = el.value || el.placeholder || '';
+  // mirror computed typography so measurement matches
+  const cs = window.getComputedStyle(el);
+  __fitMeasure.style.font = cs.font;
+  __fitMeasure.style.letterSpacing = cs.letterSpacing;
+
+  __fitMeasure.textContent = txt.replace(/\s/g, '\u00A0'); // keep spaces
+  const padding = 18; // a little breathing room
+  const min = 72, max = 560;
+
+  // Set width based on measured text
+  const w = Math.min(Math.max(__fitMeasure.offsetWidth + padding, min), max);
+  el.style.width = w + 'px';
+}
+
+function wireAutosize(el){
+  if(!el) return;
+  el.classList.add('autosize');
+  autosizeWidth(el);
+  // reflow on user edits & when placeholder is removed
+  el.addEventListener('input', ()=>autosizeWidth(el));
+  el.addEventListener('change', ()=>autosizeWidth(el));
+  // if fonts load late, reflow once
+  window.requestAnimationFrame(()=>autosizeWidth(el));
+}
+
+
+/* Simple clear to avoid undefined handler */
+function clearAll(){
+  // Clear all inputs/checkboxes/selects in visible panels
+  document.querySelectorAll('input, select, textarea').forEach(el=>{
+    if(el.id==='emailTo' || el.id==='emailSubject') return; // keep OM default
+    if(el.type==='checkbox' || el.type==='radio'){ el.checked = false; }
+    else if(el.tagName==='SELECT'){ el.selectedIndex = 0; }
+    else{ el.value=''; 
+        
+      // Keep legacy toggle bar hidden after clear
+  const tb = document.getElementById('toggleBar');
+  if (tb) { tb.style.display = 'none'; tb.setAttribute('aria-hidden','true'); }
+
+    }
+  
+    // Wizard reset
+  document.querySelectorAll('input[name="wizCustomerType"], input[name="wizDocType"], input[name="wizScope"]').forEach(i=>i.checked=false);
+  const s2 = document.getElementById('wizStep2'); if(s2) s2.style.display = 'none';
+  const s3 = document.getElementById('wizStep3'); if(s3) s3.style.display = 'none';
+  setWizardDone(false);
+  showIntakeWork(false);
+  const wh = document.getElementById('wizHint'); if(wh) wh.textContent = 'Complete steps 1–3 to unlock the intake tabs.';
+
+  });
+  // Reset items table
+  document.getElementById('itemsBody').innerHTML='';
+  addRow(); // leave one empty row
+  // Totals + summary
+  refreshTotals();
+  document.getElementById('summary').textContent='';
+  refreshCSVPreview();
+}
+
+/* ===== Sales Rep Management panel logic ===== */
+function renderRepList(){
+  const list = getReps();
+  const target = document.getElementById('repList');
+  target.innerHTML='';
+  if(list.length===0){ target.textContent='No reps yet.'; return; }
+  const tbl=document.createElement('table'); tbl.className='table';
+  tbl.innerHTML=`<thead><tr><th>Name</th><th>Email</th><th>Slug</th><th>Actions</th></tr></thead>`;
+  const tb=document.createElement('tbody');
+  list.forEach(r=>{
+    const tr=document.createElement('tr');
+    const actions=el('td',{},[
+      el('button',{class:'ghost',onclick:()=>loadRepIntoForm(r)},[document.createTextNode('Edit')]),
+      el('button',{class:'bad',style:'margin-left:8px',onclick:()=>deleteRep(r.name)},[document.createTextNode('Delete')])
+    ]);
+    tr.innerHTML=`<td>${r.name}</td><td>${r.email}</td><td>${r.slug||''}</td>`;
+    tr.appendChild(actions);
+    tb.appendChild(tr);
+  });
+  tbl.appendChild(tb);
+  target.appendChild(tbl);
+  populateRepSelects(); 
+}
+function populateRepSelects(){
+  const reps=getReps();
+  const primary=document.getElementById('rep1'); const secondary=document.getElementById('rep2');
+  const mk=(sel,isPrimary)=>{
+    sel.innerHTML='';
+    if(isPrimary){
+      const opt0=document.createElement('option'); opt0.value=''; opt0.textContent='Select Primary Sales Rep'; sel.appendChild(opt0);
+    }else{
+      const optdash=document.createElement('option'); optdash.textContent='—'; sel.appendChild(optdash);
+    }
+    reps.forEach(r=>{ const o=document.createElement('option'); o.text=r.name; sel.appendChild(o); });
+    const other=document.createElement('option'); other.textContent='Other'; sel.appendChild(other);
+  };
+  mk(primary,true); mk(secondary,false);
+}
+function loadRepIntoForm(r){
+  setVal('repNameInput', r.name);
+  setVal('repEmailInput', r.email);
+  setVal('repSlugInput', r.slug||'');
+  document.getElementById('repTemplatePick').value='custom';
+  document.getElementById('repTemplateText').value=r.template||'';
+}
+function deleteRep(name){
+  if(!confirm(`Delete ${name}?`)) return;
+  const left=getReps().filter(r=>r.name!==name);
+  saveReps(left); renderRepList();
+}
+document.getElementById('repTemplatePick').addEventListener('change', e=>{
+  const v=e.target.value;
+  if(BASE_TEMPLATES[v]){
+    document.getElementById('repTemplateText').value=BASE_TEMPLATES[v];
+  }
+});
+document.getElementById('btnSaveRep').addEventListener('click', ()=>{
+  const name=val('repNameInput'); const email=val('repEmailInput'); const slug=val('repSlugInput'); const template=document.getElementById('repTemplateText').value||'';
+  if(!name||!email){ alert('Name and Email are required.'); return; }
+  const reps=getReps();
+  const idx=reps.findIndex(r=>r.name===name);
+  const item={name,email,slug,template};
+  if(idx>=0) reps[idx]=item; else reps.push(item);
+  saveReps(reps);
+  renderRepList();
+  alert('Rep saved.');
+});
+document.getElementById('btnResetRepForm').addEventListener('click', ()=>{
+  setVal('repNameInput',''); setVal('repEmailInput',''); setVal('repSlugInput',''); document.getElementById('repTemplateText').value='';
+});
+
+/* ===== Wire up Email drawer open ===== */
+document.getElementById('btnOpenEmail').addEventListener('click', ()=> {
+  setTimeout(()=>{ 
+    refreshCSVPreview();
+    updateMailtoLink();
+  }, 50);
+});
+
+document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>{
+  const btn = document.getElementById('btnSubmitIntake');
+  const status = document.getElementById('submitStatus');
+  try{
+    const errs = [];
+    if(!val('billCompany')) errs.push('Billing Company');
+    if(!val('billEmail')) errs.push('Billing Email');
+    if(getItems().length === 0) errs.push('At least one Item line');
+    if(errs.length){ alert(`Please complete: ${errs.join(', ')}`); return; }
+
+    btn.disabled = true; btn.textContent = 'Submitting…';
+    status.textContent = 'Sending to server…';
+
+    const payload = buildIntakePayload();
+    const resp = await api('/intake', { method:'POST', body: payload });
+
+    status.textContent = `Saved: ${resp.id || '(ok)'}`;
+    alert('Intake submitted successfully.');
+  }catch(err){
+    status.textContent = 'Error';
+    alert(`Submit failed: ${err.message}`);
+  }finally{
+    btn.disabled = false; btn.textContent = 'Submit Intake';
+    setTimeout(()=> status.textContent='', 3000);
+  }
+});
+
+
+/* Keep mailto fresh when inputs change */
+['emailTo','emailSubject','csvPreview'].forEach(id=>{
+  const el = document.getElementById(id);
+  if(el) el.addEventListener('input', updateMailtoLink);
+});
+
+/* ===== Init ===== */
+(function init(){
+  // Panels default
+  renderRepList();
+  populateWizardRepSelect();
+  populateSimDropdowns();
+
+  
+    // Autosize any existing inputs in the Items table
+  document.querySelectorAll('#itemsBody input').forEach(wireAutosize);
+
+
+    // Gate intake UI on first load
+  if(isWizardDone()){
+    showIntakeWork(true);
+  }else{
+    showIntakeWork(false);
+  }
+  
+    // Keep legacy toggle bar hidden
+  const tb = document.getElementById('toggleBar');
+  if (tb) { tb.style.display = 'none'; tb.setAttribute('aria-hidden','true'); }
+
+
+
+  // Intake default UI
+  addRow(); // one editable row
+  if(document.querySelector('#itemsBody tr')){ showSubtabs(); document.getElementById('totalsBox').style.display=''; }
+  tierToMinutes(); recalcServices();
+
+  // Ensure CSV preview is primed
+  refreshCSVPreview();
+})();
+</script>
+</body>
+</html>
