@@ -1339,87 +1339,92 @@ async function openOTSearch(){
 }
 
 
-// Map a customer result into your existing form fields
-async function applyCustomerFromApi(r) {
-  if (!r) return;
+// hydrate -> log -> paste -> apply (hard fail if id/detail missing)
+async function applyCustomerFromApi(r){
+  // 0) must have an id from the search result
+  const id =
+    r?.id ??
+    r?.Id ?? r?.ID ??
+    r?.CustomerId ?? r?.CustomerID ??
+    r?.CustomerIdRef ??
+    r?.CustomerRef?.Id ?? r?.CustomerRef?.ID ?? r?.CustomerRef?.id ??
+    null;
 
-  // 1) Load normalized detail from your API (has billing/shipping normalized like _ot.js)
-  async function loadCustomerDetail(id){
-    try { return id ? await api(`/ordertime/customers/${encodeURIComponent(id)}`) : null; }
-    catch (e) { console.warn('detail load failed:', e); return null; }
+  if (!id) {
+    console.warn('Apply blocked: search result had no id', r);
+    alert('This search result has no ID. Try another customer or fix /api/ordertime/customers/search mapping.');
+    return;
   }
-  const detail = (r.id ? await loadCustomerDetail(r.id) : null) || {};
 
-  // 2) Build the single canonical object the paste-applier expects
+  // 1) load detail from your API (this MUST return billing/shipping)
+  let detail = null;
+  try {
+    detail = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
+  } catch (e) {
+    console.error('Detail fetch failed:', e);
+    alert('Customer detail failed. Check server logs and env vars.');
+    return;
+  }
+
+  // 2) log the key fields so you can see what the backend actually returned
+  console.table({
+    company: detail.company,
+    billStreet: detail?.billing?.street,
+    billCity:   detail?.billing?.city,
+    billState:  detail?.billing?.state,
+    billZip:    detail?.billing?.zip,
+    shipStreet: detail?.shipping?.street,
+    shipCity:   detail?.shipping?.city,
+    shipState:  detail?.shipping?.state,
+    shipZip:    detail?.shipping?.zip,
+    payMethod:  detail?.payment?.method
+  });
+
+  // 3) build the paste object from detail only (no fallback to thin search row)
   const data = {
-    company: detail.company || r.company || r.name || '',
+    company: detail.company || '',
     billing: {
-      contact: detail.billing?.contact || r.billingContact || '',
-      phone:   detail.billing?.phone   || r.billingPhone   || '',
-      email:   detail.billing?.email   || r.billingEmail   || '',
-      street:  detail.billing?.street  || r.billingStreet  || '',
-      suite:   detail.billing?.suite   || r.billingSuite   || '',
-      city:    detail.billing?.city    || r.billingCity    || r.city || '',
-      state:   detail.billing?.state   || r.billingState   || r.state || '',
-      zip:     detail.billing?.zip     || r.billingZip     || r.zip || ''
+      contact: detail.billing?.contact || '',
+      phone:   detail.billing?.phone   || '',
+      email:   detail.billing?.email   || '',
+      street:  detail.billing?.street  || '',
+      suite:   detail.billing?.suite   || '',
+      city:    detail.billing?.city    || '',
+      state:   detail.billing?.state   || '',
+      zip:     detail.billing?.zip     || '',
     },
     shipping: {
-      company: detail.shipping?.company || r.shipCompany || r.company || '',
-      contact: detail.shipping?.contact || r.shipContact || r.billingContact || '',
-      phone:   detail.shipping?.phone   || r.shipPhone   || r.billingPhone   || '',
-      email:   detail.shipping?.email   || r.shipEmail   || r.billingEmail   || '',
-      street:  detail.shipping?.street  || r.shipStreet  || r.billingStreet  || '',
-      suite:   detail.shipping?.suite   || r.shipSuite   || r.billingSuite   || '',
-      city:    detail.shipping?.city    || r.shipCity    || r.billingCity    || r.city || '',
-      state:   detail.shipping?.state   || r.shipState   || r.billingState   || r.state || '',
-      zip:     detail.shipping?.zip     || r.shipZip     || r.billingZip     || r.zip || '',
-      residence: !!detail.shipping?.residence
+      company:   detail.shipping?.company || detail.company || '',
+      contact:   detail.shipping?.contact || '',
+      phone:     detail.shipping?.phone   || '',
+      email:     detail.shipping?.email   || '',
+      street:    detail.shipping?.street  || '',
+      suite:     detail.shipping?.suite   || '',
+      city:      detail.shipping?.city    || '',
+      state:     detail.shipping?.state   || '',
+      zip:       detail.shipping?.zip     || '',
+      residence: !!detail.shipping?.residence,
     },
     payment: {
       method:    detail.payment?.method || '',
       terms:     detail.payment?.terms  || '',
       taxExempt: !!detail.payment?.taxExempt,
-      agreement: !!detail.payment?.agreement
+      agreement: !!detail.payment?.agreement,
     },
     shippingOptions: {
-      pay:   detail.shippingOptions?.pay   || '',
-      speed: detail.shippingOptions?.speed || '',
-      shortShip: detail.shippingOptions?.shortShip || ''
+      pay:       detail.shippingOptions?.pay   || '',
+      speed:     detail.shippingOptions?.speed || '',
+      shortShip: detail.shippingOptions?.shortShip || '',
     },
-    rep: {
-      primary:   detail.rep?.primary || '',
-      secondary: detail.rep?.secondary || ''
-    },
-    carrierRep: {
-      name:  detail.carrierRep?.name  || '',
-      email: detail.carrierRep?.email || ''
-    }
+    rep:        detail.rep        || {},
+    carrierRep: detail.carrierRep || {},
   };
 
-  // 3) Debug — you’ll see exactly what’s being applied
-  console.table({
-    billCompany: data.company,
-    billStreet: data.billing.street,
-    billCity: data.billing.city,
-    billState: data.billing.state,
-    billZip: data.billing.zip,
-    shipStreet: data.shipping.street,
-    shipCity: data.shipping.city,
-    shipState: data.shipping.state,
-    shipZip: data.shipping.zip,
-    payMethod: data.payment.method
-  });
-
-  // 4) Use the same “paste → apply” path your UI already wires up
+  // 4) send through your single paste->applier path
   const ta = document.getElementById('wcpPaste');
   if (ta) ta.value = JSON.stringify(data, null, 2);
   applyPastedCustomer('wcpPaste');
-
-  // 5) Keep UX consistent
-  try { if (typeof showIntakeWork === 'function') showIntakeWork(true); } catch {}
-  document.querySelector('.tab[data-tab="customer"]')?.click();
 }
-
 
 
 // ---- apply customer from textarea paste (JSON or key: value lines)
