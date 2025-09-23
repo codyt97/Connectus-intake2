@@ -1390,12 +1390,7 @@ applyCustomerFromApi({ id });
           return; // <- DO NOT call the detail endpoint
         }
         try{
-          const full = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
-          applyCustomerFromApi(full);  // your existing mapper -> form
-          closeDrawer?.('drawerWCP');  // close if your UI supports it
-        }catch(err){
-          alert(`Load customer failed: ${err.message}`);
-        }
+          applyCustomerFromApi({ id });   // one fetch, inside the mapper
       });
     });
 
@@ -2580,19 +2575,5 @@ function addItemFromSearch(r){
 }
 </script>
 
-</script>
-  <script>
-(function () {
-  el.addEventListener('click', (e) => {
-  const btn = e.target.closest('button[data-cust-id]');
-  if (!btn) return;
-  const id = btn.dataset.custId;
-  if (!id || id === 'undefined' || id === 'null' || String(id).trim() === '') {
-    alert('This search result has no usable ID.'); 
-    return;
-  }
-  applyCustomerFromApi({ id }); // one fetch path
-});
-</script>
 </body>
 </html>
