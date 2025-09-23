@@ -1,23 +1,19 @@
-// CommonJS
-const { otList, like, getCustomerById, getSalesOrderByDocNo, otGet } = require('../../_ot');
+const { otListSmart, like, filterRows } = require('../../_ot');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const base = { Type: 'SalesOrder', Page: 1, Take: 50, SortParams: [{ PropertyName: 'DocNumber', SortDirection: 1 }] }; // 1 = Desc
-
-    // run two separate filters then de-dupe
     const [byDoc, byCust] = await Promise.all([
-      otList({ ...base, FilterParams: [like('DocNumber', q)] }),
-      otList({ ...base, FilterParams: [like('CustomerRef.Name', q)] }), // OT supports dotted path here
+      otListSmart({ type: 'SalesOrder', filters: [like('DocNumber', q)], sortProp: 'DocNumber', desc: true, take: 50 }),
+      otListSmart({ type: 'SalesOrder', filters: [like('CustomerRef.Name', q)], sortProp: 'DocNumber', desc: true, take: 50 }),
     ]);
 
-    const rows = [
-      ...(Array.isArray(byDoc?.Records) ? byDoc.Records : Array.isArray(byDoc) ? byDoc : []),
-      ...(Array.isArray(byCust?.Records) ? byCust.Records : Array.isArray(byCust) ? byCust : []),
-    ];
+    let rows = [...byDoc, ...byCust];
+
+    // Guaranteed relevance
+    rows = filterRows(rows, q, r => [r.DocNumber, r.DocNo, r.Number, r.CustomerRef?.Name]);
 
     const seen = new Set();
     const out = rows
@@ -34,4 +30,4 @@ export default async function handler(req, res) {
   } catch (err) {
     res.status(500).json({ error: `API GET /ordertime/salesorders/search failed: ${err.message || err}` });
   }
-}
+};
