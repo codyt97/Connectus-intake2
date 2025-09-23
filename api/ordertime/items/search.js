@@ -9,22 +9,19 @@ export default async function handler(req, res) {
     const like = (prop) => ({
       PropertyName: prop,
       FieldType: 1,
-      Operator: 12,
+      Operator: 12,             // contains
       FilterValueArray: [q]
     });
 
-    const [byName, byNum] = await Promise.all([
-      otPost('/list', { Type: 115, NumberOfRecords: 25, PageNumber: 1, Filters: [like('Name')] }),
-      otPost('/list', { Type: 115, NumberOfRecords: 25, PageNumber: 1, Filters: [like('Number')] }).catch(() => ([])),
+    const [byName, byNum, byMfg, byUpc] = await Promise.all([
+      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('Name')] }),
+      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('Number')] }),
+      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('ManufacturerPartNo')] }),
+      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('UPC')] }),
     ]);
 
-    const rows = [
-      ...((byName?.result || byName?.Items || byName) || []),
-      ...((byNum?.result || byNum?.Items || byNum) || []),
-    ];
-
     const seen = new Set();
-    const out = rows
+    const out = [...byName, ...byNum, ...byMfg, ...byUpc]
       .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
       .map(x => ({
         id: x.Id,
@@ -38,6 +35,7 @@ export default async function handler(req, res) {
 
     res.status(200).json(out);
   } catch (e) {
+    console.error('items/search', e);
     res.status(500).json({ error: 'Item search failed: ' + e.message });
   }
 }
