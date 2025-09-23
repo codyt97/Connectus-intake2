@@ -1,42 +1,41 @@
 // /api/ordertime/items/search.js
-import { otPost } from '../../_ot';
+import { otList } from '../../_ot';
 
 export default async function handler(req, res) {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const like = (prop) => ({
-      PropertyName: prop,
-      FieldType: 1,
-      Operator: 12,             // contains
-      FilterValueArray: [q]
-    });
+    const base = {
+      Type: 'PartItem',
+      PageNumber: 1,
+      NumberOfRecords: 50,
+      Sortation: { PropertyName: 'Name', Direction: 'Asc' },
+    };
 
-    const [byName, byNum, byMfg, byUpc] = await Promise.all([
-  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('Name')] }),
-  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('Number')] }),
-  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('ManufacturerPartNo')] }),
-  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('UPC')] }),
-]);
+    // Two passes (name/number) – keeps filter logic simple and avoids AND/OR gymnastics
+    const [byName, byNumber, byMfg] = await Promise.all([
+      otList({ ...base, Filters: [{ PropertyName: 'Name', FieldType: 'String', Operator: 'Contains', FilterValueArray: [q] }] }),
+      otList({ ...base, Filters: [{ PropertyName: 'Number', FieldType: 'String', Operator: 'Contains', FilterValueArray: [q] }] }),
+      otList({ ...base, Filters: [{ PropertyName: 'ManufacturerPartNo', FieldType: 'String', Operator: 'Contains', FilterValueArray: [q] }] }),
+    ]);
 
-
+    const rows = [...(byName?.Records || byName || []), ...(byNumber?.Records || byNumber || []), ...(byMfg?.Records || byMfg || [])];
     const seen = new Set();
-    const out = [...byName, ...byNum, ...byMfg, ...byUpc]
+    const out = rows
       .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
       .map(x => ({
         id: x.Id,
-        name: x.Name || x.ItemName || x.Number || '',
+        name: x.Name || x.ItemName || '',
         description: x.Description || '',
         mfgPart: x.ManufacturerPartNo || '',
         upc: x.UPC || '',
         price: x.SalesPrice ?? x.Price ?? 0,
-        sku: x.Number || ''
+        sku: x.Number || '',
       }));
 
     res.status(200).json(out);
-  } catch (e) {
-    console.error('items/search', e);
-    res.status(500).json({ error: 'Item search failed: ' + e.message });
+  } catch (err) {
+    res.status(500).json({ error: `API GET /ordertime/items/search failed: ${String(err.message || err)}` });
   }
 }
