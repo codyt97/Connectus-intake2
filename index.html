@@ -1363,17 +1363,19 @@ async function openOTSearch(){
     }
 
     // Render list using the robust ID mapper
-     target.querySelectorAll('[data-cust-id]').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const id = e.currentTarget.getAttribute('data-cust-id');
-      if (!id || id === 'undefined' || id === 'null' || String(id).trim() === '') {
-        alert('This search result has no usable ID.\nFix /ordertime/customers/search to include an Id/ID/CustomerId/CustomerRef.Id.');
-        return;
-      }
-      // One call only: let the mapper fetch detail.
-      applyCustomerFromApi({ id });
-    });
+     // Wire Apply buttons with an explicit guard
+target.querySelectorAll('[data-cust-id]').forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    const id = e.currentTarget.getAttribute('data-cust-id');
+    if (!id || id === 'undefined' || id === 'null' || String(id).trim() === '') {
+      alert('This search result has no usable ID.\nFix /ordertime/customers/search to include an Id/ID/CustomerId/CustomerRef.Id.');
+      return;
+    }
+    // One path, one fetch: mapper will hydrate via /ordertime/customers/:id
+    applyCustomerFromApi({ id });
   });
+});
+
 
 
 
