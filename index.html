@@ -1381,8 +1381,12 @@ async function openOTSearch(){
     target.querySelectorAll('[data-cust-id]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const id = e.currentTarget.getAttribute('data-cust-id');
-        if (!id || id === 'undefined' || id === 'null' || String(id).trim() === ''){
-          alert('This search result has no usable ID.\nFix /ordertime/customers/search to include an Id/ID/CustomerId/CustomerRef.Id.');
+if (!id || id === 'undefined' || id === 'null' || String(id).trim() === ''){
+  alert('This search result has no usable ID.\nFix /ordertime/customers/search to include an Id/ID/CustomerId/CustomerRef.Id.');
+  return;
+}
+// Pass just the id; the mapper will fetch once.
+applyCustomerFromApi({ id });
           return; // <- DO NOT call the detail endpoint
         }
         try{
@@ -2579,20 +2583,16 @@ function addItemFromSearch(r){
 </script>
   <script>
 (function () {
-  const el = document.getElementById('wcpResults'); // customer results container
-  if (!el) return;
-  el.addEventListener('click', async (e) => {
-    const btn = e.target.closest('button[data-cust-id]');
-    if (!btn) return;
-    try {
-      const data = await api(`/ordertime/customers/${encodeURIComponent(btn.dataset.custId)}`);
-      applyCustomerFromApi(data);   // your existing mapper fills Billing/Shipping/Payment
-      closeDrawer('drawerWCP');
-    } catch (err) {
-      alert('Load customer failed: ' + err.message);
-    }
-  });
-}());
+  el.addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-cust-id]');
+  if (!btn) return;
+  const id = btn.dataset.custId;
+  if (!id || id === 'undefined' || id === 'null' || String(id).trim() === '') {
+    alert('This search result has no usable ID.'); 
+    return;
+  }
+  applyCustomerFromApi({ id }); // one fetch path
+});
 </script>
 </body>
 </html>
