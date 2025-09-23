@@ -2518,31 +2518,20 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
   refreshCSVPreview();
 })();
 </script>
+
 <script>
 (function () {
   const list = document.getElementById('cloneResults');
   if (!list) return;
-  list.addEventListener('click', (e) => { /* existing code */ });
+  list.addEventListener('click', (e) => {
+    const applyBtn = e.target.closest('button[data-so-id]');
+    if (applyBtn) { const id = applyBtn.dataset.soId; if (!id || id === 'undefined') { alert('Missing id'); return; } applySO(id); return; }
+    const prevBtn = e.target.closest('button[data-so-preview]');
+    if (prevBtn) { const id = prevBtn.dataset.soPreview; if (!id || id === 'undefined') { alert('Missing id'); return; } loadSO(id); }
+  });
 }());
-
-list.addEventListener('click', (e) => {
-  const applyBtn = e.target.closest('button[data-so-id]');
-  if (applyBtn) {
-    const id = applyBtn.dataset.soId;
-    if (!id || id === 'undefined') { alert('Missing id'); return; }
-    applySO(id);     // loads details + applies to form
-    return;
-  }
-  const prevBtn = e.target.closest('button[data-so-preview]');
-  if (prevBtn) {
-    const id = prevBtn.dataset.soPreview;
-    if (!id || id === 'undefined') { alert('Missing id'); return; }
-    loadSO(id);      // loads details into preview textarea
-  }
-});
-
-
 </script>
+
 <script>
   // tiny loading helper
   function busy(el, on) {
