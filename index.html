@@ -1332,11 +1332,25 @@ document.getElementById('flagNewCustomer').addEventListener('change', e=>{
   }
 });
 
+
+/* ===== Robust ID mapper (use for any OT "customer" row) ===== */
+function mapCustomerId(r){
+  return (
+    r?.id ??
+    r?.Id ?? r?.ID ??
+    r?.CustomerId ?? r?.CustomerID ??
+    r?.CustomerIdRef ??
+    (r?.CustomerRef && (r.CustomerRef.Id ?? r.CustomerRef.ID ?? r.CustomerRef.id)) ??
+    null
+  );
+}
+  
 /* ===== WCP helper ===== */
 async function openOTSearch(){
-  const q = (document.getElementById('wcpQuery').value
-            || document.getElementById('billCompany').value
-            || '').trim();
+  const q =
+    (document.getElementById('wcpQuery').value ||
+     document.getElementById('billCompany').value || '').trim();
+
   const target = document.getElementById('wcpResults');
   if (!q){ target.innerHTML = 'Enter a query first.'; return; }
   target.innerHTML = 'Searching…';
@@ -1344,37 +1358,48 @@ async function openOTSearch(){
   try {
     const results = await api(`/ordertime/customers/search?q=${encodeURIComponent(q)}`);
     if (!Array.isArray(results) || results.length === 0){
-      target.innerHTML = 'No matches.'; 
+      target.innerHTML = 'No matches.';
       return;
     }
 
-    // Render list; note r.*, not so.*
-    target.innerHTML = results.slice(0, 25).map(r => `
-      <div class="card" style="margin:6px 0;padding:10px">
-        <div><strong>${r.company || '—'}</strong></div>
-        <div class="tiny">${r.city || ''} ${r.state || ''} ${r.zip || ''}</div>
-        <div class="row" style="margin-top:6px">
-          <button class="ok" data-cust-id="${r.id || r.Id}">Apply</button>
+    // Render list using the robust ID mapper
+    target.innerHTML = results.slice(0, 25).map(r => {
+      const id = mapCustomerId(r);
+      const city = r.city || ''; const state = r.state || ''; const zip = r.zip || '';
+      return `
+        <div class="card" style="margin:6px 0;padding:10px">
+          <div><strong>${r.company || '—'}</strong></div>
+          <div class="tiny">${city} ${state} ${zip}</div>
+          <div class="row" style="margin-top:6px">
+            <button class="ok" data-cust-id="${id ?? ''}">Apply</button>
+          </div>
         </div>
-      </div>
-    `).join('');
+      `;
+    }).join('');
 
-    // Wire up Apply buttons to fetch full record then paste to form
+    // Wire Apply buttons with an explicit guard
     target.querySelectorAll('[data-cust-id]').forEach(btn => {
       btn.addEventListener('click', async (e) => {
         const id = e.currentTarget.getAttribute('data-cust-id');
+        if (!id || id === 'undefined' || id === 'null' || String(id).trim() === ''){
+          alert('This search result has no usable ID.\nFix /ordertime/customers/search to include an Id/ID/CustomerId/CustomerRef.Id.');
+          return; // <- DO NOT call the detail endpoint
+        }
         try{
           const full = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
-          applyCustomerFromApi(full);
+          applyCustomerFromApi(full);  // your existing mapper -> form
+          closeDrawer?.('drawerWCP');  // close if your UI supports it
         }catch(err){
           alert(`Load customer failed: ${err.message}`);
         }
       });
     });
+
   } catch (err) {
     target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
   }
 }
+
 
 
 
