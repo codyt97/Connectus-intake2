@@ -40,6 +40,21 @@ export async function otPost(path, body){ return _req(path, { method: 'POST', bo
    Domain helpers (normalized)
    ========================= */
 
+
+// ---- Lists API helper ----
+export async function otList(body) {
+  return otPost('/list', body);
+}
+
+// enums the List API actually accepts
+const FT = { String: 1, Number: 2, DateTime: 3, Boolean: 4 };
+const OP = { Equals: 0, StartsWith: 10, Contains: 12 };
+
+// convenience builder
+export function like(prop, value) {
+  return { PropertyName: prop, FieldType: FT.String, Operator: OP.Contains, FilterValueArray: [String(value || '')] };
+}
+
 // Customer search (by Name, CompanyName, Email, Phone)
 // listCustomersByName
 export async function listCustomersByName(q, page = 1, take = 25) {
