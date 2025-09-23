@@ -11,85 +11,91 @@ function assertEnv() {
 }
 
 function authHeaders() {
-  // Be generous with header names (some tenants differ)
   const h = {
     'Content-Type': 'application/json',
-    ApiKey: API_KEY,
-    apiKey: API_KEY,
-    'x-api-key': API_KEY,
+    // OT accepts ApiKey/apiKey case variants in some tenants; send both to be safe.
+    'ApiKey': API_KEY,
+    'apiKey': API_KEY,
   };
-  if (EMAIL) h.email = EMAIL;
-  if (DEVKEY) h.DevKey = DEVKEY;
-  else if (PASS) h.password = PASS;
+  if (EMAIL)  { h.email = EMAIL; }
+  if (DEVKEY) { h.DevKey = DEVKEY; }
+  else if (PASS) { h.password = PASS; }
   return h;
 }
 
-function safeJSON(txt) { try { return JSON.parse(txt); } catch { return null; } }
-
-async function post(path, body) {
+async function _req(path, init = {}) {
   assertEnv();
-  const res = await fetch(`${BASE}${path}`, {
-    method: 'POST',
-    headers: authHeaders(),
-    body: JSON.stringify(body || {}),
-  });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`OT POST ${path} ${res.status}: ${text}`);
-  return safeJSON(text) ?? text;
+  const url = `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  const r = await fetch(url, { ...init, headers: { ...authHeaders(), ...(init.headers || {}) }});
+  const text = await r.text();
+  let data; try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!r.ok) throw new Error(typeof data === 'string' ? data : (data?.Message || data?.error || r.statusText));
+  return data;
 }
 
-async function get(path) {
-  assertEnv();
-  const res = await fetch(`${BASE}${path}`, { headers: authHeaders() });
-  const text = await res.text();
-  if (!res.ok) throw new Error(`OT GET ${path} ${res.status}: ${text}`);
-  return safeJSON(text) ?? text;
+export async function otGet(path)      { return _req(path, { method: 'GET'  }); }
+export async function otPost(path, body){ return _req(path, { method: 'POST', body: JSON.stringify(body || {}) }); }
+
+/* =========================
+   Domain helpers (normalized)
+   ========================= */
+
+// Customer search (by Name, CompanyName, Email, Phone)
+export async function listCustomersByName(q, page = 1, take = 25) {
+  const like = (prop) => ({ PropertyName: prop, FieldType: 1, Operator: 12, FilterValueArray: [q] });
+  // Two passes (name/company) then merge/unique
+  const [byName, byCompany, byEmail, byPhone] = await Promise.all([
+    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('Name')] }),
+    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('CompanyName')] }),
+    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('Email')] }),
+    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('Phone')] }),
+  ]);
+
+  const seen = new Set();
+  return [...byName, ...byCompany, ...byEmail, ...byPhone]
+    .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
+    .map(r => ({
+      id: r.Id,
+      company: r.CompanyName || r.Name || '',
+      contact: r.Contact || r.PrimaryContact || '',
+      phone: r.Phone || r.BillPhone || r.MainPhone || '',
+      email: r.Email || r.BillingEmail || '',
+      city: r.City || r.BillingCity || '',
+      state: r.State || r.BillingState || '',
+    }));
 }
 
-// Export a generic poster so all routes share the same working auth
-export async function otPost(path, body) { return post(path, body); }
-export async function otGet(path) { return get(path); }
-
-// Normalized customer-by-id (used by WCP "Apply")
+// Get + normalize a single customer for “Apply”
 export async function getCustomerById(id) {
-  const x = await get(`/customer?id=${encodeURIComponent(id)}`);
+  const x = await otGet(`/customer?id=${encodeURIComponent(id)}`);
 
-  const bill = x.BillAddress || x.BillingAddress || {
-    Contact: x.BillingContact, Phone: x.BillingPhone, Email: x.BillingEmail,
-    Addr1: x.BillingAddress1 || x.BillingAddress, Addr2: x.BillingAddress2,
-    City: x.BillingCity, State: x.BillingState, Zip: x.BillingZip
-  };
-  const ship = x.ShipAddress || x.ShipToAddress || {
-    Contact: x.ShipToContact, Phone: x.ShipToPhone, Email: x.ShipToEmail,
-    Addr1: x.ShipToAddress1, Addr2: x.ShipToAddress2,
-    City: x.ShipToCity, State: x.ShipToState, Zip: x.ShipToZip,
-    IsResidential: x.ShipToIsResidential
-  };
+  // OrderTime uses Addr1/2/3 -> Name/Street/Suite (yep, street is Addr2)
+  const pickAddr = (a = {}) => ({
+    name:  a.Addr1 || '',
+    street:a.Addr2 || '',
+    suite: a.Addr3 || '',
+    city:  a.City  || '',
+    state: a.State || '',
+    zip:   a.PostalCode || a.Zip || '',
+    phone: a.Phone || '',
+    email: a.Email || '',
+  });
+
+  const bill = pickAddr(x.BillAddress || x.BillingAddress || {
+    Addr1: x.CompanyName || x.Name, Addr2: x.BillingAddress1, Addr3: x.BillingAddress2,
+    City: x.BillingCity, State: x.BillingState, PostalCode: x.BillingZip, Phone: x.BillingPhone, Email: x.BillingEmail
+  });
+
+  const ship = pickAddr(x.ShipAddress || x.ShippingAddress || {
+    Addr1: x.ShipCompany || x.CompanyName || x.Name, Addr2: x.ShippingAddress1, Addr3: x.ShippingAddress2,
+    City: x.ShippingCity, State: x.ShippingState, PostalCode: x.ShippingZip, Phone: x.ShippingPhone, Email: x.ShippingEmail
+  });
 
   return {
-    company: x.Company || x.CompanyName || x.Name || '',
-    billing: {
-      contact: bill?.Contact || '',
-      phone:   bill?.Phone   || '',
-      email:   bill?.Email   || '',
-      street:  bill?.Addr1   || '',
-      suite:   bill?.Addr2   || '',
-      city:    bill?.City    || '',
-      state:   bill?.State   || '',
-      zip:     bill?.Zip     || ''
-    },
-    shipping: {
-      company: x.ShipToCompany || x.Company || '',
-      contact: ship?.Contact || '',
-      phone:   ship?.Phone   || '',
-      email:   ship?.Email   || '',
-      street:  ship?.Addr1   || '',
-      suite:   ship?.Addr2   || '',
-      city:    ship?.City    || '',
-      state:   ship?.State   || '',
-      zip:     ship?.Zip     || '',
-      residence: !!ship?.IsResidential
-    },
+    id: x.Id,
+    company: x.CompanyName || x.Name || '',
+    billing: bill,
+    shipping: ship,
     payment: {
       method: x.DefaultPaymentMethod || '',
       terms:  x.PaymentTerms || '',
@@ -102,6 +108,28 @@ export async function getCustomerById(id) {
       shortShip: x.ShortShipPolicy || '',
     },
     carrierRep: { name: x.CarrierRepName || '', email: x.CarrierRepEmail || '' },
-    rep:        { primary: x.PrimaryRepName || '', secondary: x.SecondaryRepName || '' },
+    rep: { primary: x.PrimaryRepName || '', secondary: x.SecondaryRepName || '' },
   };
 }
+
+// Sales order search (doc no or customer name)
+export async function searchSalesOrders(q, page = 1, take = 25) {
+  const like = (prop) => ({ PropertyName: prop, FieldType: 1, Operator: 12, FilterValueArray: [q] });
+  const [byDoc, byCust] = await Promise.all([
+    otPost('/salesorder/Search', { Page: page, Take: take, FilterParams: [like('DocNumber')] }),
+    otPost('/salesorder/Search', { Page: page, Take: take, FilterParams: [like('CustomerRef.Name')] }),
+  ]);
+  const seen = new Set();
+  return [...byDoc, ...byCust]
+    .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
+    .map(r => ({
+      id: r.Id,
+      docNo: r.DocNumber || r.Number || r.DocNo || '',
+      customer: r.CustomerRef?.Name || '',
+      status: r.Status || r.DocStatus || '',
+      date: r.TxnDate || r.Date || ''
+    }));
+}
+
+export async function getSalesOrderById(id)    { return otGet(`/salesorder?id=${id}`); }
+export async function getSalesOrderByDocNo(n)  { return otGet(`/salesorder?docNo=${n}`); }
