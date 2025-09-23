@@ -1,24 +1,20 @@
-// CommonJS
-const { otList, like, getCustomerById, getSalesOrderByDocNo, otGet } = require('../../_ot');
+const { otListSmart, like, filterRows } = require('../../_ot');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const base = { Type: 'PartItem', Page: 1, Take: 50, SortParams: [{ PropertyName: 'Name', SortDirection: 0 }] };
-
     const [byName, byNumber, byMfg] = await Promise.all([
-      otList({ ...base, FilterParams: [like('Name', q)] }),
-      otList({ ...base, FilterParams: [like('Number', q)] }),
-      otList({ ...base, FilterParams: [like('ManufacturerPartNo', q)] }),
+      otListSmart({ type: 'PartItem', filters: [like('Name', q)],              sortProp: 'Name', desc: false, take: 50 }),
+      otListSmart({ type: 'PartItem', filters: [like('Number', q)],            sortProp: 'Name', desc: false, take: 50 }),
+      otListSmart({ type: 'PartItem', filters: [like('ManufacturerPartNo', q)], sortProp: 'Name', desc: false, take: 50 }),
     ]);
 
-    const rows = [
-      ...(Array.isArray(byName?.Records) ? byName.Records : Array.isArray(byName) ? byName : []),
-      ...(Array.isArray(byNumber?.Records) ? byNumber.Records : Array.isArray(byNumber) ? byNumber : []),
-      ...(Array.isArray(byMfg?.Records) ? byMfg.Records : Array.isArray(byMfg) ? byMfg : []),
-    ];
+    let rows = [...byName, ...byNumber, ...byMfg];
+
+    // Guaranteed relevance
+    rows = filterRows(rows, q, r => [r.Name, r.Number, r.Description, r.ManufacturerPartNo, r.UPC]);
 
     const seen = new Set();
     const out = rows
@@ -37,4 +33,4 @@ export default async function handler(req, res) {
   } catch (err) {
     res.status(500).json({ error: `API GET /ordertime/items/search failed: ${err.message || err}` });
   }
-}
+};
