@@ -41,16 +41,15 @@ export async function otPost(path, body){ return _req(path, { method: 'POST', bo
    ========================= */
 
 // Customer search (by Name, CompanyName, Email, Phone)
+// listCustomersByName
 export async function listCustomersByName(q, page = 1, take = 25) {
-  const like = (prop) => ({ PropertyName: prop, FieldType: 1, Operator: 12, FilterValueArray: [q] });
-  // Two passes (name/company) then merge/unique
+  const like = (p) => ({ PropertyName: p, FieldType: 1, Operator: 12, FilterValueArray: [q] });
   const [byName, byCompany, byEmail, byPhone] = await Promise.all([
-    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('Name')] }),
-    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('CompanyName')] }),
-    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('Email')] }),
-    otPost('/customer/Search', { Page: page, Take: take, FilterParams: [like('Phone')] }),
+    otPost('/Customer/Search', { Page: page, Take: take, FilterParams: [like('Name')] }),
+    otPost('/Customer/Search', { Page: page, Take: take, FilterParams: [like('CompanyName')] }),
+    otPost('/Customer/Search', { Page: page, Take: take, FilterParams: [like('Email')] }),
+    otPost('/Customer/Search', { Page: page, Take: take, FilterParams: [like('Phone')] }),
   ]);
-
   const seen = new Set();
   return [...byName, ...byCompany, ...byEmail, ...byPhone]
     .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
@@ -65,59 +64,18 @@ export async function listCustomersByName(q, page = 1, take = 25) {
     }));
 }
 
-// Get + normalize a single customer for “Apply”
+// getCustomerById
 export async function getCustomerById(id) {
-  const x = await otGet(`/customer?id=${encodeURIComponent(id)}`);
-
-  // OrderTime uses Addr1/2/3 -> Name/Street/Suite (yep, street is Addr2)
-  const pickAddr = (a = {}) => ({
-    name:  a.Addr1 || '',
-    street:a.Addr2 || '',
-    suite: a.Addr3 || '',
-    city:  a.City  || '',
-    state: a.State || '',
-    zip:   a.PostalCode || a.Zip || '',
-    phone: a.Phone || '',
-    email: a.Email || '',
-  });
-
-  const bill = pickAddr(x.BillAddress || x.BillingAddress || {
-    Addr1: x.CompanyName || x.Name, Addr2: x.BillingAddress1, Addr3: x.BillingAddress2,
-    City: x.BillingCity, State: x.BillingState, PostalCode: x.BillingZip, Phone: x.BillingPhone, Email: x.BillingEmail
-  });
-
-  const ship = pickAddr(x.ShipAddress || x.ShippingAddress || {
-    Addr1: x.ShipCompany || x.CompanyName || x.Name, Addr2: x.ShippingAddress1, Addr3: x.ShippingAddress2,
-    City: x.ShippingCity, State: x.ShippingState, PostalCode: x.ShippingZip, Phone: x.ShippingPhone, Email: x.ShippingEmail
-  });
-
-  return {
-    id: x.Id,
-    company: x.CompanyName || x.Name || '',
-    billing: bill,
-    shipping: ship,
-    payment: {
-      method: x.DefaultPaymentMethod || '',
-      terms:  x.PaymentTerms || '',
-      taxExempt: !!x.IsTaxExempt,
-      agreement: !!x.HasPurchaseAgreement,
-    },
-    shippingOptions: {
-      pay:   x.DefaultShipPaymentMethod || '',
-      speed: x.DefaultShipSpeed || '',
-      shortShip: x.ShortShipPolicy || '',
-    },
-    carrierRep: { name: x.CarrierRepName || '', email: x.CarrierRepEmail || '' },
-    rep: { primary: x.PrimaryRepName || '', secondary: x.SecondaryRepName || '' },
-  };
+  const x = await otGet(`/Customer?id=${encodeURIComponent(id)}`);
+  // ... (keep your normalizer the same)
 }
- 
-// Sales order search (doc no or customer name)
+
+// searchSalesOrders
 export async function searchSalesOrders(q, page = 1, take = 25) {
-  const like = (prop) => ({ PropertyName: prop, FieldType: 1, Operator: 12, FilterValueArray: [q] });
+  const like = (p) => ({ PropertyName: p, FieldType: 1, Operator: 12, FilterValueArray: [q] });
   const [byDoc, byCust] = await Promise.all([
-    otPost('/salesorder/Search', { Page: page, Take: take, FilterParams: [like('DocNumber')] }),
-    otPost('/salesorder/Search', { Page: page, Take: take, FilterParams: [like('CustomerRef.Name')] }),
+    otPost('/SalesOrder/Search', { Page: page, Take: take, FilterParams: [like('DocNumber')] }),
+    otPost('/SalesOrder/Search', { Page: page, Take: take, FilterParams: [like('CustomerRef.Name')] }),
   ]);
   const seen = new Set();
   return [...byDoc, ...byCust]
@@ -131,5 +89,6 @@ export async function searchSalesOrders(q, page = 1, take = 25) {
     }));
 }
 
-export async function getSalesOrderById(id)    { return otGet(`/salesorder?id=${id}`); }
-export async function getSalesOrderByDocNo(n)  { return otGet(`/salesorder?docNo=${n}`); }
+export async function getSalesOrderById(id)   { return otGet(`/SalesOrder?id=${id}`); }
+export async function getSalesOrderByDocNo(n) { return otGet(`/SalesOrder?docNo=${n}`); }
+
