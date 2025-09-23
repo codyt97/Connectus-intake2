@@ -236,45 +236,6 @@
     </section>
   </section>
 
-
-  <!-- Wizard screen -->
-<section id="wizardPane">
-  <h2>Intake Wizard</h2>
-
-  <!-- 1) Sales Rep -->
-  <label>Sales Rep</label>
-  <select id="repSelect">
-    <option value="">-- Select --</option>
-    <option value="Cody T">Cody T</option>
-    <option value="Jess E">Jess E</option>
-    <!-- add your reps -->
-  </select>
-
-  <!-- 2) Customer Type -->
-  <fieldset>
-    <legend>Customer Type</legend>
-    <label><input type="radio" name="wizCustomerType" value="existing"> Existing</label>
-    <label><input type="radio" name="wizCustomerType" value="new"> New</label>
-  </fieldset>
-
-  <!-- 3) Document Type -->
-  <fieldset>
-    <legend>Document Type</legend>
-    <label><input type="radio" name="wizDocType" value="quote"> Quote</label>
-    <label><input type="radio" name="wizDocType" value="sales_order"> Sales Order</label>
-  </fieldset>
-
-  <!-- 4) Scope -->
-  <fieldset>
-    <legend>Scope</legend>
-    <label><input type="radio" name="wizScope" value="hardware"> Hardware only</label>
-    <label><input type="radio" name="wizScope" value="hardware_pro"> Hardware + Pro Services</label>
-  </fieldset>
-
-  <button id="wizDone">Finalize</button>
-  <div id="wizHint" style="margin-top:8px;color:#666"></div>
-</section>
-
 <!-- Actual intake app (hidden until wizard completes) -->
 <section id="intakePane" style="display:none">
   <!-- your Quote / Sales Order Intake tabs + forms live here -->
@@ -2742,6 +2703,21 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
-
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  try {
+    // If wizard was completed earlier, show Intake tabs + stepper immediately.
+    if (isWizardDone && isWizardDone()) {
+      showIntakeWork(true);
+      console.debug('[Intake] Wizard already complete → showing tabs');
+    } else {
+      showIntakeWork(false);
+      console.debug('[Intake] Wizard not complete → hiding tabs');
+    }
+  } catch (e) {
+    console.error('[Intake] init gate failed', e);
+  }
+});
+</script>
 </body>
 </html>
