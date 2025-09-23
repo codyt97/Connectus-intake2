@@ -1404,18 +1404,33 @@ async function openOTSearch(){
 
 
 // Map a customer result into your existing form fields
-function applyCustomerFromApi(r){
-  // Keep only the parts your form mapper expects
+// hydrate -> paste -> apply (hard-fail if id missing)
+async function applyCustomerFromApi(r){
+  const id = mapCustomerId(r);
+  if (!id){
+    console.warn('Apply blocked: search result had no id', r);
+    alert('This search result has no ID. Try another customer or fix the search mapping.');
+    return;
+  }
+  let full;
+  try{
+    full = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
+  }catch(e){
+    alert(`Customer detail failed: ${e.message}`);
+    return;
+  }
   const data = {
-    company: r.company,
-    billing: r.billing,
-    shipping: r.shipping,
-    payment: r.payment,
-    shippingOptions: r.shippingOptions
+    company: full.company,
+    billing: full.billing,
+    shipping: full.shipping,
+    payment: full.payment,
+    shippingOptions: full.shippingOptions
   };
   document.getElementById('wcpPaste').value = JSON.stringify(data, null, 2);
-  applyPastedCustomer('wcpPaste'); // your existing JSON→form function
+  applyPastedCustomer('wcpPaste');
+  closeDrawer?.('drawerWCP');
 }
+
 
 function applyPastedCustomer(textareaId){
   const raw=document.getElementById(textareaId).value.trim();
