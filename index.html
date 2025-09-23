@@ -2519,9 +2519,25 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
 (function () {
   const list = document.getElementById('cloneResults');
   if (!list) return;
-  );
+
+  list.addEventListener('click', (e) => {
+    const applyBtn = e.target.closest('button[data-so-id]');
+    if (applyBtn) {
+      const id = applyBtn.dataset.soId;
+      if (!id || id === 'undefined') { alert('Missing id'); return; }
+      applySO(id);     // loads details + applies to form
+      return;
+    }
+    const prevBtn = e.target.closest('button[data-so-preview]');
+    if (prevBtn) {
+      const id = prevBtn.dataset.soPreview;
+      if (!id || id === 'undefined') { alert('Missing id'); return; }
+      loadSO(id);      // loads details into preview textarea
+    }
+  });
 }());
 </script>
+
 
 <script>
   // tiny loading helper
@@ -2579,6 +2595,9 @@ function addItemFromSearch(r){
 }());
 </script>
 <script>
+
+// Use ONE key consistently
+const WIZ_DONE_KEY = 'CUC_WIZ_DONE_V1';
 /* ===== Wizard state helpers ===== */
 function isWizardDone(){
   try { return sessionStorage.getItem('wiz.done') === '1'; }
@@ -2673,22 +2692,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   } else {
     console.warn('[Intake] Missing #wizDone');
-  }
-});
-</script>
-<script>
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    // If wizard was completed earlier, show Intake tabs + stepper immediately.
-    if (isWizardDone && isWizardDone()) {
-      showIntakeWork(true);
-      console.debug('[Intake] Wizard already complete → showing tabs');
-    } else {
-      showIntakeWork(false);
-      console.debug('[Intake] Wizard not complete → hiding tabs');
-    }
-  } catch (e) {
-    console.error('[Intake] init gate failed', e);
   }
 });
 </script>
