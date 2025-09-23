@@ -1,5 +1,5 @@
-// /api/ordertime/salesorders/get.js
-import { getSalesOrderByDocNo } from '../../_ot';
+// CommonJS
+const { otList, like, getCustomerById, getSalesOrderByDocNo, otGet } = require('../../_ot');
 
 export default async function handler(req, res) {
   try {
