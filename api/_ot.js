@@ -111,7 +111,7 @@ export async function getCustomerById(id) {
     rep: { primary: x.PrimaryRepName || '', secondary: x.SecondaryRepName || '' },
   };
 }
-
+ 
 // Sales order search (doc no or customer name)
 export async function searchSalesOrders(q, page = 1, take = 25) {
   const like = (prop) => ({ PropertyName: prop, FieldType: 1, Operator: 12, FilterValueArray: [q] });
