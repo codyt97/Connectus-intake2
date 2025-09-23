@@ -70,6 +70,11 @@ export async function getCustomerById(id) {
   // ... (keep your normalizer the same)
 }
 
+// Generic List helper (OrderTime Lists API)
+export async function otList(listInfo) {
+  return otPost('/list', listInfo);
+}
+
 // searchSalesOrders
 export async function searchSalesOrders(q, page = 1, take = 25) {
   const like = (p) => ({ PropertyName: p, FieldType: 1, Operator: 12, FilterValueArray: [q] });
