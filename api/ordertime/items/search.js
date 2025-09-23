@@ -14,11 +14,12 @@ export default async function handler(req, res) {
     });
 
     const [byName, byNum, byMfg, byUpc] = await Promise.all([
-      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('Name')] }),
-      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('Number')] }),
-      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('ManufacturerPartNo')] }),
-      otPost('/partitem/Search', { Page: 1, Take: 50, FilterParams: [like('UPC')] }),
-    ]);
+  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('Name')] }),
+  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('Number')] }),
+  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('ManufacturerPartNo')] }),
+  otPost('/PartItem/Search', { Page: 1, Take: 50, FilterParams: [like('UPC')] }),
+]);
+
 
     const seen = new Set();
     const out = [...byName, ...byNum, ...byMfg, ...byUpc]
