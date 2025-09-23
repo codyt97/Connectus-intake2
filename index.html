@@ -1472,12 +1472,12 @@ async function openItemSearch(){
         <div class="tiny">${r.description || ''}</div>
         <div class="row" style="margin-top:6px">
           <button class="ghost" data-item='${JSON.stringify({
-           name: r.name || r.sku || r.mfgPart || "Item",
-             description: r.description || "",
-             mfgPart: r.mfgPart || "",
-             sku: r.sku || r.number || "",
-             price: Number(r.price || 0)
-             }).replace(/'/g,"&#39;")}'>Add</button>
+            name: r.name || r.sku || r.mfgPart || "Item",
+            description: r.description || "",
+            mfgPart: r.mfgPart || "",
+            sku: r.sku || r.number || "",     // <= must exist
+           price: Number(r.price || 0)
+            }).replace(/'/g,"&#39;")}'>Add</button>
 
         </div>
       </div>
