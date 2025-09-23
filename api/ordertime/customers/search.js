@@ -18,7 +18,7 @@ export default async function handler(req, res) {
         like('Phone', q),
       ],
     };
-
+ 
     const data = await otList(listBody);
     const rows = Array.isArray(data?.Records) ? data.Records : (Array.isArray(data) ? data : []);
 
