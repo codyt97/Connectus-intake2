@@ -1621,16 +1621,65 @@ async function openSOSearch(){
   }
 }
 
+function normalizeOrderTimeSO(so){
+  const A = so.BillAddress || {};
+  const S = so.ShipAddress || {};
+  const L = (so.LineItems || so.Lines || []);
+
+  return {
+    company: so.CustomerRef?.Name || so.Customer?.Name || '',
+    billing: {
+      name:   A.Addr1 || '',
+      phone:  A.Phone || '',
+      email:  A.Email || '',
+      street: A.Addr2 || '',   // OT quirk: street is Addr2
+      suite:  A.Addr3 || '',   // OT quirk: suite/floor is Addr3
+      city:   A.City  || '',
+      state:  A.State || '',
+      zip:    A.PostalCode || A.Zip || ''
+    },
+    shipping: {
+      company: S.Addr1 || '',
+      contact: S.Addr1 || '',
+      phone:   S.Phone || '',
+      email:   S.Email || '',
+      street:  S.Addr2 || '',
+      suite:   S.Addr3 || '',
+      city:    S.City  || '',
+      state:   S.State || '',
+      zip:     S.PostalCode || S.Zip || ''
+    },
+    payment: {
+      method:    so.PaymentMethodRef?.Name || so.PaymentMethod || '',
+      terms:     so.TermsRef?.Name || so.Terms || '',
+      taxExempt: !!so.IsTaxExempt,
+      agreement: !!so.HasPurchaseAgreement
+    },
+    shippingOptions: {
+      pay:       so.ShipPaymentMethodRef?.Name || so.ShippingPaymentMethod || '',
+      speed:     so.ShipSpeedRef?.Name || so.ShippingSpeed || '',
+      shortShip: so.ShortShipPolicy || ''
+    },
+    items: L.map(li => ({
+      sku:  li.ItemRef?.Number || li.ItemRef?.Name || '',
+      desc: li.Description || li.ItemRef?.Name || '',
+      qty:  Number(li.Quantity || 1),
+      sell: Number((li.Price ?? li.SalesPrice ?? 0))
+    }))
+  };
+}
+  
 async function loadSO(id){
   try{
-    // GET /api/ordertime/salesorders/:id
-    const so = await api(`/ordertime/salesorders/${encodeURIComponent(id)}`);
-    // show JSON in the drawer textarea so the user can review/edit
-    document.getElementById('clonePaste').value = JSON.stringify(so, null, 2);
+    const soRaw  = await api(`/ordertime/salesorders/${encodeURIComponent(id)}`);
+    const soNorm = normalizeOrderTimeSO(soRaw);
+    // Put the NORMALIZED shape into the textarea so applyClonedOrder() can map it
+    document.getElementById('clonePaste').value = JSON.stringify(soNorm, null, 2);
   }catch(err){
     alert(`Load SO failed: ${err.message}`);
   }
 }
+
 
 async function applySO(id){
   await loadSO(id);     // puts the JSON into #clonePaste
