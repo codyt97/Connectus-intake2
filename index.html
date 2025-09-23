@@ -1136,19 +1136,22 @@ function isWizardDone(){
 }
 
 function showIntakeWork(show){
-  const tabs = document.getElementById('intakeTabs');
-  const stepper = document.getElementById('stepper');
+    const wiz     = document.getElementById('intakeWizard'); // the card with the four steps
+    const tabs    = document.getElementById('intakeTabs');   // the main intake tabs
+    const stepper = document.getElementById('stepper');      // the appbar step dots
 
-  if(show){
-    if(tabs) tabs.style.display = '';
-    if(stepper) stepper.style.display = '';
-    document.querySelector('.tab[data-tab="customer"]')?.click();
-  }else{
-    if(tabs) tabs.style.display = 'none';
-    if(stepper) stepper.style.display = 'none';
-    document.querySelectorAll('[data-panel]').forEach(p => p.style.display='none');
+    if (show){
+      if (wiz)     wiz.style.display = 'none';
+      if (tabs)    tabs.style.display = '';
+      if (stepper) stepper.style.display = '';
+      document.querySelector('.tab[data-tab="customer"]')?.click();
+    } else {
+      if (wiz)     wiz.style.display = '';
+      if (tabs)    tabs.style.display = 'none';
+      if (stepper) stepper.style.display = 'none';
+      document.querySelectorAll('[data-panel]').forEach(p => p.style.display='none');
+    }
   }
-}
 
 function showMDM(show){
   const mdmTab   = document.querySelector('.tab[data-tab="mdm"]');
@@ -2514,6 +2517,11 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
   refreshCSVPreview();
 })();
 </script>
+<script>
+  const WIZ_DONE_KEY = 'wiz.done';
+  function isWizardDone(){ try { return sessionStorage.getItem(WIZ_DONE_KEY) === '1'; } catch { return false; } }
+  function setWizardDone(v){ try { sessionStorage.setItem(WIZ_DONE_KEY, v ? '1' : '0'); } catch(e){} }
+</script>
 
 <script>
 (function () {
@@ -2606,12 +2614,26 @@ function setWizardDone(v){
   catch (e) { console.warn('[Intake] sessionStorage unavailable?', e); }
 }
 /** show/hide the wizard vs. the intake app */
-function showIntakeWork(show){
-  const wiz  = document.getElementById('wizardPane');
-  const work = document.getElementById('intakePane');
-  if (wiz)  wiz.style.display  = show ? 'none' : '';
-  if (work) work.style.display = show ? '' : 'none';
-}
+<script>
+  function showIntakeWork(show){
+    const wiz     = document.getElementById('intakeWizard'); // the card with the four steps
+    const tabs    = document.getElementById('intakeTabs');   // the main intake tabs
+    const stepper = document.getElementById('stepper');      // the appbar step dots
+
+    if (show){
+      if (wiz)     wiz.style.display = 'none';
+      if (tabs)    tabs.style.display = '';
+      if (stepper) stepper.style.display = '';
+      document.querySelector('.tab[data-tab="customer"]')?.click();
+    } else {
+      if (wiz)     wiz.style.display = '';
+      if (tabs)    tabs.style.display = 'none';
+      if (stepper) stepper.style.display = 'none';
+      document.querySelectorAll('[data-panel]').forEach(p => p.style.display='none');
+    }
+  }
+</script>
+
 
 /* ===== Wire everything on DOM ready ===== */
 document.addEventListener('DOMContentLoaded', () => {
