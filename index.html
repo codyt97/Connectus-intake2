@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -235,7 +234,7 @@
         </section>
       </div>
     </section>
-  
+  </section>
 
   <!-- ========== PANEL: INTAKE ========== -->
   <section data-mainpanel="intake">
@@ -1137,22 +1136,19 @@ function isWizardDone(){
 }
 
 function showIntakeWork(show){
-    const wiz     = document.getElementById('intakeWizard'); // the card with the four steps
-    const tabs    = document.getElementById('intakeTabs');   // the main intake tabs
-    const stepper = document.getElementById('stepper');      // the appbar step dots
+  const tabs = document.getElementById('intakeTabs');
+  const stepper = document.getElementById('stepper');
 
-    if (show){
-      if (wiz)     wiz.style.display = 'none';
-      if (tabs)    tabs.style.display = '';
-      if (stepper) stepper.style.display = '';
-      document.querySelector('.tab[data-tab="customer"]')?.click();
-    } else {
-      if (wiz)     wiz.style.display = '';
-      if (tabs)    tabs.style.display = 'none';
-      if (stepper) stepper.style.display = 'none';
-      document.querySelectorAll('[data-panel]').forEach(p => p.style.display='none');
-    }
+  if(show){
+    if(tabs) tabs.style.display = '';
+    if(stepper) stepper.style.display = '';
+    document.querySelector('.tab[data-tab="customer"]')?.click();
+  }else{
+    if(tabs) tabs.style.display = 'none';
+    if(stepper) stepper.style.display = 'none';
+    document.querySelectorAll('[data-panel]').forEach(p => p.style.display='none');
   }
+}
 
 function showMDM(show){
   const mdmTab   = document.querySelector('.tab[data-tab="mdm"]');
@@ -1338,33 +1334,47 @@ document.getElementById('flagNewCustomer').addEventListener('change', e=>{
 
 /* ===== WCP helper ===== */
 async function openOTSearch(){
-  const q = (document.getElementById('wcpQuery')?.value
-          || document.getElementById('billCompany')?.value || '').trim();
+  const q = (document.getElementById('wcpQuery').value
+            || document.getElementById('billCompany').value
+            || '').trim();
   const target = document.getElementById('wcpResults');
-  if (!target) return;
-  if (!q) { target.innerHTML = '<div class="tiny">Type a company name…</div>'; return; }
+  if (!q){ target.innerHTML = 'Enter a query first.'; return; }
+  target.innerHTML = 'Searching…';
 
   try {
-    target.innerHTML = 'Searching…';
     const results = await api(`/ordertime/customers/search?q=${encodeURIComponent(q)}`);
-    if (!Array.isArray(results) || results.length === 0) {
-      target.innerHTML = '<div>No matches.</div>';
+    if (!Array.isArray(results) || results.length === 0){
+      target.innerHTML = 'No matches.'; 
       return;
     }
+
+    // Render list; note r.*, not so.*
     target.innerHTML = results.slice(0, 25).map(r => `
       <div class="card" style="margin:6px 0;padding:10px">
         <div><strong>${r.company || '—'}</strong></div>
         <div class="tiny">${r.city || ''} ${r.state || ''} ${r.zip || ''}</div>
-        <div style="margin-top:8px">
-          <button class="ok" data-cust-id="${r.id}">Apply</button>
+        <div class="row" style="margin-top:6px">
+          <button class="ok" data-cust-id="${r.id || r.Id}">Apply</button>
         </div>
       </div>
     `).join('');
+
+    // Wire up Apply buttons to fetch full record then paste to form
+    target.querySelectorAll('[data-cust-id]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-cust-id');
+        try{
+          const full = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
+          applyCustomerFromApi(full);
+        }catch(err){
+          alert(`Load customer failed: ${err.message}`);
+        }
+      });
+    });
   } catch (err) {
-    target.innerHTML = `<div class="tiny" style="color:#b00">Search failed: ${err.message}</div>`;
+    target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
   }
 }
-
 
 
 
@@ -1382,21 +1392,6 @@ function applyCustomerFromApi(r){
   applyPastedCustomer('wcpPaste'); // your existing JSON→form function
 }
 
-function normalizeAddressPair(addr) {
-  // Guard
-  if (!addr) return {street:'', suite:'', city:'', state:'', zip:''};
-  let {street='', suite=''} = addr;
-
-  // Heuristic: if street looks like a unit/suite and suite looks like a street, swap.
-  const isSuiteLike = (s) => /(?:suite|ste\.?|unit|fl(?:oor)?|apt|#)/i.test(String(s));
-  const looksLikeStreetNum = (s) => /^\s*\d+(\s+\w+)/.test(String(s));
-
-  if (isSuiteLike(street) && suite && looksLikeStreetNum(suite)) {
-    const tmp = street; street = suite; suite = tmp;
-  }
-  return {...addr, street, suite};
-}
-  
 function applyPastedCustomer(textareaId){
   const raw=document.getElementById(textareaId).value.trim();
   if(!raw){ alert('Paste customer details first.'); return; }
@@ -1404,33 +1399,16 @@ function applyPastedCustomer(textareaId){
   try{ data=JSON.parse(raw); }
   catch(_){ raw.split(/\r?\n/).forEach(line=>{ const m=line.match(/^([^:]+):\s*(.*)$/); if(!m)return; setByPath(data,m[1].trim(),m[2].trim()); }); }
 
-  // ----- Billing (explicit + normalized)
-  const b = normalizeAddressPair(data?.billing || {});
-  setVal('billCompany', pick(data?.company, b.company || ''));
-  setVal('billContact', b.contact || '');
-  setVal('billPhone',   b.phone   || '');
-  setVal('billEmail',   b.email   || '');
-  setVal('billStreet',  b.street  || '');
-  setVal('billSuite',   b.suite   || '');
-  setVal('billCity',    b.city    || '');
-  setVal('billState',   b.state   || '');
-  setVal('billZip',     b.zip     || '');
+  setVal('billCompany', pick(data.company, data.billing?.company));
+  setVal('billContact', pick(data.billing?.contact)); setVal('billPhone', pick(data.billing?.phone));
+  setVal('billEmail', pick(data.billing?.email)); setVal('billStreet', pick(data.billing?.street));
+  setVal('billSuite', pick(data.billing?.suite)); setVal('billCity', pick(data.billing?.city));
+  setVal('billState', pick(data.billing?.state)); setVal('billZip', pick(data.billing?.zip));
 
-  // ----- Shipping (explicit + normalized)
-  const s = normalizeAddressPair(data?.shipping || {});
-  setVal('shipCompany', s.company || '');
-  setVal('shipContact', s.contact || '');
-  setVal('shipPhone',   s.phone   || '');
-  setVal('shipEmail',   s.email   || '');
-  setVal('shipStreet',  s.street  || '');
-  setVal('shipSuite',   s.suite   || '');
-  setVal('shipCity',    s.city    || '');
-  setVal('shipState',   s.state   || '');
-  setVal('shipZip',     s.zip     || '');
-  const rbox = document.getElementById('resShip');
-  if (rbox) { rbox.checked = !!s.residence; rbox.dispatchEvent(new Event('change',{bubbles:true})); }
-
-
+  setVal('shipCompany', pick(data.shipping?.company)); setVal('shipContact', pick(data.shipping?.contact));
+  setVal('shipPhone', pick(data.shipping?.phone)); setVal('shipEmail', pick(data.shipping?.email));
+  setVal('shipStreet', pick(data.shipping?.street)); setVal('shipSuite', pick(data.shipping?.suite));
+  setVal('shipCity', pick(data.shipping?.city)); setVal('shipState', pick(data.shipping?.state)); setVal('shipZip', pick(data.shipping?.zip));
 
   const pm=pick(data.payment?.method); if(pm) selectByTextExact('payMethod', pm);
   setVal('payTerms', pick(data.payment?.terms));
@@ -1472,12 +1450,12 @@ async function openItemSearch(){
         <div class="tiny">${r.description || ''}</div>
         <div class="row" style="margin-top:6px">
           <button class="ghost" data-item='${JSON.stringify({
-            name: r.name || r.sku || r.mfgPart || "Item",
-            description: r.description || "",
-            mfgPart: r.mfgPart || "",
-            sku: r.sku || r.number || "",     // <= must exist
-           price: Number(r.price || 0)
-            }).replace(/'/g,"&#39;")}'>Add</button>
+           name: r.name || r.sku || r.mfgPart || "Item",
+             description: r.description || "",
+             mfgPart: r.mfgPart || "",
+             sku: r.sku || r.number || "",
+             price: Number(r.price || 0)
+             }).replace(/'/g,"&#39;")}'>Add</button>
 
         </div>
       </div>
@@ -1489,35 +1467,16 @@ async function openItemSearch(){
 
 // Map a found item into your Items table
 function addItemFromSearch(r){
-  // Infer a few obvious things from text; safe defaults
-  const txt = [r.name, r.description, r.mfgPart].filter(Boolean).join(' ').toUpperCase();
-  const net = txt.includes('LTE') && (txt.includes('WI-FI') || txt.includes('WIFI')) ? 'Both'
-            : txt.includes('LTE') ? 'LTE'
-            : (txt.includes('WI-FI') || txt.includes('WIFI')) ? 'Wi-Fi'
-            : '';
-
-  const carrier =
-      /VERIZON|VZW/.test(txt) ? 'Verizon' :
-      /AT&T|ATT\b/.test(txt) ? 'AT&T' :
-      /T[- ]?MOBILE|TMO/.test(txt) ? 'T-Mobile' :
-      /US ?CELLULAR|USC/.test(txt) ? 'US Cellular' : '';
-
-  const cond = /CPO|REFURB|CERTIFIED PRE[- ]?OWNED/i.test(r.description || '') ? 'CPO' : '';
-
   addRow({
-    desc:  r.description || r.name || '',
+    desc: r.description || r.name || '',
     model: r.mfgPart || '',
-    sku:   r.sku || '',        // <- this now always comes from backend Number
-    qty:   1,
-    msrp:  r.price || '',
-    sell:  r.price || '',
-    net,
-    carrier,
-    cond
+    sku: r.sku || '',
+    qty: 1,
+    msrp: r.price || '',
+    sell: r.price || ''
   });
   closeDrawer('drawerItems');
 }
-
 // Pull 1 SO and show JSON in the Clone drawer textarea
 async function loadSO(id){
   try{
@@ -1646,6 +1605,7 @@ async function openSOSearch(){
       target.innerHTML = 'No matches.'; return;
     }
     // render small cards with Preview + Apply
+    target.innerHTML = results.slice(0,25).map(so => `
       <div class="card" style="margin:6px 0;padding:10px">
         <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
         <div class="tiny">${so.date || ''} • ${so.status || ''}</div>
@@ -2519,34 +2479,26 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
 })();
 </script>
 <script>
-  const WIZ_DONE_KEY = 'wiz.done';
-  function isWizardDone(){ try { return sessionStorage.getItem(WIZ_DONE_KEY) === '1'; } catch { return false; } }
-  function setWizardDone(v){ try { sessionStorage.setItem(WIZ_DONE_KEY, v ? '1' : '0'); } catch(e){} }
+const list = document.getElementById('cloneResults');
+if (!list) return;
+list.addEventListener('click', (e) => {
+  const applyBtn = e.target.closest('button[data-so-id]');
+  if (applyBtn) {
+    const id = applyBtn.dataset.soId;
+    if (!id || id === 'undefined') { alert('Missing id'); return; }
+    applySO(id);     // loads details + applies to form
+    return;
+  }
+  const prevBtn = e.target.closest('button[data-so-preview]');
+  if (prevBtn) {
+    const id = prevBtn.dataset.soPreview;
+    if (!id || id === 'undefined') { alert('Missing id'); return; }
+    loadSO(id);      // loads details into preview textarea
+  }
+});
+
+
 </script>
-
-<script>
-(function () {
-  const list = document.getElementById('cloneResults');
-  if (!list) return;
-
-  list.addEventListener('click', (e) => {
-    const applyBtn = e.target.closest('button[data-so-id]');
-    if (applyBtn) {
-      const id = applyBtn.dataset.soId;
-      if (!id || id === 'undefined') { alert('Missing id'); return; }
-      applySO(id);     // loads details + applies to form
-      return;
-    }
-    const prevBtn = e.target.closest('button[data-so-preview]');
-    if (prevBtn) {
-      const id = prevBtn.dataset.soPreview;
-      if (!id || id === 'undefined') { alert('Missing id'); return; }
-      loadSO(id);      // loads details into preview textarea
-    }
-  });
-}());
-</script>
-
 <script>
   // tiny loading helper
   function busy(el, on) {
@@ -2584,6 +2536,7 @@ function addItemFromSearch(r){
 }
 </script>
 
+</script>
   <script>
 (function () {
   const el = document.getElementById('wcpResults'); // customer results container
@@ -2600,121 +2553,6 @@ function addItemFromSearch(r){
     }
   });
 }());
-</script>
-<script>
-
-// Use ONE key consistently
-const WIZ_DONE_KEY = 'CUC_WIZ_DONE_V1';
-/* ===== Wizard state helpers ===== */
-function isWizardDone(){
-  try { return sessionStorage.getItem('wiz.done') === '1'; }
-  catch { return false; }
-}
-function setWizardDone(v){
-  try { sessionStorage.setItem('wiz.done', v ? '1' : '0'); }
-  catch (e) { console.warn('[Intake] sessionStorage unavailable?', e); }
-}
-/** show/hide the wizard vs. the intake app */
-<script>
-  function showIntakeWork(show){
-    const wiz     = document.getElementById('intakeWizard'); // the card with the four steps
-    const tabs    = document.getElementById('intakeTabs');   // the main intake tabs
-    const stepper = document.getElementById('stepper');      // the appbar step dots
-
-    if (show){
-      if (wiz)     wiz.style.display = 'none';
-      if (tabs)    tabs.style.display = '';
-      if (stepper) stepper.style.display = '';
-      document.querySelector('.tab[data-tab="customer"]')?.click();
-    } else {
-      if (wiz)     wiz.style.display = '';
-      if (tabs)    tabs.style.display = 'none';
-      if (stepper) stepper.style.display = 'none';
-      document.querySelectorAll('[data-panel]').forEach(p => p.style.display='none');
-    }
-  }
-</script>
-
-
-/* ===== Wire everything on DOM ready ===== */
-document.addEventListener('DOMContentLoaded', () => {
-  console.debug('[Intake] DOM ready → wiring wizard');
-
-  // 1) Initial show/hide based on saved state
-  try {
-    if (isWizardDone()) {
-      showIntakeWork(true);
-      console.debug('[Intake] Wizard already complete → showing tabs');
-    } else {
-      showIntakeWork(false);
-      console.debug('[Intake] Wizard not complete → hiding tabs');
-    }
-  } catch (e) {
-    console.error('[Intake] init error (isWizardDone/showIntakeWork?)', e);
-  }
-
-  // 2) Sales Rep select
-  const repSel = document.getElementById('repSelect');
-  if (repSel) {
-    repSel.addEventListener('change', () => {
-      sessionStorage.setItem('wiz.rep', repSel.value || '');
-      console.debug('[Intake] Rep selected:', repSel.value);
-    });
-  } else {
-    console.warn('[Intake] Missing #repSelect');
-  }
-
-  // 3) Customer Type radios
-  document.querySelectorAll('input[name="wizCustomerType"]').forEach(r => {
-    r.addEventListener('change', () => {
-      sessionStorage.setItem('wiz.customerType', r.value);
-      console.debug('[Intake] Customer type:', r.value);
-      // Optional: if r.value === 'new', open your "new customer" drawer
-    });
-  });
-
-  // 4) Document Type radios
-  document.querySelectorAll('input[name="wizDocType"]').forEach(r => {
-    r.addEventListener('change', () => {
-      sessionStorage.setItem('wiz.docType', r.value);
-      console.debug('[Intake] Doc type:', r.value);
-    });
-  });
-
-  // 5) Scope radios
-  document.querySelectorAll('input[name="wizScope"]').forEach(r => {
-    r.addEventListener('change', () => {
-      sessionStorage.setItem('wiz.scope', r.value);
-      console.debug('[Intake] Scope:', r.value);
-    });
-  });
-
-  // 6) Finalize button → unlock tabs
-  const doneBtn = document.getElementById('wizDone');
-  if (doneBtn) {
-    doneBtn.addEventListener('click', () => {
-      const rep   = sessionStorage.getItem('wiz.rep')          || '';
-      const ct    = sessionStorage.getItem('wiz.customerType') || '';
-      const dt    = sessionStorage.getItem('wiz.docType')      || '';
-      const scope = sessionStorage.getItem('wiz.scope')        || '';
-
-      if (!rep || !ct || !dt || !scope) {
-        const miss = ['rep','customerType','docType','scope']
-          .filter(k => !sessionStorage.getItem('wiz.'+k));
-        alert('Finish the wizard: missing ' + miss.join(', '));
-        return;
-      }
-
-      setWizardDone(true);
-      showIntakeWork(true);
-      const hint = document.getElementById('wizHint');
-      if (hint) hint.textContent = 'Wizard complete — tabs unlocked.';
-      console.debug('[Intake] Wizard COMPLETE → tabs unlocked');
-    });
-  } else {
-    console.warn('[Intake] Missing #wizDone');
-  }
-});
 </script>
 </body>
 </html>
