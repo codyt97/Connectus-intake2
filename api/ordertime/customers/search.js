@@ -1,40 +1,38 @@
-// /api/ordertime/customers/search.js
-import { otList } from '../../_ot';
+import { otList, like } from '../../_ot';
 
 export default async function handler(req, res) {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    // See "Basic Object Types → ListInfo / FilterField" for these fields
-    // Operator/FieldType accept enum names per docs.
-    const listInfo = {
-      Type: 'Customer',                 // RecordTypeEnum
-      PageNumber: 1,
-      NumberOfRecords: 50,
-      Sortation: { PropertyName: 'Name', Direction: 'Asc' },
-      Filters: [
-        { PropertyName: 'Name',       FieldType: 'String', Operator: 'Contains', FilterValueArray: [q] },
-        { PropertyName: 'Company',    FieldType: 'String', Operator: 'Contains', FilterValueArray: [q] },
-        { PropertyName: 'Email',      FieldType: 'String', Operator: 'Contains', FilterValueArray: [q] },
-        { PropertyName: 'Phone',      FieldType: 'String', Operator: 'Contains', FilterValueArray: [q] },
+    // Correct keys + correct field names
+    const listBody = {
+      Type: 'Customer',
+      Page: 1,
+      Take: 50,
+      SortParams: [{ PropertyName: 'Name', SortDirection: 0 }], // 0 = Asc
+      FilterParams: [
+        like('Name', q),
+        like('CompanyName', q),
+        like('Email', q),
+        like('Phone', q),
       ],
     };
 
-    const r = await otList(listInfo);
+    const data = await otList(listBody);
+    const rows = Array.isArray(data?.Records) ? data.Records : (Array.isArray(data) ? data : []);
 
-    // Normalize just what the UI needs
-    const out = (r?.Records || r || []).map(x => ({
+    const out = rows.map(x => ({
       id: x.Id,
-      name: x.Name || x.Company || '',
+      company: x.CompanyName || x.Name || '',
       email: x.Email || x.BillingEmail || '',
       phone: x.Phone || x.BillingPhone || '',
-      billing: x.BillAddress || x.BillingAddress || null,
-      shipping: x.ShipAddress || x.ShippingAddress || null,
+      city: x.BillingCity || x.City || '',
+      state: x.BillingState || x.State || '',
     }));
 
     res.status(200).json(out);
   } catch (err) {
-    res.status(500).json({ error: `API GET /ordertime/customers/search failed: ${String(err.message || err)}` });
+    res.status(500).json({ error: `API GET /ordertime/customers/search failed: ${err.message || err}` });
   }
 }
