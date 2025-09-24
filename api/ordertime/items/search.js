@@ -1,4 +1,32 @@
 // /api/ordertime/items/search.js
+const OT_BASE = process.env.ORDERTIME_BASE_URL || "https://services.ordertime.com";
+const OT_KEY  = process.env.ORDERTIME_API_KEY; // <-- make sure this is set in Vercel
+
+function otHeaders() {
+  if (!OT_KEY) throw new Error("Missing ORDERTIME_API_KEY");
+  return {
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    // OrderTime accepts either of these; we send both to be safe.
+    "apikey": OT_KEY,
+    "x-apikey": OT_KEY,
+  };
+}
+
+async function callList(body) {
+  const url = `${OT_BASE}/api/list?apikey=${encodeURIComponent(OT_KEY)}`;
+  const r = await fetch(url, {
+    method: "POST",
+    headers: otHeaders(),
+    body: JSON.stringify(body),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    throw new Error(`OT list failed ${r.status}: ${JSON.stringify(data)}`);
+  }
+  return (data && (data.Data || data.data)) || [];
+}
+
 export default async function handler(req, res) {
   try {
     const q = String(req.query.q || "").trim();
@@ -6,20 +34,17 @@ export default async function handler(req, res) {
 
     const tokens = q.split(/\s+/).filter(Boolean);
 
-    // Build a body OT /api/list understands for PartItem
     const makeBody = (vals) => ({
       Type: "PartItem",
       ListOptions: {
         Page: 1,
-        PageSize: 50,                // show more on the first page
-        // AND across all tokens on Description
+        PageSize: 50,
+        // AND across tokens: mirrors the two "Description like" filters you showed in OT UI
         Filters: vals.map((v) => ({
           Field: "Description",
           Operator: "like",
           Value: v
         })),
-        // Keep columns minimal & safe — unnecessary columns or bad field
-        // names are what produced "filter skipped ..." warnings earlier.
         Columns: [
           "ID",
           "ItemNumber",
@@ -27,45 +52,22 @@ export default async function handler(req, res) {
           "Description",
           "ManufacturerPartNo",
           "UPCCode",
-          "SKU"
+          "SKU",
         ],
-        Sort: [{ Field: "Description", Direction: "Asc" }]
-      }
+        Sort: [{ Field: "Description", Direction: "Asc" }],
+      },
     });
-
-    const callList = async (body) => {
-      const r = await fetch("https://services.ordertime.com/api/list", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // use your secret or proxy; same header you use elsewhere
-          Authorization: `Bearer ${process.env.ORDERTIME_TOKEN}`
-        },
-        body: JSON.stringify(body)
-      });
-
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        throw new Error(
-          `OT list failed ${r.status}: ${typeof data === "object" ? JSON.stringify(data) : data}`
-        );
-      }
-      // OT returns either { Data, Total } or sometimes { data } depending on account
-      return (data && (data.Data || data.data)) || [];
-    };
 
     // Pass 1: AND all tokens on Description
     let results = await callList(makeBody(tokens));
 
-    // Pass 2 (fallback): OR across tokens if AND returned nothing
+    // Pass 2: OR across tokens if the AND returns nothing
     if (results.length === 0 && tokens.length > 1) {
-      const all = await Promise.all(
-        tokens.map((t) => callList(makeBody([t])).catch(() => []))
-      );
+      const all = await Promise.all(tokens.map((t) => callList(makeBody([t])).catch(() => [])));
       const dedup = new Map();
-      for (const arr of all.flat()) {
-        const key = arr.ID ?? arr.ItemID ?? arr.ItemNumber ?? arr.Id ?? arr.id;
-        if (!dedup.has(key)) dedup.set(key, arr);
+      for (const item of all.flat()) {
+        const key = item.ID ?? item.ItemID ?? item.ItemNumber ?? item.Id ?? item.id;
+        if (!dedup.has(key)) dedup.set(key, item);
       }
       results = [...dedup.values()];
     }
@@ -73,6 +75,6 @@ export default async function handler(req, res) {
     res.status(200).json({ items: results });
   } catch (err) {
     console.error("items/search error:", err);
-    res.status(500).json({ error: "items search failed" });
+    res.status(500).json({ error: String(err.message || err) });
   }
 }
