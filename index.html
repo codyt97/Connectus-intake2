@@ -1379,39 +1379,26 @@ function applyPastedCustomer(textareaId){
   const s = c.shipping || c.Shipping || c.ShippingAddress || c.ShipTo || {};
 
   // Billing (Customer tab)
-  setVal('billCompany', pick(c.company, b.company, c.CompanyName, c.Name));
-  setVal('billContact', pick(b.contact, b.Contact));
-  setVal('billPhone',   pick(b.phone));
-  setVal('billEmail',   pick(b.email));
-  setVal('billStreet',  pick(b.street, b.Address1, b.Street));
-  setVal('billSuite',   pick(b.suite,  b.Address2, b.Suite));
-  setVal('billCity',    pick(b.city));
-  setVal('billState',   pick(b.state));
-  setVal('billZip',     pick(b.zip, b.PostalCode));
+  setVal('billCompany', (c.company || b.company || c.CompanyName || c.Name || ''));
+  setVal('billContact', (b.contact || b.Contact || ''));
+  setVal('billPhone',   (b.phone   || ''));
+  setVal('billEmail',   (b.email   || ''));
+  setVal('billStreet',  (b.street  || b.Address1 || b.Street || ''));
+  setVal('billSuite',   (b.suite   || b.Address2 || b.Suite  || ''));
+  setVal('billCity',    (b.city    || ''));
+  setVal('billState',   (b.state   || ''));
+  setVal('billZip',     (b.zip     || b.PostalCode || ''));
 
   // Shipping (Shipping tab)
-  setVal('shipCompany', pick(s.company, c.company, s.CompanyName));
-  setVal('shipContact', pick(s.contact, s.Contact));
-  setVal('shipPhone',   pick(s.phone));
-  setVal('shipEmail',   pick(s.email));
-  setVal('shipStreet',  pick(s.street, s.Address1, s.Street));
-  setVal('shipSuite',   pick(s.suite,  s.Address2, s.Suite));
-  setVal('shipCity',    pick(s.city));
-  setVal('shipState',   pick(s.state));
-  setVal('shipZip',     pick(s.zip, s.PostalCode));
-
-  // Options (if present)
-  if (c.payment){
-    const pm = c.payment.method; if (pm) selectByTextExact?.('payMethod', pm);
-    setVal('payTerms', c.payment.terms || '');
-    const tax = document.getElementById('taxExempt'); if (tax) tax.checked = !!c.payment.taxExempt;
-    const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!c.payment.agreement;
-  }
-  if (c.shippingOptions){
-    c.shippingOptions.pay   && selectByTextExact?.('shipPay',   c.shippingOptions.pay);
-    c.shippingOptions.speed && selectByTextExact?.('shipSpeed', c.shippingOptions.speed);
-    c.shippingOptions.shortShip && selectByTextExact?.('shortShip', c.shippingOptions.shortShip);
-  }
+  setVal('shipCompany', (s.company || c.company || s.CompanyName || ''));
+  setVal('shipContact', (s.contact || s.Contact || ''));
+  setVal('shipPhone',   (s.phone   || ''));
+  setVal('shipEmail',   (s.email   || ''));
+  setVal('shipStreet',  (s.street  || s.Address1 || s.Street || ''));
+  setVal('shipSuite',   (s.suite   || s.Address2 || s.Suite  || ''));
+  setVal('shipCity',    (s.city    || ''));
+  setVal('shipState',   (s.state   || ''));
+  setVal('shipZip',     (s.zip     || s.PostalCode || ''));
 
   closeDrawer?.('drawerWCP');
 }
