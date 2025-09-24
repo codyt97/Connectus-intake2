@@ -1600,8 +1600,9 @@ async function openSOSearch(){
         <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
         <div class="tiny">${so.date || ''} • ${so.status || ''}</div>
         <div class="row" style="margin-top:6px">
-          <button class="ok"    data-so-id="${so.id || so.number}">Apply</button>
-          <button class="ghost" data-so-preview="${so.id || so.number}">Preview</button>
+          <button class="ok" data-so-id="${r.id}">Apply</button>
+          <button class="ghost" data-so-preview="${r.id}">Preview</button>
+
         </div>
       </div>
     `).join('');
