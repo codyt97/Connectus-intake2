@@ -2631,20 +2631,26 @@ function renderItemRow(r){
 
 async function doItemSearch(){
   const q = document.getElementById('itemQuery').value.trim();
-  const target = document.getElementById('itemResults');
-  if(!q){ target.textContent = 'Type a search'; return; }
+  const btn = document.getElementById('itemSearchBtn');
+  const out = document.getElementById('itemResults');
+  if(!q){ out.innerHTML = '<div class="muted">Type something…</div>'; return; }
+  btn.disabled = true; out.innerHTML = '<div class="muted">Searching…</div>';
 
-  target.textContent = 'Searching…';
   try{
     const res = await fetch(`/api/ordertime/items/search?q=${encodeURIComponent(q)}`);
     if(!res.ok) throw new Error(await res.text());
-    const items = toArray(await res.json());   // your helper
-    // ...render your results as you already do...
-  }catch(err){
-    target.innerHTML = `<span style="color:#b45309">Error: ${err.message}</span>`;
+    const rows = toArray(await res.json()); // accepts {items|results|data|...}
+    if(!Array.isArray(rows) || rows.length === 0){
+      out.innerHTML = '<div class="muted">No results.</div>';
+      return;
+    }
+    out.innerHTML = rows.map(renderItemRow).join('');
+  }catch(e){
+    out.innerHTML = `<div class="error">Error: ${escapeHtml(e.message||e)}</div>`;
+  }finally{
+    btn.disabled = false;
   }
 }
-
 
 function applyItem(row){
   try {
