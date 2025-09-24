@@ -1349,7 +1349,7 @@ async function openOTSearch(){
     }
 
     // Render list; note r.*, not so.*
-    target.innerHTML = results.slice(0, 100).map(r => `
+    target.innerHTML = results.slice(0, 25).map(r => `
       <div class="card" style="margin:6px 0;padding:10px">
         <div><strong>${r.company || '—'}</strong></div>
         <div class="tiny">${r.city || ''} ${r.state || ''} ${r.zip || ''}</div>
