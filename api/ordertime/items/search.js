@@ -1,30 +1,33 @@
 // /api/ordertime/items/search.js
 
-// Support either naming convention; yours are OT_*.
-const OT_BASE =
-  process.env.OT_BASE_URL ||
+const RAW_BASE =
   process.env.ORDERTIME_BASE_URL ||
+  process.env.OT_BASE_URL ||
   "https://services.ordertime.com";
- 
+
 const OT_KEY =
-  process.env.OT_API_KEY ||
-  process.env.ORDERTIME_API_KEY;
+  process.env.ORDERTIME_API_KEY ||
+  process.env.OT_API_KEY;
+
+// normalize: remove a trailing /api and trailing slashes
+const OT_BASE = RAW_BASE.replace(/\/+$/, "").replace(/\/api$/i, "");
 
 function otHeaders() {
-  if (!OT_KEY) throw new Error("Missing OT_API_KEY");
+  if (!OT_KEY) throw new Error("Missing ORDERTIME_API_KEY (or OT_API_KEY)");
   return {
     "Content-Type": "application/json",
     Accept: "application/json",
-    apikey: OT_KEY,       // OrderTime accepts this header
-    "x-apikey": OT_KEY,   // …and this one too (belt & suspenders)
+    apikey: OT_KEY,
+    "x-apikey": OT_KEY,
   };
 }
 
 async function callList(body) {
-  const url = `${OT_BASE}/api/list`;
+  const url = `${OT_BASE}/api/list`; // <- single /api
   const r = await fetch(url, {
     method: "POST",
     headers: otHeaders(),
+    // OT accepts the key via header; you don't need it in the querystring.
     body: JSON.stringify(body),
   });
   const data = await r.json().catch(() => ({}));
@@ -39,7 +42,6 @@ export default async function handler(req, res) {
     const q = String(req.query.q || "").trim();
     if (!q) return res.status(400).json({ error: "Missing q" });
 
-    // tokenized keyword search: "iphone 14" => ["iphone","14"]
     const tokens = q.split(/\s+/).filter(Boolean);
 
     const makeBody = (vals) => ({
@@ -47,7 +49,6 @@ export default async function handler(req, res) {
       ListOptions: {
         Page: 1,
         PageSize: 50,
-        // AND all tokens against Description (mirrors your OT UI example)
         Filters: vals.map((v) => ({
           Field: "Description",
           Operator: "like",
@@ -66,20 +67,20 @@ export default async function handler(req, res) {
       },
     });
 
-    // Pass 1: AND across tokens
+    // Pass 1: AND all tokens (e.g., "iphone" AND "14")
     let results = await callList(makeBody(tokens));
 
-    // Pass 2: if nothing, OR across tokens and de-dupe
+    // Pass 2: OR across tokens if AND returns nothing
     if (results.length === 0 && tokens.length > 1) {
-      const chunks = await Promise.all(
+      const all = await Promise.all(
         tokens.map((t) => callList(makeBody([t])).catch(() => []))
       );
-      const seen = new Map();
-      for (const row of chunks.flat()) {
-        const key = row.ID ?? row.ItemID ?? row.ItemNumber ?? row.Id ?? row.id;
-        if (!seen.has(key)) seen.set(key, row);
+      const dedup = new Map();
+      for (const item of all.flat()) {
+        const key = item.ID ?? item.ItemID ?? item.ItemNumber ?? item.Id ?? item.id;
+        if (!dedup.has(key)) dedup.set(key, item);
       }
-      results = [...seen.values()];
+      results = [...dedup.values()];
     }
 
     res.status(200).json({ items: results });
