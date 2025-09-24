@@ -1377,6 +1377,16 @@ async function openOTSearch(){
 }
 
 
+function toArray(resp) {
+  if (Array.isArray(resp)) return resp;
+  if (!resp || typeof resp !== 'object') return [];
+  for (const k of ['results','data','rows','Records','items','list','value','Customers','SalesOrders','Items']) {
+    if (Array.isArray(resp[k])) return resp[k];
+  }
+  return [];
+}
+
+  
 
 // Map a customer result into your existing form fields
 function applyCustomerFromApi(r){
