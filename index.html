@@ -1591,24 +1591,23 @@ async function openSOSearch(){
   if(!q){ target.innerHTML = 'Enter a query first.'; return; }
   target.innerHTML = 'Searching…';
   try{
-    // hit your proxy: GET /api/ordertime/salesorders/search?q=...
     const results = await api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
     if(!Array.isArray(results) || results.length === 0){
       target.innerHTML = 'No matches.'; return;
     }
-    // render small cards with Preview + Apply
-   target.innerHTML = results.slice(0, 25).map(r => `
-  <div class="card" style="margin:6px 0;padding:10px">
-    <div><strong>SO ${r.docNo || '—'}</strong> — ${r.customer || ''}</div>
-    <div class="tiny">${r.date || ''} • ${r.status || ''}</div>
-    <div class="row" style="margin-top:6px;gap:8px">
-      <button class="ok" data-so-id="${r.id}">Apply</button>
-      <button class="ghost" data-so-preview="${r.id}">Preview</button>
-    </div>
-  </div>
-`).join('');
-
-
+    target.innerHTML = results.slice(0,25).map(so => `
+      <div class="card" style="margin:6px 0;padding:10px">
+        <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
+        <div class="tiny">${so.date || ''} • ${so.status || ''}</div>
+        <div class="row" style="margin-top:6px">
+          <button class="ok"    data-so-id="${so.id || so.number}">Apply</button>
+          <button class="ghost" data-so-preview="${so.id || so.number}">Preview</button>
+        </div>
+      </div>
+    `).join('');
+  }catch(err){
+    target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
+  }
 }
 
 function normalizeOrderTimeSO(so){
