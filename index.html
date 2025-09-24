@@ -1363,41 +1363,85 @@ function applyCustomerFromApi(r){
   applyPastedCustomer('wcpPaste'); // your existing JSON→form function
 }
 
+// safeties (in case they’re not defined yet)
+function setVal(id,v){ const el=document.getElementById(id); if(!el) return; el.value = v ?? ''; el.dispatchEvent(new Event('input',{bubbles:true})); }
+function pick(...vals){ for (const v of vals){ if (v !== undefined && v !== null && String(v).trim() !== '') return v; } return ''; }
+
+// ⬇️ REPLACE THIS WHOLE FUNCTION
 function applyPastedCustomer(textareaId){
-  const raw=document.getElementById(textareaId).value.trim();
+  const ta = document.getElementById(textareaId);
+  if(!ta){ alert('Paste area not found'); return; }
+  const raw = ta.value.trim();
   if(!raw){ alert('Paste customer details first.'); return; }
-  let data={};
-  try{ data=JSON.parse(raw); }
-  catch(_){ raw.split(/\r?\n/).forEach(line=>{ const m=line.match(/^([^:]+):\s*(.*)$/); if(!m)return; setByPath(data,m[1].trim(),m[2].trim()); }); }
 
+  let data = {};
+  try {
+    data = JSON.parse(raw);
+  } catch {
+    // allow key:value lines fallback
+    raw.split(/\r?\n/).forEach(line=>{
+      const m = line.match(/^([^:]+):\s*(.*)$/);
+      if(!m) return;
+      const k = m[1].trim().toLowerCase();
+      const v = m[2].trim();
+      if(!data.billing) data.billing = {};
+      if(!data.shipping) data.shipping = {};
+      if(k.includes('company')) data.company = v;
+      else if(k.includes('bill') && k.includes('street')) data.billing.street = v;
+      else if(k.includes('bill') && k.includes('suite'))  data.billing.suite = v;
+      else if(k.includes('bill') && k.includes('city'))   data.billing.city = v;
+      else if(k.includes('bill') && k.includes('state'))  data.billing.state = v;
+      else if(k.includes('bill') && k.includes('zip'))    data.billing.zip = v;
+      else if(k.includes('ship') && k.includes('street')) data.shipping.street = v;
+      else if(k.includes('ship') && k.includes('suite'))  data.shipping.suite = v;
+      else if(k.includes('ship') && k.includes('city'))   data.shipping.city = v;
+      else if(k.includes('ship') && k.includes('state'))  data.shipping.state = v;
+      else if(k.includes('ship') && k.includes('zip'))    data.shipping.zip = v;
+      else if(k.includes('email'))                         data.billing = { ...(data.billing||{}), email: v };
+      else if(k.includes('phone'))                         data.billing = { ...(data.billing||{}), phone: v };
+      else if(k.includes('contact'))                       data.billing = { ...(data.billing||{}), contact: v };
+    });
+  }
+
+  // ===== BILLING (Customer panel)
   setVal('billCompany', pick(data.company, data.billing?.company));
-  setVal('billContact', pick(data.billing?.contact)); setVal('billPhone', pick(data.billing?.phone));
-  setVal('billEmail', pick(data.billing?.email)); setVal('billStreet', pick(data.billing?.street));
-  setVal('billSuite', pick(data.billing?.suite)); setVal('billCity', pick(data.billing?.city));
-  setVal('billState', pick(data.billing?.state)); setVal('billZip', pick(data.billing?.zip));
+  setVal('billContact', pick(data.billing?.contact));
+  setVal('billPhone',   pick(data.billing?.phone));
+  setVal('billEmail',   pick(data.billing?.email));
+  setVal('billStreet',  pick(data.billing?.street));
+  setVal('billSuite',   pick(data.billing?.suite));
+  setVal('billCity',    pick(data.billing?.city));
+  setVal('billState',   pick(data.billing?.state));
+  setVal('billZip',     pick(data.billing?.zip));
 
-  setVal('shipCompany', pick(data.shipping?.company)); setVal('shipContact', pick(data.shipping?.contact));
-  setVal('shipPhone', pick(data.shipping?.phone)); setVal('shipEmail', pick(data.shipping?.email));
-  setVal('shipStreet', pick(data.shipping?.street)); setVal('shipSuite', pick(data.shipping?.suite));
-  setVal('shipCity', pick(data.shipping?.city)); setVal('shipState', pick(data.shipping?.state)); setVal('shipZip', pick(data.shipping?.zip));
+  // ===== SHIPPING (Shipping panel)
+  setVal('shipCompany', pick(data.shipping?.company, data.company));
+  setVal('shipContact', pick(data.shipping?.contact));
+  setVal('shipPhone',   pick(data.shipping?.phone));
+  setVal('shipEmail',   pick(data.shipping?.email));
+  setVal('shipStreet',  pick(data.shipping?.street));
+  setVal('shipSuite',   pick(data.shipping?.suite));
+  setVal('shipCity',    pick(data.shipping?.city));
+  setVal('shipState',   pick(data.shipping?.state));
+  setVal('shipZip',     pick(data.shipping?.zip));
 
-  const pm=pick(data.payment?.method); if(pm) selectByTextExact('payMethod', pm);
-  setVal('payTerms', pick(data.payment?.terms));
-  document.getElementById('taxExempt').checked=!!data.payment?.taxExempt;
-  document.getElementById('hasAgreement').checked=!!data.payment?.agreement;
+  // ===== PAYMENT & SHIPPING OPTIONS (optional but supported in your WCP drawer)
+  if (data.payment){
+    setVal('payMethod', pick(data.payment.method));
+    setVal('payTerms',  pick(data.payment.terms));
+    const hasAgreement = document.getElementById('hasAgreement');
+    const taxExempt    = document.getElementById('taxExempt');
+    if (hasAgreement) hasAgreement.checked = !!data.payment.agreement;
+    if (taxExempt)    taxExempt.checked    = !!data.payment.taxExempt;
+  }
+  if (data.shippingOptions){
+    setVal('shipPay',   pick(data.shippingOptions.pay));
+    setVal('shipSpeed', pick(data.shippingOptions.speed));
+    setVal('shortShip', pick(data.shippingOptions.shortShip));
+  }
 
-  const so=data.shippingOptions||{};
-  if(so.pay) selectByTextExact('shipPay', so.pay);
-  if(so.speed) selectByTextExact('shipSpeed', so.speed);
-  if(so.shortShip) selectByTextExact('shortShip', so.shortShip);
-
-  setVal('carrierRepName', pick(data.carrierRep?.name)); setVal('carrierRepEmail', pick(data.carrierRep?.email));
-
-  const r1=pick(data.rep?.primary); if(r1) selectByTextExact('rep1', r1);
-  const r2=pick(data.rep?.secondary); if(r2) selectByTextExact('rep2', r2);
-
-  closeDrawer('drawerWCP');
-  refreshTotals();
+  // Close helper drawer if open
+  if (typeof closeDrawer === 'function') closeDrawer('drawerWCP');
 }
 
 
