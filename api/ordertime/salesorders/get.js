@@ -1,7 +1,6 @@
-// CommonJS
-const { otList, like, getCustomerById, getSalesOrderByDocNo, otGet } = require('../../_ot');
+const { getSalesOrderByDocNo } = require('../../_ot');
 
-export default async function handler(req, res) {
+module.exports = async function handler(req, res) {
   try {
     const docNo = parseInt(req.query.docNo, 10);
     if (!docNo) return res.status(400).json({ error: 'docNo is required' });
@@ -11,4 +10,4 @@ export default async function handler(req, res) {
     console.error('salesorders/get', err);
     res.status(500).json({ error: 'Fetch sales order failed: ' + (err.message || err) });
   }
-}
+};
