@@ -1351,20 +1351,21 @@ function toArray(resp) {
 
 // Map a customer result into your existing form fields
 function applyCustomerFromApi(r){
-  // Keep only the parts your form mapper expects
   const data = {
-    company: r.company,
-    billing: r.billing,
-    shipping: r.shipping,
-    payment: r.payment,
-    shippingOptions: r.shippingOptions
+    company: r.company || r.CompanyName || r.Name || (r.CustomerRef?.Name ?? ''),
+    // pass through whichever casing the API used
+    billing:  r.billing  || r.Billing  || r.BillingAddress  || r.BillTo  || null,
+    shipping: r.shipping || r.Shipping || r.ShippingAddress || r.ShipTo  || null,
+    payment:  r.payment  || r.Payment  || null,
+    shippingOptions: r.shippingOptions || r.ShippingOptions || {
+      pay:   r.ShipPaymentMethod   || r.ShippingPaymentMethod || '',
+      speed: r.ShipSpeed           || r.ShippingSpeed         || '',
+      shortShip: r.ShortShip || ''
+    }
   };
   document.getElementById('wcpPaste').value = JSON.stringify(data, null, 2);
-  applyPastedCustomer('wcpPaste'); // your existing JSON→form function
+  applyPastedCustomer('wcpPaste');
 }
-
-function setVal(id,v){ const el=document.getElementById(id); if(!el) return; el.value = v ?? ''; el.dispatchEvent(new Event('input',{bubbles:true})); }
-const pick = (...vals) => { for (const v of vals) if (v !== undefined && v !== null && String(v).trim() !== '') return v; return ''; };
 
 function applyPastedCustomer(textareaId){
   const ta = document.getElementById(textareaId);
@@ -1648,22 +1649,6 @@ async function applySalesOrder(row){
   }
 }
   
-async function loadSO(id){
-  const soRaw  = await api(`/ordertime/salesorders/${encodeURIComponent(id)}`);
-  const soNorm = normalizeOrderTimeSO(soRaw);   // billing.contact not billing.name
-  document.getElementById('clonePaste').value = JSON.stringify(soNorm, null, 2);
-}
-
-async function applySO(id){
-  await loadSO(id);
-  applyClonedOrder(); // fills Customer, Shipping, Items
-}
-
-
-function fillCloneExample(){
-  document.getElementById('cloneQuery').value = 'Acme Corp';
-  document.getElementById('clonePaste').value = JSON.stringify(CLONE_ORDER_EXAMPLE, null, 2);
-}
 // Apply (by Sales Order record Id)
 document.addEventListener('click', (e) => {
   const applyBtn = e.target.closest('#cloneResults button[data-so-id]');
