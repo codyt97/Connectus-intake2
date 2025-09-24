@@ -1,3 +1,4 @@
+// /api/ordertime/salesorders/search.js
 const { listSearch, getSalesOrderByDocNo } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
@@ -5,36 +6,35 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    // 1) Fast path: numeric docNo -> direct GET (bypasses /list entirely)
-    if (/^\d+$/.test(q)) {
+    // If it's a pure doc number (or nearly), go straight to the entity GET
+    const digitsOnly = q.replace(/\D+/g, '');
+    if (digitsOnly && digitsOnly.length >= 3 && /^\d+$/.test(digitsOnly)) {
       try {
-        const so = await getSalesOrderByDocNo(parseInt(q, 10));
-        if (so?.Id) {
+        const so = await getSalesOrderByDocNo(parseInt(digitsOnly, 10));
+        if (so && (so.Id || so.DocNumber)) {
           return res.status(200).json([{
             id: so.Id,
-            docNo: so.DocNumber || so.Number || q,
+            docNo: so.DocNumber || so.Number || digitsOnly,
             customer: so.CustomerRef?.Name || '',
-            status:  so.Status || so.DocStatus || '',
-            date:    so.TxnDate || so.Date || '',
+            status: so.Status || so.DocStatus || '',
+            date: so.TxnDate || so.Date || '',
           }]);
         }
-      } catch (e) {
-        // Not found via direct GET — fall through to list scan
-        console.warn('salesorders/search docNo GET fallback', String(e?.message || e));
+      } catch (_) {
+        // fall back to list search if not found
       }
     }
 
-    // 2) Resilient list scan + local filter
+    // Text search (tokenized AND across columns)
     const rows = await listSearch({
       type: 'SalesOrder',
       q,
-      columns: ['DocNumber', 'Number', 'CustomerRef.Name', 'CustomerName'],
-      sortProp: 'Id',
+      columns: ['DocNumber','CustomerRef.Name'],
+      sortProp: 'DocNumber',
       dir: 'Desc',
-      pageSize: 200,
-      maxPages: 25,
-      take: 50,
-      tryServerFilters: false, // OT filters for SalesOrder are flaky on some tenants
+      pageSize: 100,
+      maxPages: 8,
+      targetCount: 50
     });
 
     const seen = new Set();
@@ -43,14 +43,13 @@ module.exports = async function handler(req, res) {
       .map(r => ({
         id: r.Id,
         docNo: r.DocNumber || r.Number || '',
-        customer: r.CustomerRef?.Name || r.CustomerName || '',
+        customer: r.CustomerRef?.Name || '',
         status: r.Status || r.DocStatus || '',
         date: r.TxnDate || r.Date || '',
       }));
 
     res.status(200).json(out);
   } catch (err) {
-    console.error('salesorders/search', err);
     res.status(500).json({ error: `API GET /ordertime/salesorders/search failed: ${err.message || err}` });
   }
 };
