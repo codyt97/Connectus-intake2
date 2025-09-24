@@ -64,56 +64,90 @@ function rowContainsAnyString(value, needle) {
   return false;
 }
 
+// PUT THIS IN /api/_ot.js, replacing the existing listSearch
+
 async function listSearch({
-  type, q, columns,
-  sortProp = 'Id', dir = 'Asc',
-  pageSize = 100, maxPages = 8
+  type,
+  q,
+  columns,
+  sortProp = 'Id',
+  dir = 'Asc',
+  pageSize = 100,
+  maxPages = 12,          // scan a bit deeper for two-word queries
 }) {
-  const needle = String(q || '').toLowerCase().trim();
-  const filterable = (columns || []).filter(c => c && !c.includes('.')); // only simple fields
+  const tokens = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
+  const seen   = new Set();
+  const merged = [];
 
-  const seen = new Set();
-  let merged = [];
+  const addUnique = (rows) => {
+    if (!Array.isArray(rows)) return;
+    for (const r of rows) {
+      if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
+    }
+  };
 
-  // Try server-side filters, but never fail the whole search.
-  for (const col of filterable) {
+  // Try a filtered call per column, but NEVER fail the whole search
+  for (const col of columns) {
     try {
       const rows = await listPage({
         type,
-        filters: [contains(col, needle)],
-        sortProp, dir, page: 1, size: pageSize
+        filters: [contains(col, q)],
+        sortProp,
+        dir,
+        page: 1,
+        size: pageSize,
       });
-      for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
+      addUnique(rows);
     } catch (e) {
-      console.warn('listSearch filter skipped:', type, col, e.message);
+      console.warn(`listSearch filter skipped: ${type} ${col} ${e.message}`);
+      // ignore and move on; some tenants/properties explode on filter
     }
   }
 
-  // Post-filter whatever we collected using the provided columns (incl. nested)
-  const usesColumns = (columns && columns.length > 0);
-  const postMatch = (row) => {
-    if (usesColumns) {
-      return columns.some(c => {
-        const v = c.split('.').reduce((a,k) => (a ? a[k] : undefined), row);
-        return typeof v === 'string' && v.toLowerCase().includes(needle);
-      });
-    }
-    return rowContainsAnyString(row, needle);
+  // Post-filter what we collected using token AND across all provided columns
+  const postMatch = (r) => {
+    const hay = columns
+      .map(c => c.split('.').reduce((a, k) => a?.[k], r))
+      .filter(v => typeof v === 'string')
+      .join(' ')
+      .toLowerCase();
+    return tokens.every(t => hay.includes(t));
   };
 
-  const filtered = merged.filter(postMatch);
+  let filtered = merged.filter(postMatch);
   if (filtered.length) return filtered;
 
-  // Fallback: page through without filters and match across ANY string fields
+  // Fallback: scan pages with NO filters, then post-filter
   const out = [];
   for (let p = 1; p <= maxPages; p++) {
-    const rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
-    if (!rows.length) break;
-    for (const r of rows) if (rowContainsAnyString(r, needle)) out.push(r);
-    if (out.length >= 50) break;
+    let rows;
+    try {
+      rows = await listPage({
+        type,
+        filters: [],
+        sortProp,
+        dir,
+        page: p,
+        size: pageSize,
+      });
+    } catch (e) {
+      console.warn(`listSearch fallback page ${p} failed: ${e.message}`);
+      break;
+    }
+    if (!rows?.length) break;
+
+    for (const r of rows) if (postMatch(r)) out.push(r);
+    if (out.length >= 75) break; // enough to render quickly
   }
   return out;
 }
+
+module.exports = {
+  otGet, otPost,
+  listSearch,
+  getCustomerById, getSalesOrderById, getSalesOrderByDocNo,
+};
+
 
 // Entity GETs (note the correct casing)
 async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
