@@ -64,6 +64,41 @@ function rowContainsAnyString(value, needle) {
   return false;
 }
 
+// --- add these helpers in /api/_ot.js ---
+
+function val(obj, path) {
+  return String(
+    path.split('.').reduce((a, k) => (a && a[k] != null ? a[k] : undefined), obj) ?? ''
+  );
+}
+
+// Try a page with progressively smaller sizes if /list is grumpy
+async function listPageSafe({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }) {
+  const sizes = [size, 50, 25, 10, 5];
+  for (const s of sizes) {
+    try {
+      const rows = await listPage({ type, filters, sortProp, dir, page, size: s });
+      return rows;
+    } catch (e) {
+      // swallow and try the next smaller page size
+    }
+  }
+  return [];
+}
+
+// Scan N pages without filters and let us post-filter locally
+async function scanList({ type, sortProp='Id', dir='Asc', pageSize=50, maxPages=20 }) {
+  let out = [];
+  for (let p = 1; p <= maxPages; p++) {
+    const rows = await listPageSafe({ type, filters: [], sortProp, dir, page: p, size: pageSize });
+    if (!rows.length) break;
+    out.push(...rows);
+    if (rows.length < pageSize) break; // last page
+  }
+  return out;
+}
+
+
 // PUT THIS IN /api/_ot.js, replacing the existing listSearch
 
 async function listSearch({
@@ -156,6 +191,9 @@ async function getSalesOrderByDocNo(n){ return otGet(`/SalesOrder?docNo=${encode
 
 module.exports = {
   otGet, otPost,
-  listSearch,
+  listSearch,           // keep for customers
+  scanList, listPageSafe,
+  val,
   getCustomerById, getSalesOrderById, getSalesOrderByDocNo,
 };
+
