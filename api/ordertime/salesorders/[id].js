@@ -1,4 +1,3 @@
-// /api/ordertime/salesorders/[id].js
 const { getSalesOrderById } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
