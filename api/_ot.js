@@ -11,7 +11,10 @@ function assertEnv(){ if(!BASE) throw new Error('Missing OT_BASE_URL'); if(!API_
 function normalize(s) {
   return String(s || '')
     .toLowerCase()
-    .replace(/[^a-z0-9]/g, '');            // collapse spaces & punctuation
+    .normalize('NFKD')       // strip accents
+    .replace(/[^\p{L}\p{N}]+/gu, ' ') // non letters/digits -> space
+    .replace(/\s+/g, ' ')    // collapse spaces
+    .trim();
 }
 
 function authHeaders(){
@@ -107,9 +110,6 @@ async function scanList({ type, sortProp='Id', dir='Asc', pageSize=50, maxPages=
 }
 
 
-// PUT THIS IN /api/_ot.js, replacing the existing 
-
-// Replace your current listSearch with this:
 // replace your listSearch with this one
 async function listSearch({
   type, q, columns,
@@ -168,6 +168,7 @@ async function listSearch({
   }
   return merged;
 }
+
 
 
 // Entity GETs (note the correct casing)
