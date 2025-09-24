@@ -1649,23 +1649,7 @@ async function applySalesOrder(row){
   }
 }
   
-// Apply (by Sales Order record Id)
-document.addEventListener('click', (e) => {
-  const applyBtn = e.target.closest('#cloneResults button[data-so-id]');
-  if (!applyBtn) return;
-  const id = applyBtn.dataset.soId;
-  if (!id || id === 'undefined') { alert('Missing id'); return; }
-  applySO(id);     // loads details + applies to form
-});
 
-// Preview (loads normalized JSON into the textarea)
-document.addEventListener('click', (e) => {
-  const prevBtn = e.target.closest('#cloneResults button[data-so-preview]');
-  if (!prevBtn) return;
-  const id = prevBtn.dataset.soPreview;
-  if (!id || id === 'undefined') { alert('Missing id'); return; }
-  loadSO(id);      // loads details into preview textarea
-});
 
 
 /* ===== SSP invite ===== */
