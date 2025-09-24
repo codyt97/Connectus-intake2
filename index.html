@@ -615,80 +615,41 @@
 </aside>
 
 <!-- Clone Existing Order -->
-<aside class="drawer" id="drawerClone" aria-label="Clone Sales Order Drawer">
-  <header>
-    <strong>Clone Existing Order — OrderTime</strong>
-    <button class="ghost" onclick="closeDrawer('drawerClone')">Close</button>
-  </header>
-  <div class="content">
-    <label class="tiny">Search Sales Orders in OrderTime (opens in a new tab)</label>
+<!-- ===================== SALES ORDERS: SEARCH UI (BEGIN) ===================== -->
+<aside class="drawer" id="drawerClone" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>Clone / Apply Existing Sales Order (OrderTime)</h3>
+    <button class="close" onclick="if(window.closeDrawer) closeDrawer('drawerClone')">✕</button>
+  </div>
+
+  <div class="drawer-body">
     <div class="row">
-      <input id="cloneQuery" placeholder="Type customer name, SO number, etc." />
-      <button class="ghost" onclick="openSOSearch()">Search</button>
-    </div>
-    <div id="cloneResults" class="tiny" style="margin-top:8px"></div>
-
-
-    <div class="divider"></div>
-
-    <div class="tiny">
-      After selecting a Sales Order in OrderTime, paste the exported details below (JSON).
-      Supports <em>customer</em>, <em>shipping</em>, <em>payment</em>, <em>shippingOptions</em>,
-      <em>items</em> (array), and <em>mdm</em>.
+      <input id="soQuery" placeholder="DocNo (e.g., 10234) or Customer name (e.g., Acme)" />
+      <button id="soSearchBtn" class="ghost">Search</button>
     </div>
 
-    <textarea id="clonePaste" rows="12" style="width:100%;margin-top:8px" placeholder='{
-  "so":"SO-2025-00456",
-  "customer":{
-    "company":"Acme Corp",
-    "billing":{"contact":"John","phone":"555-1111","email":"john@acme.com","street":"1 Main","suite":"Ste 100","city":"Philadelphia","state":"PA","zip":"19104"}
-  },
-  "shipping":{
-    "company":"Acme Warehouse",
-    "contact":"Jane","phone":"555-2222","email":"wh@acme.com",
-    "street":"500 Dock Rd","suite":"","city":"Philadelphia","state":"PA","zip":"19112",
-    "residence":false
-  },
-  "payment":{"method":"Net Terms","terms":"Net 30","taxExempt":true,"agreement":false},
-  "shippingOptions":{"pay":"Prepaid","speed":"Ground","shortShip":"No"},
-  "items":[
-    {
-      "desc":"Apple iPad 10.2\" 128GB — Silver", "model":"MK2K3LL/A", "color":"Silver", "sku":"IPAD10-128-SLV",
-      "qty":25, "net":"LTE", "carrier":"AT&T", "payout":50, "msrp":429.99, "disc":10, "sell":386.99,
-      "cond":"New", "stock":"Yes", "vendor":"Ingram", "cost":330.00,
-      "deal":"DLL-$310 / DR-12345", "hold":"RES-9981", "leadtime":"2-3 wks", "eol":"No",
-      "accessory":{"sku":"CASE-IPAD10-RUG","desc":"Rugged Case","qty":1,"sell":29.99},
-      "insurance":{"plan":"AKKO","ded":"$100","term":"2 year","sell":69.00},
-      "services":{"enabled":true,"tier":1},
-      "sim":{"card":"AT-SIM3IN1","pairing":"SIM PAIR ONLY","handling":"Install SIM Card"},
-      "lic":{"vendor":"Jamf","duration":"1 year","prorated":"12.00","key":"SIMBA-ABC123","contact":"licenses@vendor.com"}
-    }
-  ],
-  "mdm":{"carrierSPF":false,"planCode":"","subsidyNote":false,"abm":true,"knox":false,"knoxAccount":"","zeroTouch":true,"pro":true,"notes":"Clone from SO"}
-}'></textarea>
-
-    <div class="row" style="gap:10px;margin-top:8px">
-      <button class="ok" onclick="applyClonedOrder()">Apply to Form</button>
-      <button class="ghost" onclick="fillCloneExample()">Load Example</button>
-    </div>
+    <div id="soResults" class="drawer-results muted">Type a search and hit Enter or click Search.</div>
   </div>
 </aside>
-<!-- Items (OrderTime) -->
-<aside class="drawer" id="drawerItems" aria-label="Items Drawer">
-  <header>
-    <strong>Items — OrderTime Search</strong>
-    <button class="ghost" onclick="closeDrawer('drawerItems')">Close</button>
-  </header>
-  <div class="content">
-    <label class="tiny">Search items in OrderTime</label>
+<!-- ===================== SALES ORDERS: SEARCH UI (END) ===================== -->
+
+<!-- ===================== ITEMS: SEARCH UI (BEGIN) ===================== -->
+<aside class="drawer" id="drawerItems" aria-hidden="true">
+  <div class="drawer-head">
+    <h3>Search Items (OrderTime)</h3>
+    <button class="close" onclick="if(window.closeDrawer) closeDrawer('drawerItems')">✕</button>
+  </div>
+
+  <div class="drawer-body">
     <div class="row">
-      <input id="itemQuery" placeholder="Name, MFG Part #, UPC, SKU" />
-      <button class="ghost" onclick="openItemSearch()">Search</button>
+      <input id="itemQuery" placeholder="e.g., iPhone 14, Samsung S23, or SKU like SM-T307UVWV31" />
+      <button id="itemSearchBtn" class="ghost">Search</button>
     </div>
-    <div id="itemResults" class="tiny" style="margin-top:8px"></div>
+
+    <div id="itemResults" class="drawer-results muted">Type a search and hit Enter or click Search.</div>
   </div>
 </aside>
-
+<!-- ===================== ITEMS: SEARCH UI (END) ===================== -->
 
 <!-- NEW Customer invite -->
 <!-- NEW Customer invite -->
@@ -1440,41 +1401,6 @@ function applyPastedCustomer(textareaId){
 }
 
 
-
-// Items: search in OT and add to the Items table
-async function openItemSearch(){
-  const q = (document.getElementById('itemQuery').value || '').trim();
-  const target = document.getElementById('itemResults');
-  if (!q){ target.innerHTML = 'Enter a query first.'; return; }
-  target.innerHTML = 'Searching…';
-  try{
-    // Works with either {results:[...]} or [...]
-    const resp = await api(`/ordertime/items/search?q=${encodeURIComponent(q)}`);
-    const rows = Array.isArray(resp) ? resp : (resp?.results || []);
-    if (!Array.isArray(rows) || rows.length === 0){ target.innerHTML = 'No matches.'; return; }
-
-    target.innerHTML = rows.slice(0,50).map(r => `
-      <div class="card" style="margin:6px 0;padding:10px">
-        <div><strong>${(r.name || r.sku || r.mfgPart || 'Item')}</strong></div>
-        <div class="tiny">${r.mfgPart ? r.mfgPart : ''}${r.upc ? (' • UPC ' + r.upc) : ''}</div>
-        <div class="tiny">${r.description || ''}</div>
-        <div class="row" style="margin-top:6px">
-          <button class="ghost" data-item='${JSON.stringify({
-           name: r.name || r.sku || r.mfgPart || "Item",
-             description: r.description || "",
-             mfgPart: r.mfgPart || "",
-             sku: r.sku || r.number || "",
-             price: Number(r.price || 0)
-             }).replace(/'/g,"&#39;")}'>Add</button>
-
-        </div>
-      </div>
-    `).join('');
-  }catch(err){
-    target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
-  }
-}
-
 // Map a found item into your Items table
 function addItemFromSearch(r){
   addRow({
@@ -1595,32 +1521,84 @@ function applyClonedOrder(){
 
 /* ===== Clone Existing Order helper ===== */
 // ---------- Clone Existing Sales Order (OrderTime) ----------
-async function openSOSearch(){
-  const q = (document.getElementById('cloneQuery').value || '').trim();
-  const target = document.getElementById('cloneResults');
-  if(!q){ target.innerHTML = 'Enter a query first.'; return; }
-  target.innerHTML = 'Searching…';
-  try{
-    const results = await api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
-    if(!Array.isArray(results) || results.length === 0){
-      target.innerHTML = 'No matches.'; return;
-    }
-    target.innerHTML = results.slice(0,25).map(so => `
-      <div class="card" style="margin:6px 0;padding:10px">
-        <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
-        <div class="tiny">${so.date || ''} • ${so.status || ''}</div>
-        <div class="row" style="margin-top:6px">
-          <button class="ok" data-so-id="${r.id}">Apply</button>
-          <button class="ghost" data-so-preview="${r.id}">Preview</button>
+// Map SO header → your form field IDs (CHANGE THESE RIGHT-SIDE IDs)
+const SO_HEADER_MAP = [
+  { val: r => r.docNo,    id: 'so_docno' },
+  { val: r => r.customer, id: 'so_customer' },
+  { val: r => r.status,   id: 'so_status' },
+  { val: r => r.date,     id: 'so_date' }
+];
 
-        </div>
+// Optional deeper mapping once full SO is fetched:
+const SO_DETAIL_MAP = [
+  { val: so => so?.Id,                           id: 'so_id' },
+  { val: so => so?.TotalAmount ?? so?.Total,     id: 'so_total' },
+  { val: so => so?.BillingAddress?.Name,         id: 'so_bill_to_name' },
+  { val: so => so?.ShippingAddress?.Name,        id: 'so_ship_to_name' }
+];
+
+function renderSORow(r){
+  const title = `${escapeHtml(r.docNo||'')} — ${escapeHtml(r.customer||'')}`;
+  const meta  = [r.status, r.date].filter(Boolean).map(escapeHtml).join(' · ');
+  return `
+    <div class="result-row">
+      <div class="row-main">
+        <div class="row-title">${title}</div>
+        <div class="row-meta">${meta}</div>
       </div>
-    `).join('');
-  } catch (err) {
-    target.innerHTML = `Search failed: ${err.message}`;
+      <div class="row-cta">
+        <button onclick='applySalesOrder(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
+      </div>
+    </div>
+  `;
+}
+
+async function doSOSearch(){
+  const q = document.getElementById('soQuery').value.trim();
+  const btn = document.getElementById('soSearchBtn');
+  const out = document.getElementById('soResults');
+  if(!q){ out.innerHTML = '<div class="muted">Type something…</div>'; return; }
+  btn.disabled = true; out.innerHTML = '<div class="muted">Searching…</div>';
+
+  try{
+    const res = await fetch(`/api/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
+    const rows = await res.json(); // [{id,docNo,customer,status,date}]
+    if(!Array.isArray(rows) || rows.length===0){
+      out.innerHTML = '<div class="muted">No results.</div>';
+      return;
+    }
+    out.innerHTML = rows.map(renderSORow).join('');
+  }catch(e){
+    out.innerHTML = `<div class="error">Error: ${escapeHtml(e.message||e)}</div>`;
+  }finally{
+    btn.disabled = false;
   }
 }
 
+async function applySalesOrder(row){
+  try{
+    // Paste quick header from search row
+    SO_HEADER_MAP.forEach(m => setVal(m.id, (typeof m.val==='function'? m.val(row) : row[m.val]) ?? ''));
+
+    // Then pull full SO by DocNo (for lines/addresses/totals)
+    if (row.docNo){
+      const res = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(row.docNo)}`);
+      if (res.ok){
+        const so = await res.json();
+        SO_DETAIL_MAP.forEach(m => setVal(m.id, (typeof m.val==='function'? m.val(so) : so[m.val]) ?? ''));
+        // TODO: If you maintain a line-items table, render so.Lines here.
+      }
+    }
+
+    if (typeof closeDrawer === 'function') closeDrawer('drawerClone');
+  }catch(e){
+    alert('Failed to apply Sales Order: ' + (e.message||e));
+  }
+}
+
+// wire events
+document.getElementById('soSearchBtn')?.addEventListener('click', doSOSearch);
+document.getElementById('soQuery')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSOSearch(); });
 function normalizeOrderTimeSO(so){
   const A = so.BillAddress || {};
   const S = so.ShipAddress || {};
@@ -2596,5 +2574,81 @@ function addItemFromSearch(r){
   });
 }());
 </script>
+<script>
+// --- shared helpers (safe if already defined) ---
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));}
+function setVal(id,v){ const el=document.getElementById(id); if(!el) return; el.value = v ?? ''; el.dispatchEvent(new Event('input',{bubbles:true})); }
+
+// Map OT item → your form field IDs (CHANGE THESE RIGHT-SIDE IDs TO MATCH YOUR FORM)
+const ITEM_FIELD_MAP = [
+  { val: r => r.sku,         id: 'item_sku' },          // e.g. ItemNumber
+  { val: r => r.name,        id: 'item_name' },
+  { val: r => r.description, id: 'item_description' },
+  { val: r => r.mfgPart,     id: 'item_mfg_part' },
+  { val: r => r.upc,         id: 'item_upc' },
+  { val: r => r.price,       id: 'item_price' },
+  { val: r => r.id,          id: 'item_ot_id' }         // hidden field for OT Id (optional)
+];
+
+// Render one result row
+function renderItemRow(r){
+  const title  = `${escapeHtml(r.name||'')}${r.sku ? ' ('+escapeHtml(r.sku)+')' : ''}`;
+  const sub    = escapeHtml(r.description || '');
+  const meta   = [
+    r.mfgPart ? `Mfg#: ${escapeHtml(r.mfgPart)}` : '',
+    r.upc ? `UPC: ${escapeHtml(r.upc)}` : '',
+    `Price: ${Number(r.price||0).toFixed(2)}`
+  ].filter(Boolean).join(' · ');
+
+  return `
+    <div class="result-row">
+      <div class="row-main">
+        <div class="row-title">${title}</div>
+        <div class="row-sub">${sub}</div>
+        <div class="row-meta">${meta}</div>
+      </div>
+      <div class="row-cta">
+        <button onclick='applyItem(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
+      </div>
+    </div>
+  `;
+}
+
+async function doItemSearch(){
+  const q = document.getElementById('itemQuery').value.trim();
+  const btn = document.getElementById('itemSearchBtn');
+  const out = document.getElementById('itemResults');
+  if(!q){ out.innerHTML = '<div class="muted">Type something…</div>'; return; }
+  btn.disabled = true; out.innerHTML = '<div class="muted">Searching…</div>';
+
+  try{
+    const res = await fetch(`/api/ordertime/items/search?q=${encodeURIComponent(q)}`);
+    const rows = await res.json(); // [{id,name,description,mfgPart,upc,price,sku}]
+    if(!Array.isArray(rows) || rows.length === 0){
+      out.innerHTML = '<div class="muted">No results.</div>';
+      return;
+    }
+    out.innerHTML = rows.map(renderItemRow).join('');
+  }catch(e){
+    out.innerHTML = `<div class="error">Error: ${escapeHtml(e.message||e)}</div>`;
+  }finally{
+    btn.disabled = false;
+  }
+}
+
+function applyItem(row){
+  try {
+    ITEM_FIELD_MAP.forEach(m => setVal(m.id, (typeof m.val==='function'? m.val(row) : row[m.val]) ?? ''));
+    if (typeof closeDrawer === 'function') closeDrawer('drawerItems');
+  } catch(e) {
+    alert('Failed to apply item: ' + (e.message||e));
+  }
+}
+
+// wire events
+document.getElementById('itemSearchBtn')?.addEventListener('click', doItemSearch);
+document.getElementById('itemQuery')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doItemSearch(); });
+</script>
+
 </body>
 </html>
