@@ -1621,74 +1621,21 @@ async function doSOSearch(){
 
 async function applySalesOrder(row){
   try{
-    // Paste quick header from search row
-    SO_HEADER_MAP.forEach(m => setVal(m.id, (typeof m.val==='function'? m.val(row) : row[m.val]) ?? ''));
+    if (!row?.docNo) { alert('Missing DocNo'); return; }
+    const res = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(row.docNo)}`);
+    if (!res.ok) throw new Error(await res.text());
 
-    // Then pull full SO by DocNo (for lines/addresses/totals)
-    if (row.docNo){
-      const res = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(row.docNo)}`);
-      if (res.ok){
-        const so = await res.json();
-        SO_DETAIL_MAP.forEach(m => setVal(m.id, (typeof m.val==='function'? m.val(so) : so[m.val]) ?? ''));
-        // TODO: If you maintain a line-items table, render so.Lines here.
-      }
-    }
+    const soRaw  = await res.json();
+    // you already have normalizeOrderTimeSO in the file
+    const soNorm = normalizeOrderTimeSO(soRaw);
+    document.getElementById('clonePaste').value = JSON.stringify(soNorm, null, 2);
 
+    // This is your canonical mapper that populates Customer, Shipping, Items, MDM
+    applyClonedOrder();
     if (typeof closeDrawer === 'function') closeDrawer('drawerClone');
   }catch(e){
     alert('Failed to apply Sales Order: ' + (e.message||e));
   }
-}
-
-// wire events
-document.getElementById('soSearchBtn')?.addEventListener('click', doSOSearch);
-document.getElementById('soQuery')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSOSearch(); });
-function normalizeOrderTimeSO(so){
-  const A = so.BillAddress || {};
-  const S = so.ShipAddress || {};
-  const L = (so.LineItems || so.Lines || []);
-
-  return {
-    company: so.CustomerRef?.Name || so.Customer?.Name || '',
-    billing: {
-      contact: A.Addr1 || '',
-      phone:  A.Phone || '',
-      email:  A.Email || '',
-      street: A.Addr2 || '',   // OT quirk: street is Addr2
-      suite:  A.Addr3 || '',   // OT quirk: suite/floor is Addr3
-      city:   A.City  || '',
-      state:  A.State || '',
-      zip:    A.PostalCode || A.Zip || ''
-    },
-    shipping: {
-      company: S.Addr1 || '',
-      contact: S.Addr1 || '',
-      phone:   S.Phone || '',
-      email:   S.Email || '',
-      street:  S.Addr2 || '',
-      suite:   S.Addr3 || '',
-      city:    S.City  || '',
-      state:   S.State || '',
-      zip:     S.PostalCode || S.Zip || ''
-    },
-    payment: {
-      method:    so.PaymentMethodRef?.Name || so.PaymentMethod || '',
-      terms:     so.TermsRef?.Name || so.Terms || '',
-      taxExempt: !!so.IsTaxExempt,
-      agreement: !!so.HasPurchaseAgreement
-    },
-    shippingOptions: {
-      pay:       so.ShipPaymentMethodRef?.Name || so.ShippingPaymentMethod || '',
-      speed:     so.ShipSpeedRef?.Name || so.ShippingSpeed || '',
-      shortShip: so.ShortShipPolicy || ''
-    },
-    items: L.map(li => ({
-      sku:  li.ItemRef?.Number || li.ItemRef?.Name || '',
-      desc: li.Description || li.ItemRef?.Name || '',
-      qty:  Number(li.Quantity || 1),
-      sell: Number((li.Price ?? li.SalesPrice ?? 0))
-    }))
-  };
 }
   
 async function loadSO(id){
