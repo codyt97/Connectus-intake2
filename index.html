@@ -1606,8 +1606,8 @@ async function openSOSearch(){
         </div>
       </div>
     `).join('');
-  }catch(err){
-    target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
+  } catch (err) {
+    target.innerHTML = `Search failed: ${err.message}`;
   }
 }
 
