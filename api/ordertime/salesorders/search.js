@@ -25,7 +25,6 @@ module.exports = async function handler(req, res) {
         status: r.Status || r.DocStatus || '',
         date: r.TxnDate || r.Date || '',
       }));
-
     res.status(200).json(out);
   } catch (err) {
     res.status(500).json({ error: `API GET /ordertime/salesorders/search failed: ${err.message || err}` });
