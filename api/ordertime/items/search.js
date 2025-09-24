@@ -1,54 +1,58 @@
-const { scanList, val } = require('../../_ot');
+// Replace your current listSearch with this:
+async function listSearch({
+  type, q, columns,
+  sortProp = 'Id', dir = 'Asc',
+  pageSize = 100, maxPages = 8,
+  minHits = 50        // how many client-side matches before we stop scanning
+}) {
+  const needleRaw = String(q || '').trim();
+  const needle = normalize(needleRaw);
+  const tokens = needleRaw.toLowerCase().split(/\s+/).filter(Boolean).map(normalize);
+  const seen = new Set();
+  let merged = [];
 
-module.exports = async function handler(req, res) {
-  try {
-    const q = String(req.query.q || '').trim();
-    if (!q) return res.status(200).json([]);
-
-    // Tokenize: "iphone 14 pro" => ["iphone","14","pro"]
-    const terms = q.toLowerCase().split(/\s+/).filter(Boolean);
-
-    // Pull a bunch of PartItem rows safely (no server-side filters)
-    const rows = await scanList({
-      type: 'PartItem',
-      sortProp: 'Name',
-      dir: 'Asc',
-      pageSize: 50,     // reasonable page size
-      maxPages: 30      // scan up to ~1500 items; adjust if needed
-    });
-
-    const FIELDS = [
-      'Name', 'ItemName', 'Number', 'SKU',
-      'ManufacturerPartNo', 'MfgPartNo',
-      'UPC', 'UPCCode',
-      'Description'
-    ];
-
-    const matched = rows.filter(r => {
-      const hay = FIELDS.map(f => val(r, f)).join(' ').toLowerCase();
-      return terms.every(t => hay.includes(t));
-    });
-
-    // De-dupe by Id and map to the shape the UI expects
-    const seen = new Set();
-    const out = [];
-    for (const x of matched) {
-      if (seen.has(x.Id)) continue;
-      seen.add(x.Id);
-      out.push({
-        id: x.Id,
-        name: x.Name || x.ItemName || '',
-        description: x.Description || '',
-        mfgPart: x.ManufacturerPartNo || x.MfgPartNo || '',
-        upc: x.UPC || x.UPCCode || '',
-        price: x.SalesPrice ?? x.Price ?? 0,
-        sku: x.Number || x.SKU || '',
+  // server-side filters (best effort)
+  for (const col of columns) {
+    try {
+      const rows = await listPage({
+        type,
+        filters: [contains(col, needleRaw)],
+        sortProp, dir, page: 1, size: pageSize
       });
-      if (out.length >= 200) break; // protect the UI; raise if you want more
+      for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
+    } catch (e) {
+      console.warn('listSearch filter skipped:', type, col, e?.message || e);
     }
-
-    res.status(200).json(out);
-  } catch (err) {
-    res.status(500).json({ error: `API GET /ordertime/items/search failed: ${err.message || err}` });
   }
-};
+
+  // tokenized client-side match (handles "iphone 14" vs "iphone14", punctuation, etc.)
+  const matches = (row) => {
+    for (const c of columns) {
+      const v = c.split('.').reduce((a,k)=>a?.[k], row);
+      if (typeof v !== 'string') continue;
+      const nv = normalize(v);
+      if (nv.includes(needle)) return true;
+      if (tokens.length > 1 && tokens.every(t => nv.includes(t))) return true;
+    }
+    return false;
+  };
+
+  const filtered = merged.filter(matches);
+  if (filtered.length) return filtered;
+
+  // fallback: scan pages without filters and match client-side
+  merged = [];
+  for (let p = 1; p <= maxPages; p++) {
+    let rows = [];
+    try {
+      rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
+    } catch (e) {
+      console.warn('listSearch fallback page', p, 'failed for', type, e?.message || e);
+      break; // stop scanning on hard OT errors
+    }
+    if (!rows.length) break;
+    for (const r of rows) if (matches(r)) merged.push(r);
+    if (merged.length >= minHits) break;
+  }
+  return merged;
+}
