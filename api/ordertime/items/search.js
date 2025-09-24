@@ -1,4 +1,4 @@
-const { listSearchWithFallback } = require('../..//_ot');
+const { listSearchWithFallback } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
   try {
@@ -27,7 +27,6 @@ module.exports = async function handler(req, res) {
         price: x.SalesPrice ?? x.Price ?? 0,
         sku: x.Number || '',
       }));
-
     res.status(200).json(out);
   } catch (err) {
     res.status(500).json({ error: `API GET /ordertime/items/search failed: ${err.message || err}` });
