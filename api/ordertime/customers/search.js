@@ -1,26 +1,21 @@
-// CJS import
-const { otListSmart, like, filterRows } = require('../../_ot');
+const { listSearchWithFallback } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const filters = [
-      like('Name', q),
-      like('CompanyName', q),
-      like('Email', q),
-      like('Phone', q),
-    ];
+    const rows = await listSearchWithFallback({
+      type: 'Customer',
+      q,
+      columns: ['Name', 'CompanyName', 'Email', 'Phone'],
+      sortProp: 'Name',
+      desc: false,
+      take: 50,
+      fallbackTake: 400
+    });
 
-    const rows = await otListSmart({ type: 'Customer', filters, sortProp: 'Name', desc: false, take: 50 });
-
-    // Post-filter to guarantee relevance even if OT ignores filters
-    const filtered = filterRows(rows, q, r => [
-      r.Name, r.CompanyName, r.Email, r.Phone, r.BillingEmail, r.BillingPhone
-    ]);
-
-    const out = filtered.map(x => ({
+    const out = rows.map(x => ({
       id: x.Id,
       company: x.CompanyName || x.Name || '',
       email: x.Email || x.BillingEmail || '',
