@@ -1,176 +1,144 @@
-// /api/_ot.js  — CommonJS, OrderTime canonical shapes
+// /api/_ot.js — resilient OrderTime helpers (CommonJS)
 const BASE    = process.env.OT_BASE_URL || 'https://services.ordertime.com/api';
 const API_KEY = process.env.OT_API_KEY;
 const EMAIL   = process.env.OT_EMAIL || '';
 const PASS    = process.env.OT_PASSWORD || '';
 const DEVKEY  = process.env.OT_DEV_KEY || '';
 
-function assertEnv(){ if(!BASE) throw new Error('Missing OT_BASE_URL'); if(!API_KEY) throw new Error('Missing OT_API_KEY'); }
-
-// add near top
-function normalize(s) {
-  return String(s || '')
-    .toLowerCase()
-    .normalize('NFKD')       // strip accents
-    .replace(/[^\p{L}\p{N}]+/gu, ' ') // non letters/digits -> space
-    .replace(/\s+/g, ' ')    // collapse spaces
-    .trim();
+function assertEnv() {
+  if (!BASE) throw new Error('Missing OT_BASE_URL');
+  if (!API_KEY) throw new Error('Missing OT_API_KEY');
 }
 
-function authHeaders(){
-  const h = { 'Content-Type':'application/json', ApiKey:API_KEY, apiKey:API_KEY };
-  if (EMAIL)  h.email = EMAIL;
-  if (DEVKEY) h.DevKey = DEVKEY; else if (PASS) h.password = PASS;
+function authHeaders() {
+  const h = { 'Content-Type': 'application/json', ApiKey: API_KEY, apiKey: API_KEY };
+  if (EMAIL)  h.email  = EMAIL;
+  if (DEVKEY) h.DevKey = DEVKEY;
+  else if (PASS) h.password = PASS;
   return h;
 }
 
-async function _req(path, init={}){
+async function _req(path, init = {}) {
   assertEnv();
-  const url = `${BASE}${path.startsWith('/')?'':'/'}${path}`;
-  const r = await fetch(url, { ...init, headers:{ ...authHeaders(), ...(init.headers||{}) } });
+  const url = `${BASE}${path.startsWith('/') ? '' : '/'}${path}`;
+  const r   = await fetch(url, { ...init, headers: { ...authHeaders(), ...(init.headers || {}) } });
   const txt = await r.text();
   let data; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
-  if(!r.ok) throw new Error(typeof data==='string' ? data : (data?.Message||data?.error||r.statusText));
+  if (!r.ok) {
+    const msg = typeof data === 'string' ? data : (data?.Message || data?.error || r.statusText);
+    throw new Error(msg || `HTTP ${r.status}`);
+  }
   return data;
 }
 
-async function otGet(path){  return _req(path, { method:'GET'  }); }
-async function otPost(path,b){return _req(path, { method:'POST', body:JSON.stringify(b||{}) }); }
+async function otGet(path)     { return _req(path, { method: 'GET'  }); }
+async function otPost(path, b) { return _req(path, { method: 'POST', body: JSON.stringify(b || {}) }); }
 
-// ---- Canonical ListInfo helpers
+// ---- canonical /list shapes ----
 const OP = { Contains: 12 };
 
-function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
+function listInfo({ type, filters = [], sortProp = 'Id', dir = 'Asc', page = 1, size = 100 }) {
   return {
     Type: type,
     Filters: filters,
     Sortation: { PropertyName: sortProp, Direction: dir },
     PageNumber: page,
-    NumberOfRecords: size
+    NumberOfRecords: size,
   };
 }
 
-
-async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
-  const payload = listInfo({ type, filters, sortProp, dir, page, size });
-  const res = await otPost('/list', payload);
-  return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
-}
-
+// IMPORTANT: OT expects an ARRAY here.
 function contains(field, value) {
-  return {
-    PropertyName: field,
-    Operator: OP.Contains,
-    // MUST be an array for OrderTime
-    FilterValueArray: [ String(value ?? '') ]
-  };
+  return { PropertyName: field, Operator: OP.Contains, FilterValueArray: [ String(value ?? '') ] };
 }
 
-// recursive “does any string field include needle?”
-function rowContainsAnyString(value, needle) {
-  if (!value) return false;
-  if (typeof value === 'string') return value.toLowerCase().includes(needle);
-  if (Array.isArray(value)) return value.some(v => rowContainsAnyString(v, needle));
-  if (typeof value === 'object') return Object.values(value).some(v => rowContainsAnyString(v, needle));
-  return false;
-}
-
-// --- add these helpers in /api/_ot.js ---
-
-function val(obj, path) {
-  return String(
-    path.split('.').reduce((a, k) => (a && a[k] != null ? a[k] : undefined), obj) ?? ''
-  );
-}
-
-// Try a page with progressively smaller sizes if /list is grumpy
-async function listPageSafe({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }) {
-  const sizes = [size, 50, 25, 10, 5];
-  for (const s of sizes) {
-    try {
-      const rows = await listPage({ type, filters, sortProp, dir, page, size: s });
-      return rows;
-    } catch (e) {
-      // swallow and try the next smaller page size
-    }
+// Try a page; NEVER throw — return [] on any failure
+async function listPage({ type, filters = [], sortProp = 'Id', dir = 'Asc', page = 1, size = 100 }) {
+  try {
+    const payload = listInfo({ type, filters, sortProp, dir, page, size });
+    const res = await otPost('/list', payload);
+    return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
+  } catch (e) {
+    console.warn('listPage failed', { type, page, err: String(e?.message || e) });
+    return [];
   }
-  return [];
 }
 
-// Scan N pages without filters and let us post-filter locally
-async function scanList({ type, sortProp='Id', dir='Asc', pageSize=50, maxPages=20 }) {
-  let out = [];
-  for (let p = 1; p <= maxPages; p++) {
-    const rows = await listPageSafe({ type, filters: [], sortProp, dir, page: p, size: pageSize });
-    if (!rows.length) break;
-    out.push(...rows);
-    if (rows.length < pageSize) break; // last page
-  }
-  return out;
-}
-
-
-// Search: try filtered pages (OR across columns), post-filter, then fallback scan
+/**
+ * Resilient search:
+ *  - tries (safe) filtered page 1 for each column, swallowing OT errors
+ *  - post-filters what it got
+ *  - if nothing, scans more pages *without filters* and filters locally
+ */
 async function listSearch({
   type,
   q,
   columns,
   sortProp = 'Id',
   dir = 'Asc',
-  pageSize = 100,     // new: page size for /list pages
-  maxPages = 8,       // new: how many pages to scan in fallback
-  scanLimit = 100     // new: stop once we have this many matches
+  pageSize = 200,
+  maxPages = 30,
+  take = 80,
+  tryServerFilters = true, // flip to false to force page-scan only
 }) {
-  const needle = String(q || '').toLowerCase().trim();
-  const tokens = needle.split(/\s+/).filter(Boolean); // multi-word support
-  const seen   = new Set();
-  let merged   = [];
+  const needle = String(q || '').trim().toLowerCase();
+  if (!needle) return [];
 
-  const rowMatches = (r) => {
-    return columns.some(c => {
-      const v = c.split('.').reduce((a,k)=>a?.[k], r);
-      if (v == null) return false;
-      const s = String(v).toLowerCase();
-      // require ALL tokens to be present, any column can satisfy
-      return tokens.every(t => s.includes(t));
-    });
-  };
+  const seen = new Set();
+  let merged = [];
 
-  // Try each column as a separate filter (best-case: server filters help)
-  for (const col of columns) {
-    const rows = await listPage({ type, filters:[contains(col, q)], sortProp, dir, page:1, size:pageSize });
-    for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
-    if (merged.length >= scanLimit) break;
+  // Phase 1: one filtered page per column (many tenants choke on certain columns)
+  if (tryServerFilters) {
+    for (const col of columns) {
+      try {
+        const rows = await listPage({ type, filters: [contains(col, q)], sortProp, dir, page: 1, size: pageSize });
+        for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
+      } catch (e) {
+        // listPage already swallowed; keep the log for visibility:
+        console.warn('listSearch filter skipped:', { type, col, err: String(e?.message || e) });
+      }
+    }
   }
 
-  // Always post-filter (some tenants ignore filters)
-  const filtered = merged.filter(rowMatches);
-  if (filtered.length) return filtered.slice(0, scanLimit);
+  // Always post-filter locally
+  const hit = (row) => columns.some(c => {
+    const v = c.split('.').reduce((a, k) => (a ? a[k] : undefined), row);
+    return typeof v === 'string' && v.toLowerCase().includes(needle);
+  });
 
-  // Fallback: scan more pages unfiltered, post-filter client-side
-  merged = [];
+  const filtered = merged.filter(hit);
+  if (filtered.length) return filtered.slice(0, take);
+
+  // Phase 2: scan pages with *no server filters*, then filter locally
+  const out = [];
+  let emptyStreak = 0;
+
   for (let p = 1; p <= maxPages; p++) {
-    const rows = await listPage({ type, filters:[], sortProp, dir, page:p, size:pageSize });
-    if (!rows.length) break;
-    for (const r of rows) if (rowMatches(r)) merged.push(r);
-    if (merged.length >= scanLimit) break;
+    const rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
+    if (!rows.length) {
+      if (++emptyStreak >= 2) break; // stop after a couple empty/broken pages
+      continue;
+    }
+    emptyStreak = 0;
+
+    for (const r of rows) {
+      if (hit(r) && !seen.has(r.Id)) {
+        seen.add(r.Id);
+        out.push(r);
+        if (out.length >= take) return out;
+      }
+    }
   }
-  return merged.slice(0, scanLimit);
+  return out;
 }
 
-
-
-
-// Entity GETs (note the correct casing)
-async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderById(id){   return otGet(`/SalesOrder?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderByDocNo(n){ return otGet(`/SalesOrder?docNo=${encodeURIComponent(n)}`); }
+// Entity GETs
+async function getCustomerById(id)     { return otGet(`/customer?id=${encodeURIComponent(id)}`); }
+async function getSalesOrderById(id)   { return otGet(`/salesorder?id=${encodeURIComponent(id)}`); }
+async function getSalesOrderByDocNo(n) { return otGet(`/salesorder?docNo=${encodeURIComponent(n)}`); }
 
 module.exports = {
   otGet, otPost,
-  listSearch,           // keep for customers
-  scanList, listPageSafe,
-  val,
+  listSearch,
   getCustomerById, getSalesOrderById, getSalesOrderByDocNo,
 };
-
