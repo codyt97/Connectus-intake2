@@ -1,8 +1,9 @@
 // /api/ordertime/items/search.js
 
 // Env vars (supports both OT_* and ORDERTIME_* names)
-const BASE = (process.env.OT_BASE_URL || process.env.ORDERTIME_BASE_URL || 'https://services.ordertime.com')
-  .replace(/\/+$/, ''); // trim trailing slashes, we add /api ourselves
+ const BASE = (process.env.OT_BASE_URL || process.env.ORDERTIME_BASE_URL || 'https://services.ordertime.com')
+.replace(/\/+$/, '')         // trim trailing slash
+.replace(/\/api$/i, '');      // also trim a trailing /api if present
 
 const API_KEY  = process.env.OT_API_KEY  || process.env.ORDERTIME_API_KEY || '';
 const EMAIL    = process.env.OT_EMAIL    || process.env.ORDERTIME_EMAIL   || '';
