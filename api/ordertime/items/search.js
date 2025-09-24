@@ -3,7 +3,7 @@
 const RAW_BASE =
   process.env.ORDERTIME_BASE_URL ||
   process.env.OT_BASE_URL ||
-  "https://services.ordertime.com";
+  "https://services.ordertime.com/api";
 
 const OT_KEY =
   process.env.ORDERTIME_API_KEY ||
