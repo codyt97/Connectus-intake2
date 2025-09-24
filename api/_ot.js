@@ -1,125 +1,70 @@
 // /api/_ot.js
-const BASE    = process.env.OT_BASE_URL || 'https://services.ordertime.com/api';
-const API_KEY = process.env.OT_API_KEY;
-const EMAIL   = process.env.OT_EMAIL || '';
-const PASS    = process.env.OT_PASSWORD || '';
-const DEVKEY  = process.env.OT_DEV_KEY || '';
+const BASE = (process.env.OT_BASE_URL || 'https://services.ordertime.com/api').replace(/\/+$/, '');
+const KEY  = process.env.OT_API_KEY;
 
-function assertEnv(){ if(!BASE) throw new Error('Missing OT_BASE_URL'); if(!API_KEY) throw new Error('Missing OT_API_KEY'); }
-
-function authHeaders(){
-  const h = { 'Content-Type':'application/json', ApiKey:API_KEY, apiKey:API_KEY };
-  if (EMAIL)  h.email = EMAIL;
-  if (DEVKEY) h.DevKey = DEVKEY; else if (PASS) h.password = PASS;
-  return h;
+function qs(obj = {}) {
+  if (!KEY) throw new Error('Missing OT_API_KEY');
+  return new URLSearchParams({ ...obj, apikey: KEY }).toString();
 }
 
-async function _req(path, init={}){
-  assertEnv();
-  const url = `${BASE}${path.startsWith('/')?'':'/'}${path}`;
-  const r = await fetch(url, { ...init, headers:{ ...authHeaders(), ...(init.headers||{}) } });
-  const txt = await r.text();
-  let data; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
-  if(!r.ok) throw new Error(typeof data==='string' ? data : (data?.Message||data?.error||r.statusText));
-  return data;
+async function otGet(path, params) {
+  const url = `${BASE}${path}?${qs(params)}`;
+  const res = await fetch(url, { headers: { Accept: 'application/json' } });
+  const txt = await res.text();
+  let json; try { json = txt ? JSON.parse(txt) : null; } catch { json = null; }
+  if (!res.ok) throw new Error(`GET ${path} ${res.status}: ${txt || res.statusText}`);
+  return json;
 }
 
-async function otGet(path){  return _req(path, { method:'GET'  }); }
-async function otPost(path,b){return _req(path, { method:'POST', body:JSON.stringify(b||{}) }); }
-
-// ---- Canonical ListInfo helpers (per docs) ----
-const OP = { Contains: 12 };
-
-function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
-  return {
-    Type: type,
-    Filters: filters,
-    Sortation: { PropertyName: sortProp, Direction: dir },
-    PageNumber: page,
-    NumberOfRecords: size
-  };
+// Optional: list fallback (rarely needed once REST is set)
+async function otList(body) {
+  const url = `${BASE}/list?${qs()}`; // BASE already ends with /api
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(`POST /list ${res.status}: ${JSON.stringify(json)}`);
+  return json?.Data ?? json?.data ?? [];
 }
 
-function contains(field, value){
-  return { PropertyName: field, Operator: OP.Contains, FilterValueArray: String(value ?? '') };
+async function getSalesOrderById(id) {
+  return otGet(`/SalesOrder/${id}`);
 }
 
-async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
-  const payload = listInfo({ type, filters, sortProp, dir, page, size });
-  const res = await otPost('/list', payload);
-  return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
-}
+async function getSalesOrderByDocNo(docNo) {
+  const v = String(docNo).trim();
 
-function deepGet(obj, path){
-  return path.split('.').reduce((a,k)=> a?.[k], obj);
-}
+  // Try common REST shapes first
+  const attempts = [
+    () => otGet(`/SalesOrder`, { DocNumber: v }),
+    () => otGet(`/SalesOrder`, { docNumber: v }),
+    () => otGet(`/SalesOrder`, { DocNo: v }),
+    () => otGet(`/SalesOrder`, { Number: v }),
 
-// --------- SMART SEARCH (AND of tokens across any column) ----------
-async function listSearch({
-  type,
-  q,
-  columns,
-  sortProp='Id',
-  dir='Asc',
-  pageSize=100,
-  maxPages=10,          // a little higher so we can find rarer combos
-  targetCount=100       // stop once we have this many matches
-}){
-  const raw = String(q||'').trim();
-  if (!raw) return [];
+    // Last-ditch: use /list to resolve the internal ID, then fetch by ID
+    async () => {
+      const rows = await otList({
+        Type: 'SalesOrder',
+        ListOptions: {
+          Page: 1, PageSize: 1,
+          Filters: [{ Field: 'DocNumber', Operator: 'eq', Value: v }],
+          Columns: ['ID'],
+        },
+      });
+      if (rows?.[0]?.ID) return getSalesOrderById(rows[0].ID);
+      return null;
+    },
+  ];
 
-  // tokens: split on whitespace & punctuation; lower-case
-  const terms = raw.toLowerCase().split(/[\s\-_/]+/).filter(Boolean);
-  const seed  = terms.slice().sort((a,b)=>b.length-a.length)[0] || ''; // longest term first
-
-  const seen = new Set();
-  let pool = [];
-
-  // 1) Seeded pulls (each searchable column, filter by longest token)
-  if (seed){
-    for (const col of columns){
-      try {
-        const page = await listPage({ type, filters:[contains(col, seed)], sortProp, dir, page:1, size:pageSize });
-        for (const r of page) if (!seen.has(r.Id)) { seen.add(r.Id); pool.push(r); }
-      } catch { /* ignore column-level errors */ }
-    }
-  }
-
-  // 2) Post-filter for AND-of-terms across any of the columns
-  const qualifies = r => {
-    const hay = columns
-      .map(c => deepGet(r, c))
-      .filter(v => typeof v === 'string' && v)
-      .join(' ')
-      .toLowerCase();
-    return terms.every(t => hay.includes(t));
-  };
-  let out = pool.filter(qualifies);
-  if (out.length >= Math.min(targetCount, 20)) return out.slice(0, targetCount);
-
-  // 3) Fallback scan: walk pages until we have enough
-  pool = [];
-  for (let p=1; p<=maxPages; p++){
-    let rows = [];
+  for (const run of attempts) {
     try {
-      rows = await listPage({ type, filters:[], sortProp, dir, page:p, size:pageSize });
-    } catch { break; }
-    if (!rows.length) break;
-
-    for (const r of rows) if (qualifies(r)) pool.push(r);
-    if (pool.length >= targetCount) break;
+      const data = await run();
+      if (data && (data.ID || data.Id || data.DocNumber)) return data;
+    } catch { /* try the next form */ }
   }
-
-  return pool.slice(0, targetCount);
+  throw new Error(`Sales order not found for docNo=${v}`);
 }
 
-// Entity GETs
-async function getCustomerById(id){     return otGet(`/customer?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderById(id){   return otGet(`/salesorder?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderByDocNo(n){ return otGet(`/salesorder?docNo=${encodeURIComponent(n)}`); }
-
-module.exports = {
-  otGet, otPost,
-  listSearch,
-  getCustomerById, getSalesOrderById, getSalesOrderByDocNo,
-};
+module.exports = { getSalesOrderById, getSalesOrderByDocNo };
