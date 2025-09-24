@@ -6,35 +6,29 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    // If it's a pure doc number (or nearly), go straight to the entity GET
-    const digitsOnly = q.replace(/\D+/g, '');
-    if (digitsOnly && digitsOnly.length >= 3 && /^\d+$/.test(digitsOnly)) {
+    // Fast path: numeric doc number
+    if (/^\d+$/.test(q)) {
       try {
-        const so = await getSalesOrderByDocNo(parseInt(digitsOnly, 10));
-        if (so && (so.Id || so.DocNumber)) {
+        const so = await getSalesOrderByDocNo(Number(q));
+        if (so && (so.Id || so.DocNumber || so.Number)) {
           return res.status(200).json([{
             id: so.Id,
-            docNo: so.DocNumber || so.Number || digitsOnly,
-            customer: so.CustomerRef?.Name || '',
+            docNo: so.DocNumber || so.Number || String(q),
+            customer: (so.CustomerRef && so.CustomerRef.Name) || so.CustomerName || '',
             status: so.Status || so.DocStatus || '',
-            date: so.TxnDate || so.Date || '',
+            date: so.TxnDate || so.Date || ''
           }]);
         }
-      } catch (_) {
-        // fall back to list search if not found
-      }
+      } catch (_) { /* fall back to listSearch if not found */ }
     }
 
-    // Text search (tokenized AND across columns)
     const rows = await listSearch({
       type: 'SalesOrder',
       q,
-      columns: ['DocNumber','CustomerRef.Name'],
-      sortProp: 'DocNumber',
-      dir: 'Desc',
-      pageSize: 100,
-      maxPages: 8,
-      targetCount: 50
+      // only simple fields here; nested (CustomerRef.Name) will be caught by fallback
+      columns: ['DocNumber', 'Number', 'DocNo', 'CustomerName'],
+      sortProp: 'Id',
+      dir: 'Desc'
     });
 
     const seen = new Set();
@@ -42,8 +36,8 @@ module.exports = async function handler(req, res) {
       .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
       .map(r => ({
         id: r.Id,
-        docNo: r.DocNumber || r.Number || '',
-        customer: r.CustomerRef?.Name || '',
+        docNo: r.DocNumber || r.Number || r.DocNo || '',
+        customer: r.CustomerName || (r.CustomerRef && r.CustomerRef.Name) || '',
         status: r.Status || r.DocStatus || '',
         date: r.TxnDate || r.Date || '',
       }));
