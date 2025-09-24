@@ -1,18 +1,16 @@
-const { listSearchWithFallback } = require('../../_ot');
+const { listSearch } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const rows = await listSearchWithFallback({
+    const rows = await listSearch({
       type: 'SalesOrder',
       q,
-      columns: ['DocNumber', 'CustomerRef.Name'],
+      columns: ['DocNumber','CustomerRef.Name'],
       sortProp: 'DocNumber',
-      desc: true,
-      take: 50,
-      fallbackTake: 400
+      dir: 'Desc'
     });
 
     const seen = new Set();
@@ -20,7 +18,7 @@ module.exports = async function handler(req, res) {
       .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
       .map(r => ({
         id: r.Id,
-        docNo: r.DocNumber || r.DocNo || r.Number || '',
+        docNo: r.DocNumber || r.Number || '',
         customer: r.CustomerRef?.Name || '',
         status: r.Status || r.DocStatus || '',
         date: r.TxnDate || r.Date || '',
