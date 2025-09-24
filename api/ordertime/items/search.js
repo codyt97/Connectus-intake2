@@ -6,15 +6,17 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
+    const limit = Math.min(parseInt(req.query.limit || '120', 10) || 120, 300);
+
     const rows = await listSearch({
       type: 'PartItem',
       q,
-      columns: ['Name','ItemName','Number','ManufacturerPartNo','MfgPartNo','UPC','UPCCode','Description'],
+      columns: ['Name','Number','ManufacturerPartNo','UPC','Description'],
       sortProp: 'Name',
       dir: 'Asc',
-      pageSize: 200,   // was 100
-      maxPages: 20,    // scan more pages, still bounded
-      minHits: 120     // stop once we have plenty to render
+      pageSize: 200,       // scan fatter pages
+      maxPages: 25,        // scan deeper
+      scanLimit: limit     // stop when we have enough
     });
 
     const seen = new Set();
@@ -24,14 +26,14 @@ module.exports = async function handler(req, res) {
         id: x.Id,
         name: x.Name || x.ItemName || '',
         description: x.Description || '',
-        mfgPart: x.ManufacturerPartNo || x.MfgPartNo || '',
+        mfgPart: x.ManufacturerPartNo || '',
         upc: x.UPC || x.UPCCode || '',
         price: x.SalesPrice ?? x.Price ?? 0,
         sku: x.Number || '',
       }));
-    res.status(200).json(out);
+
+    res.status(200).json(out.slice(0, limit));
   } catch (err) {
     res.status(500).json({ error: `API GET /ordertime/items/search failed: ${err.message || err}` });
   }
 };
-
