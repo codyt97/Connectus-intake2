@@ -1853,15 +1853,43 @@ function addRow(prefill){
   refreshTotals();
 }
   
-function getItems(){
-  const rows = [...document.querySelectorAll('#itemsBody tr')];
-  return rows.map(r => {
-    const obj = {};
-    [...r.querySelectorAll('input')].forEach(i => {
-      obj[i.dataset.key] = (i.value || '').trim();
-    });
-    return obj;
-  }).filter(o => Object.values(o).some(v => String(v || '').trim() !== ''));
+function getItems() {
+  const rows = Array.from(document.querySelectorAll('#itemsBody tr'));
+
+  const val = (row, sel) => (row.querySelector(sel)?.value || '').trim();
+  const num = (row, sel) => {
+    const s = val(row, sel).replace(/[$,]/g, '');
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+  const int = (row, sel) => {
+    const n = parseInt(val(row, sel), 10);
+    return Number.isFinite(n) ? n : 0;
+  };
+
+  return rows
+    .map(r => ({
+      desc:    val(r, '.desc input'),
+      part:    val(r, '.part input'),
+      color:   val(r, '.color input'),
+      sku:     val(r, '.sku input'),
+      qty:     int(r, '.qty input') || 1,
+      ltewifi: val(r, '.ltewifi select'),
+      carrier: val(r, '.carrier select'),
+      act:     num(r, '.act input'),
+      msrp:    num(r, '.msrp input'),
+      disc:    num(r, '.disc input'),
+      sell:    num(r, '.sell input'),
+      cond:    val(r, '.cond select'),
+      stock:   val(r, '.stock select'),
+      vendor:  val(r, '.vendor input'),
+      cost:    num(r, '.cost input'),
+      dll:     val(r, '.dll input'),
+      hold:    val(r, '.hold input'),
+      lead:    val(r, '.lead input'),
+      eol:     val(r, '.eol select'),
+    }))
+    .filter(o => Object.values(o).some(v => String(v || '').trim() !== ''));
 }
 
   
