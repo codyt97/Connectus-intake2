@@ -1369,79 +1369,64 @@ function pick(...vals){ for (const v of vals){ if (v !== undefined && v !== null
 
 // ⬇️ REPLACE THIS WHOLE FUNCTION
 function applyPastedCustomer(textareaId){
-  const ta = document.getElementById(textareaId);
-  if(!ta){ alert('Paste area not found'); return; }
-  const raw = ta.value.trim();
+  const raw = document.getElementById(textareaId).value.trim();
   if(!raw){ alert('Paste customer details first.'); return; }
 
   let data = {};
-  try {
-    data = JSON.parse(raw);
-  } catch {
-    // allow key:value lines fallback
+  try { data = JSON.parse(raw); }
+  catch(_) {
+    // Allow simple "Key: Value" lines too
     raw.split(/\r?\n/).forEach(line=>{
-      const m = line.match(/^([^:]+):\s*(.*)$/);
+      const m=line.match(/^([^:]+):\s*(.*)$/);
       if(!m) return;
-      const k = m[1].trim().toLowerCase();
-      const v = m[2].trim();
-      if(!data.billing) data.billing = {};
-      if(!data.shipping) data.shipping = {};
-      if(k.includes('company')) data.company = v;
-      else if(k.includes('bill') && k.includes('street')) data.billing.street = v;
-      else if(k.includes('bill') && k.includes('suite'))  data.billing.suite = v;
-      else if(k.includes('bill') && k.includes('city'))   data.billing.city = v;
-      else if(k.includes('bill') && k.includes('state'))  data.billing.state = v;
-      else if(k.includes('bill') && k.includes('zip'))    data.billing.zip = v;
-      else if(k.includes('ship') && k.includes('street')) data.shipping.street = v;
-      else if(k.includes('ship') && k.includes('suite'))  data.shipping.suite = v;
-      else if(k.includes('ship') && k.includes('city'))   data.shipping.city = v;
-      else if(k.includes('ship') && k.includes('state'))  data.shipping.state = v;
-      else if(k.includes('ship') && k.includes('zip'))    data.shipping.zip = v;
-      else if(k.includes('email'))                         data.billing = { ...(data.billing||{}), email: v };
-      else if(k.includes('phone'))                         data.billing = { ...(data.billing||{}), phone: v };
-      else if(k.includes('contact'))                       data.billing = { ...(data.billing||{}), contact: v };
+      if (typeof setByPath === 'function') {
+        setByPath(data, m[1].trim(), m[2].trim());
+      }
     });
   }
 
-  // ===== BILLING (Customer panel)
-  setVal('billCompany', pick(data.company, data.billing?.company));
-  setVal('billContact', pick(data.billing?.contact));
-  setVal('billPhone',   pick(data.billing?.phone));
-  setVal('billEmail',   pick(data.billing?.email));
-  setVal('billStreet',  pick(data.billing?.street));
-  setVal('billSuite',   pick(data.billing?.suite));
-  setVal('billCity',    pick(data.billing?.city));
-  setVal('billState',   pick(data.billing?.state));
-  setVal('billZip',     pick(data.billing?.zip));
+  // Billing → Customer tab
+  setVal('billCompany', (data.company ?? data.billing?.company) || '');
+  setVal('billContact', data.billing?.contact || '');
+  setVal('billPhone',   data.billing?.phone   || '');
+  setVal('billEmail',   data.billing?.email   || '');
+  setVal('billStreet',  data.billing?.street  || '');
+  setVal('billSuite',   data.billing?.suite   || '');
+  setVal('billCity',    data.billing?.city    || '');
+  setVal('billState',   data.billing?.state   || '');
+  setVal('billZip',     data.billing?.zip     || '');
 
-  // ===== SHIPPING (Shipping panel)
-  setVal('shipCompany', pick(data.shipping?.company, data.company));
-  setVal('shipContact', pick(data.shipping?.contact));
-  setVal('shipPhone',   pick(data.shipping?.phone));
-  setVal('shipEmail',   pick(data.shipping?.email));
-  setVal('shipStreet',  pick(data.shipping?.street));
-  setVal('shipSuite',   pick(data.shipping?.suite));
-  setVal('shipCity',    pick(data.shipping?.city));
-  setVal('shipState',   pick(data.shipping?.state));
-  setVal('shipZip',     pick(data.shipping?.zip));
+  // Shipping → Shipping tab
+  setVal('shipCompany', data.shipping?.company || '');
+  setVal('shipContact', data.shipping?.contact || '');
+  setVal('shipPhone',   data.shipping?.phone   || '');
+  setVal('shipEmail',   data.shipping?.email   || '');
+  setVal('shipStreet',  data.shipping?.street  || '');
+  setVal('shipSuite',   data.shipping?.suite   || '');
+  setVal('shipCity',    data.shipping?.city    || '');
+  setVal('shipState',   data.shipping?.state   || '');
+  setVal('shipZip',     data.shipping?.zip     || '');
 
-  // ===== PAYMENT & SHIPPING OPTIONS (optional but supported in your WCP drawer)
-  if (data.payment){
-    setVal('payMethod', pick(data.payment.method));
-    setVal('payTerms',  pick(data.payment.terms));
-    const hasAgreement = document.getElementById('hasAgreement');
-    const taxExempt    = document.getElementById('taxExempt');
-    if (hasAgreement) hasAgreement.checked = !!data.payment.agreement;
-    if (taxExempt)    taxExempt.checked    = !!data.payment.taxExempt;
-  }
-  if (data.shippingOptions){
-    setVal('shipPay',   pick(data.shippingOptions.pay));
-    setVal('shipSpeed', pick(data.shippingOptions.speed));
-    setVal('shortShip', pick(data.shippingOptions.shortShip));
-  }
+  // Payment & shipping options
+  const pm = data.payment?.method;
+  if(pm && typeof selectByTextExact === 'function') selectByTextExact('payMethod', pm);
+  setVal('payTerms', data.payment?.terms || '');
+  const tax = document.getElementById('taxExempt'); if (tax) tax.checked = !!data.payment?.taxExempt;
+  const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!data.payment?.agreement;
 
-  // Close helper drawer if open
-  if (typeof closeDrawer === 'function') closeDrawer('drawerWCP');
+  const so = data.shippingOptions || {};
+  if(so.pay)       selectByTextExact?.('shipPay',   so.pay);
+  if(so.speed)     selectByTextExact?.('shipSpeed', so.speed);
+  if(so.shortShip) selectByTextExact?.('shortShip', so.shortShip);
+
+  // Carrier rep + internal reps
+  setVal('carrierRepName',  data.carrierRep?.name  || '');
+  setVal('carrierRepEmail', data.carrierRep?.email || '');
+  const r1 = data.rep?.primary;   if(r1) selectByTextExact?.('rep1', r1);
+  const r2 = data.rep?.secondary; if(r2) selectByTextExact?.('rep2', r2);
+
+  closeDrawer?.('drawerWCP');
+  refreshTotals?.();
 }
 
 
@@ -1618,6 +1603,11 @@ async function doSOSearch(){
     btn.disabled = false;
   }
 }
+
+document.getElementById('soSearchBtn')?.addEventListener('click', doSOSearch);
+document.getElementById('soQuery')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') doSOSearch();
+});
 
 async function applySalesOrder(row){
   try{
