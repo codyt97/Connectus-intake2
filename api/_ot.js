@@ -27,7 +27,7 @@ async function _req(path, init={}){
 async function otGet(path){  return _req(path, { method:'GET'  }); }
 async function otPost(path,b){return _req(path, { method:'POST', body:JSON.stringify(b||{}) }); }
 
-// ---- Canonical ListInfo helpers (per docs) ----
+// ---- Canonical ListInfo helpers
 const OP = { Contains: 12 };
 
 function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
@@ -40,25 +40,28 @@ function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100
   };
 }
 
-// keeps the same OP ids you already set above
 function contains(field, value) {
   return {
     PropertyName: field,
     Operator: OP.Contains,
-    // IMPORTANT: must be an array, not a string
+    // MUST be an array for OrderTime
     FilterValueArray: [ String(value ?? '') ]
   };
 }
 
-
-
-
-// Try to fetch one page using canonical shape
 async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
   const payload = listInfo({ type, filters, sortProp, dir, page, size });
   const res = await otPost('/list', payload);
-  // /list returns an array (per docs)
   return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
+}
+
+// recursive “does any string field include needle?”
+function rowContainsAnyString(value, needle) {
+  if (!value) return false;
+  if (typeof value === 'string') return value.toLowerCase().includes(needle);
+  if (Array.isArray(value)) return value.some(v => rowContainsAnyString(v, needle));
+  if (typeof value === 'object') return Object.values(value).some(v => rowContainsAnyString(v, needle));
+  return false;
 }
 
 async function listSearch({
@@ -67,14 +70,12 @@ async function listSearch({
   pageSize = 100, maxPages = 8
 }) {
   const needle = String(q || '').toLowerCase().trim();
-
-  // Only use server-side filters for simple (non-nested) fields.
-  const filterable = (columns || []).filter(c => c && !c.includes('.'));
+  const filterable = (columns || []).filter(c => c && !c.includes('.')); // only simple fields
 
   const seen = new Set();
   let merged = [];
 
-  // Try server-side filter column-by-column, but never fail the whole search.
+  // Try server-side filters, but never fail the whole search.
   for (const col of filterable) {
     try {
       const rows = await listPage({
@@ -84,38 +85,40 @@ async function listSearch({
       });
       for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
     } catch (e) {
-      // Unknown/invalid column for this tenant -> skip it and keep going
       console.warn('listSearch filter skipped:', type, col, e.message);
     }
   }
 
-  // Post-filter whatever we collected using *all* columns (incl. nested).
-  const allCols = columns || [];
-  const postFilterMatch = (row) => allCols.some(c => {
-    const v = c.split('.').reduce((a,k) => (a ? a[k] : undefined), row);
-    return typeof v === 'string' && v.toLowerCase().includes(needle);
-  });
+  // Post-filter whatever we collected using the provided columns (incl. nested)
+  const usesColumns = (columns && columns.length > 0);
+  const postMatch = (row) => {
+    if (usesColumns) {
+      return columns.some(c => {
+        const v = c.split('.').reduce((a,k) => (a ? a[k] : undefined), row);
+        return typeof v === 'string' && v.toLowerCase().includes(needle);
+      });
+    }
+    return rowContainsAnyString(row, needle);
+  };
 
-  const filtered = merged.filter(postFilterMatch);
+  const filtered = merged.filter(postMatch);
   if (filtered.length) return filtered;
 
-  // Fallback: page through the list without filters and post-filter client-side
+  // Fallback: page through without filters and match across ANY string fields
   const out = [];
   for (let p = 1; p <= maxPages; p++) {
     const rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
     if (!rows.length) break;
-    for (const r of rows) if (postFilterMatch(r)) out.push(r);
-    if (out.length >= 50) break; // enough to render the modal
+    for (const r of rows) if (rowContainsAnyString(r, needle)) out.push(r);
+    if (out.length >= 50) break;
   }
   return out;
 }
 
-
-// Entity GETs
+// Entity GETs (note the correct casing)
 async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
 async function getSalesOrderById(id){   return otGet(`/SalesOrder?id=${encodeURIComponent(id)}`); }
 async function getSalesOrderByDocNo(n){ return otGet(`/SalesOrder?docNo=${encodeURIComponent(n)}`); }
-
 
 module.exports = {
   otGet, otPost,
