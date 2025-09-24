@@ -1,15 +1,17 @@
-// CommonJS
-const { getCustomerById } = require('../../_ot');
+// Keep ping simple: hit a tiny page and confirm auth
+const { otPost } = require('../_ot');
 
-module.exports = async function handler(req, res) {
+module.exports = async function handler(_req, res) {
   try {
-    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-    const { id } = req.query;
-    if (!id) return res.status(400).json({ error: 'Missing :id' });
-    const data = await getCustomerById(id);
-    res.status(200).json(data);
-  } catch (err) {
-    console.error('customers/[id]', err);
-    res.status(500).json({ error: String(err.message || err) });
+    const rows = await otPost('/list', {
+      Type: 'Customer',
+      PageNumber: 1,
+      NumberOfRecords: 1,
+      Sortation: { PropertyName: 'Id', Direction: 'Asc' }
+    });
+    const list = Array.isArray(rows?.Records) ? rows.Records : (Array.isArray(rows) ? rows : []);
+    res.status(200).json({ ok: true, count: list.length, sample: list[0] || null });
+  } catch (e) {
+    res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 };
