@@ -47,6 +47,13 @@ function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100
   };
 }
 
+
+async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
+  const payload = listInfo({ type, filters, sortProp, dir, page, size });
+  const res = await otPost('/list', payload);
+  return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
+}
+
 function contains(field, value) {
   return {
     PropertyName: field,
@@ -54,12 +61,6 @@ function contains(field, value) {
     // MUST be an array for OrderTime
     FilterValueArray: [ String(value ?? '') ]
   };
-}
-
-async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
-  const payload = listInfo({ type, filters, sortProp, dir, page, size });
-  const res = await otPost('/list', payload);
-  return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
 }
 
 // recursive “does any string field include needle?”
@@ -109,6 +110,7 @@ async function scanList({ type, sortProp='Id', dir='Asc', pageSize=50, maxPages=
 // PUT THIS IN /api/_ot.js, replacing the existing 
 
 // Replace your current listSearch with this:
+// replace your listSearch with this one
 async function listSearch({
   type, q, columns,
   sortProp = 'Id', dir = 'Asc',
@@ -166,6 +168,7 @@ async function listSearch({
   }
   return merged;
 }
+
 
 // Entity GETs (note the correct casing)
 async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
