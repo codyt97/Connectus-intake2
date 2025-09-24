@@ -110,64 +110,54 @@ async function scanList({ type, sortProp='Id', dir='Asc', pageSize=50, maxPages=
 }
 
 
-// replace your listSearch with this one
+// Search: try filtered pages (OR across columns), post-filter, then fallback scan
 async function listSearch({
-  type, q, columns,
-  sortProp = 'Id', dir = 'Asc',
-  pageSize = 100, maxPages = 8,
-  minHits = 50        // how many client-side matches before we stop scanning
+  type,
+  q,
+  columns,
+  sortProp = 'Id',
+  dir = 'Asc',
+  pageSize = 100,     // new: page size for /list pages
+  maxPages = 8,       // new: how many pages to scan in fallback
+  scanLimit = 100     // new: stop once we have this many matches
 }) {
-  const needleRaw = String(q || '').trim();
-  const needle = normalize(needleRaw);
-  const tokens = needleRaw.toLowerCase().split(/\s+/).filter(Boolean).map(normalize);
-  const seen = new Set();
-  let merged = [];
+  const needle = String(q || '').toLowerCase().trim();
+  const tokens = needle.split(/\s+/).filter(Boolean); // multi-word support
+  const seen   = new Set();
+  let merged   = [];
 
-  // server-side filters (best effort)
-  for (const col of columns) {
-    try {
-      const rows = await listPage({
-        type,
-        filters: [contains(col, needleRaw)],
-        sortProp, dir, page: 1, size: pageSize
-      });
-      for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
-    } catch (e) {
-      console.warn('listSearch filter skipped:', type, col, e?.message || e);
-    }
-  }
-
-  // tokenized client-side match (handles "iphone 14" vs "iphone14", punctuation, etc.)
-  const matches = (row) => {
-    for (const c of columns) {
-      const v = c.split('.').reduce((a,k)=>a?.[k], row);
-      if (typeof v !== 'string') continue;
-      const nv = normalize(v);
-      if (nv.includes(needle)) return true;
-      if (tokens.length > 1 && tokens.every(t => nv.includes(t))) return true;
-    }
-    return false;
+  const rowMatches = (r) => {
+    return columns.some(c => {
+      const v = c.split('.').reduce((a,k)=>a?.[k], r);
+      if (v == null) return false;
+      const s = String(v).toLowerCase();
+      // require ALL tokens to be present, any column can satisfy
+      return tokens.every(t => s.includes(t));
+    });
   };
 
-  const filtered = merged.filter(matches);
-  if (filtered.length) return filtered;
+  // Try each column as a separate filter (best-case: server filters help)
+  for (const col of columns) {
+    const rows = await listPage({ type, filters:[contains(col, q)], sortProp, dir, page:1, size:pageSize });
+    for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
+    if (merged.length >= scanLimit) break;
+  }
 
-  // fallback: scan pages without filters and match client-side
+  // Always post-filter (some tenants ignore filters)
+  const filtered = merged.filter(rowMatches);
+  if (filtered.length) return filtered.slice(0, scanLimit);
+
+  // Fallback: scan more pages unfiltered, post-filter client-side
   merged = [];
   for (let p = 1; p <= maxPages; p++) {
-    let rows = [];
-    try {
-      rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
-    } catch (e) {
-      console.warn('listSearch fallback page', p, 'failed for', type, e?.message || e);
-      break; // stop scanning on hard OT errors
-    }
+    const rows = await listPage({ type, filters:[], sortProp, dir, page:p, size:pageSize });
     if (!rows.length) break;
-    for (const r of rows) if (matches(r)) merged.push(r);
-    if (merged.length >= minHits) break;
+    for (const r of rows) if (rowMatches(r)) merged.push(r);
+    if (merged.length >= scanLimit) break;
   }
-  return merged;
+  return merged.slice(0, scanLimit);
 }
+
 
 
 
