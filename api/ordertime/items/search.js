@@ -1,4 +1,4 @@
-// /api/ordertime/items/search.js 
+// CommonJS
 const { listSearch } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
@@ -6,18 +6,17 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    // allow client to request more; cap for safety
-    const limit = Math.min(parseInt(req.query.limit || '120', 10) || 120, 300);
-
     const rows = await listSearch({
       type: 'PartItem',
       q,
-      columns: ['Name','Number','ManufacturerPartNo','UPC','Description'],
-      sortProp: 'Name',
+      // Only names/numbers are “safer” to ask OT to filter; Description/UPC often crash OT.
+      columns: ['Name', 'ItemName', 'Number', 'ManufacturerPartNo', 'UPC', 'Description'],
+      sortProp: 'Id',
       dir: 'Asc',
-      pageSize: 200,   // bigger pages
-      maxPages: 25,    // scan deeper
-      scanLimit: limit // stop when enough found
+      pageSize: 200,
+      maxPages: 30,
+      take: 80,
+      tryServerFilters: false, // FORCE page-scan + local filter to avoid OT filter crashes
     });
 
     const seen = new Set();
@@ -33,8 +32,9 @@ module.exports = async function handler(req, res) {
         sku: x.Number || '',
       }));
 
-    res.status(200).json(out.slice(0, limit));
+    res.status(200).json(out);
   } catch (err) {
+    console.error('items/search', err);
     res.status(500).json({ error: `API GET /ordertime/items/search failed: ${err.message || err}` });
   }
 };
