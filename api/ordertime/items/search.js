@@ -1,5 +1,7 @@
 // /api/ordertime/items/search.js  (CommonJS, no enums)
-const _ot = require('../../_ot');
+// correct relative path from /api/ordertime/items/ → /api/_ot.js
+const { ot, listSearch, listSearchTextFilter } = require('../../_ot');
+
 
 module.exports = async function handler(req, res) {
   try {
