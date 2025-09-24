@@ -1,4 +1,3 @@
-// /api/ordertime/salesorders/search 
 // api/ordertime/salesorders/search.js
 const { getSalesOrderByDocNo } = require('../../_ot');
 
@@ -7,13 +6,12 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    // Accept "SO-2025-00456", "SO 00456", or just "00456"
+    // Pull out a number (e.g. from "SO-25068" or "25068")
     const m = q.match(/(\d{3,})$/);
-    if (!m) return res.status(200).json([]);   // avoid /list — it 400s on this tenant
+    if (!m) return res.status(200).json([]); // avoid /list entirely on this tenant
 
     const docNo = parseInt(m[1], 10);
     const so = await getSalesOrderByDocNo(docNo);
-
     if (!so || !so.Id) return res.status(200).json([]);
 
     res.status(200).json([{
