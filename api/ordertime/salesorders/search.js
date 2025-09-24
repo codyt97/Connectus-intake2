@@ -6,26 +6,28 @@ module.exports = async function handler(req, res) {
     if (!q) return res.status(200).json([]);
 
     const rows = await listSearchWithFallback({
-      type: 'Customer',
+      type: 'SalesOrder',
       q,
-      columns: ['Name', 'CompanyName', 'Email', 'Phone'],
-      sortProp: 'Name',
-      desc: false,
+      columns: ['DocNumber', 'CustomerRef.Name'],
+      sortProp: 'DocNumber',
+      desc: true,
       take: 50,
       fallbackTake: 400
     });
 
-    const out = rows.map(x => ({
-      id: x.Id,
-      company: x.CompanyName || x.Name || '',
-      email: x.Email || x.BillingEmail || '',
-      phone: x.Phone || x.BillingPhone || '',
-      city: x.BillingCity || x.City || '',
-      state: x.BillingState || x.State || '',
-    }));
+    const seen = new Set();
+    const out = rows
+      .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
+      .map(r => ({
+        id: r.Id,
+        docNo: r.DocNumber || r.DocNo || r.Number || '',
+        customer: r.CustomerRef?.Name || '',
+        status: r.Status || r.DocStatus || '',
+        date: r.TxnDate || r.Date || '',
+      }));
 
     res.status(200).json(out);
   } catch (err) {
-    res.status(500).json({ error: `API GET /ordertime/customers/search failed: ${err.message || err}` });
+    res.status(500).json({ error: `API GET /ordertime/salesorders/search failed: ${err.message || err}` });
   }
 };
