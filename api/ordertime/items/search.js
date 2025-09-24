@@ -1,5 +1,5 @@
-// /api/ordertime/items/search.js  (CommonJS)
-const _ot = require('../_ot');
+// /api/ordertime/items/search.js  (CommonJS, no enums)
+const _ot = require('../../_ot');
 
 module.exports = async function handler(req, res) {
   try {
@@ -10,53 +10,45 @@ module.exports = async function handler(req, res) {
 
     const words = q.split(/\s+/).filter(Boolean);
 
-    // 1) Broad, phrase match across common text columns
-    const broad = await _ot.listSearch({
+    // 0) Exact-ish identifiers (SKU / Mfg / UPC). listSearch is LIKE behind the scenes,
+    // but we bias to identifier columns first.
+    const identCols = ['ItemNumber', 'Number', 'SKU', 'MfgPartNo', 'ManufacturerPartNumber', 'UpcCode', 'UPC'];
+    const ident = await _ot.listSearch({ type: 'PartItem', q, columns: identCols });
+
+    // 1) Phrase search across name/desc
+    const phrase = await _ot.listSearch({
       type: 'PartItem',
       q,
-      columns: ['Name', 'ItemName', 'Description', 'Number', 'ItemNumber', 'MfgPartNo', 'ManufacturerPartNumber', 'UpcCode', 'SKU']
+      columns: ['Name', 'ItemName', 'Description']
     });
 
-    // 2) If multi-word, also AND the words client-side to tighten results
+    // 2) If multi-word, AND the words client-side (listSearch ANDs on the server across columns);
+    // we do an extra pass to make sure "iphone 14" doesn’t miss.
     let multi = [];
     if (words.length > 1) {
-      const rows = await _ot.listSearch({
-        type: 'PartItem',
-        q: words[0],
-        columns: ['Name', 'ItemName', 'Description']
-      });
-      const hasAll = r => words.every(w =>
-        _ot.__rowContainsAnyString ? _ot.__rowContainsAnyString(r, w.toLowerCase()) :
-        JSON.stringify(r).toLowerCase().includes(w.toLowerCase())
-      );
-      multi = rows.filter(hasAll);
+      const firstPass = await _ot.listSearch({ type: 'PartItem', q: words[0], columns: ['Name', 'ItemName', 'Description'] });
+      const j = s => JSON.stringify(s || {}).toLowerCase();
+      multi = firstPass.filter(r => words.every(w => j(r).includes(w.toLowerCase())));
     }
 
-    // 3) Exact match fields for SKUs and identifiers
-    const exactFields = ['Number','ItemNumber','SKU','MfgPartNo','ManufacturerPartNumber','UpcCode','UPC'];
-    const exact = await Promise.all(exactFields.map(async (f) => {
-      try {
-        return await _ot.listSearch({ type: 'PartItem', q, columns: [f] });
-      } catch { return []; }
-    }));
-
-    // Merge & normalize
+    // merge + dedupe
     const seen = new Set();
-    const merged = [...broad, ...multi, ...exact.flat()].filter(r => {
+    const merged = [...ident, ...phrase, ...multi].filter(r => {
       const id = r.Id;
       if (seen.has(id)) return false;
       seen.add(id);
       return true;
     });
 
+    // normalize to front-end
     const out = merged.slice(0, 100).map(x => ({
       id:   x.Id,
       name: x.Name || x.ItemName || '',
       description: x.Description || '',
-      sku:  x.SKU || x.Number || x.ItemNumber || '',
+      sku:  x.SKU || x.ItemNumber || x.Number || '',
       mfgPart: x.MfgPartNo || x.ManufacturerPartNumber || '',
       upc:  x.UpcCode || x.UPC || '',
-      price: Number(x.Price ?? x.SalesPrice ?? 0)
+      price: Number(x.Price ?? x.SalesPrice ?? x.StdPrice ?? 0)
     }));
 
     res.status(200).json(out);
