@@ -1,64 +1,48 @@
-const { scanList, val, getSalesOrderByDocNo } = require('../../_ot');
+const { listSearch, getSalesOrderByDocNo } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
   try {
-    const qRaw = String(req.query.q || '').trim();
-    if (!qRaw) return res.status(200).json([]);
+    const q = String(req.query.q || '').trim();
+    if (!q) return res.status(200).json([]);
 
-    // Fast path: a pure number => fetch by DocNo directly
-    if (/^\d+$/.test(qRaw)) {
+    // If q is a number, prefer the reliable endpoint
+    if (/^\d+$/.test(q)) {
       try {
-        const so = await getSalesOrderByDocNo(parseInt(qRaw, 10));
-        if (so && (so.Id || so.id)) {
-          const doc = so.DocNumber || so.DocNo || so.Number || '';
+        const so = await getSalesOrderByDocNo(parseInt(q, 10));
+        if (so && (so.Id || so.DocNumber)) {
           return res.status(200).json([{
-            id: so.Id || so.id,
-            docNo: String(doc),
-            customer: val(so, 'CustomerName') || val(so, 'CustomerRef.Name'),
+            id: so.Id,
+            docNo: so.DocNumber || so.Number || '',
+            customer: so.CustomerRef?.Name || so.CustomerName || '',
             status: so.Status || so.DocStatus || '',
-            date: so.TxnDate || so.Date || ''
+            date: so.TxnDate || so.Date || '',
           }]);
         }
-      } catch (_) { /* fall back to scan below */ }
+      } catch (_) { /* fall through to name search */ }
     }
 
-    // Otherwise: scan and token-match locally
-    const terms = qRaw.toLowerCase().split(/\s+/).filter(Boolean);
-
-    const rows = await scanList({
+    // Fallback: client-side match across pages (OT list filters are flaky for SalesOrder)
+    const rows = await listSearch({
       type: 'SalesOrder',
-      sortProp: 'DocNumber', // or 'Id' if DocNumber is flaky
+      q,
+      columns: ['DocNumber','Number','CustomerRef.Name','CustomerName','Memo','Status'],
+      sortProp: 'DocNumber',
       dir: 'Desc',
-      pageSize: 50,
-      maxPages: 40
+      pageSize: 200,
+      maxPages: 15,
+      minHits: 200
     });
 
-    const FIELDS = [
-      'DocNumber', 'DocNo', 'Number',
-      'CustomerName', 'CustomerRef.Name',
-      'Status', 'Memo'
-    ];
-
-    const out = [];
     const seen = new Set();
-
-    for (const r of rows) {
-      const hay = FIELDS.map(f => val(r, f)).join(' ').toLowerCase();
-      if (!terms.every(t => hay.includes(t))) continue;
-
-      if (seen.has(r.Id)) continue;
-      seen.add(r.Id);
-
-      out.push({
+    const out = rows
+      .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
+      .map(r => ({
         id: r.Id,
-        docNo: String(r.DocNumber || r.DocNo || r.Number || ''),
-        customer: val(r, 'CustomerName') || val(r, 'CustomerRef.Name'),
+        docNo: r.DocNumber || r.Number || '',
+        customer: r.CustomerRef?.Name || r.CustomerName || '',
         status: r.Status || r.DocStatus || '',
-        date: r.TxnDate || r.Date || ''
-      });
-
-      if (out.length >= 200) break;
-    }
+        date: r.TxnDate || r.Date || '',
+      }));
 
     res.status(200).json(out);
   } catch (err) {
