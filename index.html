@@ -1363,70 +1363,57 @@ function applyCustomerFromApi(r){
   applyPastedCustomer('wcpPaste'); // your existing JSON→form function
 }
 
-// safeties (in case they’re not defined yet)
 function setVal(id,v){ const el=document.getElementById(id); if(!el) return; el.value = v ?? ''; el.dispatchEvent(new Event('input',{bubbles:true})); }
-function pick(...vals){ for (const v of vals){ if (v !== undefined && v !== null && String(v).trim() !== '') return v; } return ''; }
+const pick = (...vals) => { for (const v of vals) if (v !== undefined && v !== null && String(v).trim() !== '') return v; return ''; };
 
-// ⬇️ REPLACE THIS WHOLE FUNCTION
 function applyPastedCustomer(textareaId){
-  const raw = document.getElementById(textareaId).value.trim();
-  if(!raw){ alert('Paste customer details first.'); return; }
+  const ta = document.getElementById(textareaId);
+  if(!ta) return alert('Paste area not found');
+  const raw = ta.value.trim();
+  if(!raw) return alert('Paste customer JSON first');
 
-  let data = {};
-  try { data = JSON.parse(raw); }
-  catch(_) {
-    // Allow simple "Key: Value" lines too
-    raw.split(/\r?\n/).forEach(line=>{
-      const m=line.match(/^([^:]+):\s*(.*)$/);
-      if(!m) return;
-      if (typeof setByPath === 'function') {
-        setByPath(data, m[1].trim(), m[2].trim());
-      }
-    });
+  let c = {};
+  try { c = JSON.parse(raw); } catch { return alert('Invalid JSON'); }
+
+  const b = c.billing  || c.Billing  || c.BillingAddress  || {};
+  const s = c.shipping || c.Shipping || c.ShippingAddress || c.ShipTo || {};
+
+  // Billing (Customer tab)
+  setVal('billCompany', pick(c.company, b.company, c.CompanyName, c.Name));
+  setVal('billContact', pick(b.contact, b.Contact));
+  setVal('billPhone',   pick(b.phone));
+  setVal('billEmail',   pick(b.email));
+  setVal('billStreet',  pick(b.street, b.Address1, b.Street));
+  setVal('billSuite',   pick(b.suite,  b.Address2, b.Suite));
+  setVal('billCity',    pick(b.city));
+  setVal('billState',   pick(b.state));
+  setVal('billZip',     pick(b.zip, b.PostalCode));
+
+  // Shipping (Shipping tab)
+  setVal('shipCompany', pick(s.company, c.company, s.CompanyName));
+  setVal('shipContact', pick(s.contact, s.Contact));
+  setVal('shipPhone',   pick(s.phone));
+  setVal('shipEmail',   pick(s.email));
+  setVal('shipStreet',  pick(s.street, s.Address1, s.Street));
+  setVal('shipSuite',   pick(s.suite,  s.Address2, s.Suite));
+  setVal('shipCity',    pick(s.city));
+  setVal('shipState',   pick(s.state));
+  setVal('shipZip',     pick(s.zip, s.PostalCode));
+
+  // Options (if present)
+  if (c.payment){
+    const pm = c.payment.method; if (pm) selectByTextExact?.('payMethod', pm);
+    setVal('payTerms', c.payment.terms || '');
+    const tax = document.getElementById('taxExempt'); if (tax) tax.checked = !!c.payment.taxExempt;
+    const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!c.payment.agreement;
+  }
+  if (c.shippingOptions){
+    c.shippingOptions.pay   && selectByTextExact?.('shipPay',   c.shippingOptions.pay);
+    c.shippingOptions.speed && selectByTextExact?.('shipSpeed', c.shippingOptions.speed);
+    c.shippingOptions.shortShip && selectByTextExact?.('shortShip', c.shippingOptions.shortShip);
   }
 
-  // Billing → Customer tab
-  setVal('billCompany', (data.company ?? data.billing?.company) || '');
-  setVal('billContact', data.billing?.contact || '');
-  setVal('billPhone',   data.billing?.phone   || '');
-  setVal('billEmail',   data.billing?.email   || '');
-  setVal('billStreet',  data.billing?.street  || '');
-  setVal('billSuite',   data.billing?.suite   || '');
-  setVal('billCity',    data.billing?.city    || '');
-  setVal('billState',   data.billing?.state   || '');
-  setVal('billZip',     data.billing?.zip     || '');
-
-  // Shipping → Shipping tab
-  setVal('shipCompany', data.shipping?.company || '');
-  setVal('shipContact', data.shipping?.contact || '');
-  setVal('shipPhone',   data.shipping?.phone   || '');
-  setVal('shipEmail',   data.shipping?.email   || '');
-  setVal('shipStreet',  data.shipping?.street  || '');
-  setVal('shipSuite',   data.shipping?.suite   || '');
-  setVal('shipCity',    data.shipping?.city    || '');
-  setVal('shipState',   data.shipping?.state   || '');
-  setVal('shipZip',     data.shipping?.zip     || '');
-
-  // Payment & shipping options
-  const pm = data.payment?.method;
-  if(pm && typeof selectByTextExact === 'function') selectByTextExact('payMethod', pm);
-  setVal('payTerms', data.payment?.terms || '');
-  const tax = document.getElementById('taxExempt'); if (tax) tax.checked = !!data.payment?.taxExempt;
-  const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!data.payment?.agreement;
-
-  const so = data.shippingOptions || {};
-  if(so.pay)       selectByTextExact?.('shipPay',   so.pay);
-  if(so.speed)     selectByTextExact?.('shipSpeed', so.speed);
-  if(so.shortShip) selectByTextExact?.('shortShip', so.shortShip);
-
-  // Carrier rep + internal reps
-  setVal('carrierRepName',  data.carrierRep?.name  || '');
-  setVal('carrierRepEmail', data.carrierRep?.email || '');
-  const r1 = data.rep?.primary;   if(r1) selectByTextExact?.('rep1', r1);
-  const r2 = data.rep?.secondary; if(r2) selectByTextExact?.('rep2', r2);
-
   closeDrawer?.('drawerWCP');
-  refreshTotals?.();
 }
 
 
@@ -1609,22 +1596,68 @@ document.getElementById('soQuery')?.addEventListener('keydown', (e) => {
   if (e.key === 'Enter') doSOSearch();
 });
 
+function normalizeOrderTimeSO(soRaw){
+  const safe = v => (v ?? '');
+  const addr = (a = {}) => ({
+    company: safe(a.CompanyName ?? a.Name ?? soRaw.CustomerRef?.Name),
+    contact: safe(a.Contact ?? a.Attention),
+    phone:   safe(a.Phone),
+    email:   safe(a.Email),
+    street:  safe(a.Address1 ?? a.Street ?? a.Line1),
+    suite:   safe(a.Address2 ?? a.Suite  ?? a.Line2),
+    city:    safe(a.City),
+    state:   safe(a.State ?? a.Region),
+    zip:     safe(a.PostalCode ?? a.Zip)
+  });
+
+  const billing  = addr(soRaw.BillingAddress || soRaw.BillTo);
+  const shipping = addr(soRaw.ShippingAddress || soRaw.ShipTo);
+
+  const lines = (soRaw.Lines || soRaw.Items || []).map((l,i)=>({
+    lineNo: l.LineNo ?? i+1,
+    sku:    safe(l.ItemRef?.Number ?? l.ItemNumber ?? l.Number),
+    name:   safe(l.ItemRef?.Name   ?? l.Description ?? l.Name),
+    qty:    Number(l.Quantity ?? l.Qty ?? 1),
+    price:  Number(l.Rate ?? l.Price ?? l.UnitPrice ?? 0),
+    amount: Number(l.Amount ?? ((l.Rate ?? l.Price ?? 0) * (l.Quantity ?? 1)))
+  }));
+
+  return {
+    docNo:    safe(soRaw.DocNo ?? soRaw.Number),
+    date:     safe(soRaw.Date),
+    customer: safe(soRaw.CustomerRef?.Name),
+    company:  safe(soRaw.CustomerRef?.Name),
+    billing,
+    shipping,
+    payment: {
+      method: safe(soRaw.PaymentMethodRef?.Name ?? soRaw.PaymentMethod),
+      terms:  safe(soRaw.TermsRef?.Name ?? soRaw.PaymentTerms)
+    },
+    shippingOptions: {
+      pay:      safe(soRaw.ShipPaymentMethod ?? soRaw.ShippingPaymentMethod),
+      speed:    safe(soRaw.ShipSpeed ?? soRaw.ShippingSpeed),
+      shortShip:safe(soRaw.ShortShip)
+    },
+    lines
+  };
+  
 async function applySalesOrder(row){
   try{
-    if (!row?.docNo) { alert('Missing DocNo'); return; }
-    const res = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(row.docNo)}`);
+    const docNo = row?.docNo || row?.DocNo;
+    if (!docNo) { alert('Missing DocNo'); return; }
+
+    const res = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`);
     if (!res.ok) throw new Error(await res.text());
 
     const soRaw  = await res.json();
-    // you already have normalizeOrderTimeSO in the file
     const soNorm = normalizeOrderTimeSO(soRaw);
-    document.getElementById('clonePaste').value = JSON.stringify(soNorm, null, 2);
 
-    // This is your canonical mapper that populates Customer, Shipping, Items, MDM
-    applyClonedOrder();
-    if (typeof closeDrawer === 'function') closeDrawer('drawerClone');
+    // your page already reads from #clonePaste in applyClonedOrder()
+    document.getElementById('clonePaste').value = JSON.stringify(soNorm, null, 2);
+    applyClonedOrder();                     // <- fills Customer + Shipping + Items + MDM
+    closeDrawer?.('drawerClone');
   }catch(e){
-    alert('Failed to apply Sales Order: ' + (e.message||e));
+    alert('Failed to apply Sales Order: ' + (e.message || e));
   }
 }
   
