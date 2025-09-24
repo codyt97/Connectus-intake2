@@ -1,127 +1,127 @@
-// /api/_ot.js  — CommonJS, OrderTime canonical shapes
-const BASE    = process.env.OT_BASE_URL || 'https://services.ordertime.com/api';
-const API_KEY = process.env.OT_API_KEY;
-const EMAIL   = process.env.OT_EMAIL || '';
-const PASS    = process.env.OT_PASSWORD || '';
-const DEVKEY  = process.env.OT_DEV_KEY || '';
+// /api/ordertime/_ot.js
+const OT_BASE = 'https://services.ordertime.com/api';
 
-function assertEnv(){ if(!BASE) throw new Error('Missing OT_BASE_URL'); if(!API_KEY) throw new Error('Missing OT_API_KEY'); }
-
-function authHeaders(){
-  const h = { 'Content-Type':'application/json', ApiKey:API_KEY, apiKey:API_KEY };
-  if (EMAIL)  h.email = EMAIL;
-  if (DEVKEY) h.DevKey = DEVKEY; else if (PASS) h.password = PASS;
+function otHeaders() {
+  const { OT_API_KEY, OT_EMAIL, OT_PASSWORD, OT_DEVKEY } = process.env;
+  const h = { 'Content-Type': 'application/json', apiKey: OT_API_KEY, email: OT_EMAIL };
+  if (OT_DEVKEY) h.DevKey = OT_DEVKEY; else h.password = OT_PASSWORD;
   return h;
 }
 
-async function _req(path, init={}){
-  assertEnv();
-  const url = `${BASE}${path.startsWith('/')?'':'/'}${path}`;
-  const r = await fetch(url, { ...init, headers:{ ...authHeaders(), ...(init.headers||{}) } });
-  const txt = await r.text();
-  let data; try { data = txt ? JSON.parse(txt) : null; } catch { data = txt; }
-  if(!r.ok) throw new Error(typeof data==='string' ? data : (data?.Message||data?.error||r.statusText));
-  return data;
-}
+/* ---- small in-memory cache ---- */
+const cache = new Map();
+const put = (k,v,ms=5*60*1000)=>cache.set(k,{v,exp:Date.now()+ms});
+const get = (k)=>{ const e=cache.get(k); if(!e||Date.now()>e.exp) return null; return e.v; };
 
-async function otGet(path){  return _req(path, { method:'GET'  }); }
-async function otPost(path,b){return _req(path, { method:'POST', body:JSON.stringify(b||{}) }); }
+/* ---- enums: resolve RecordType by name once ---- */
+async function getRecordType(typeName) {
+  const key = `recordtype:${typeName}`;
+  const hit = get(key); if (hit) return hit;
 
-// ---- Canonical ListInfo helpers
-const OP = { Contains: 12 };
-
-function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
-  return {
-    Type: type,
-    Filters: filters,
-    Sortation: { PropertyName: sortProp, Direction: dir },
-    PageNumber: page,
-    NumberOfRecords: size
-  };
-}
-
-function contains(field, value) {
-  return {
-    PropertyName: field,
-    Operator: OP.Contains,
-    // MUST be an array for OrderTime
-    FilterValueArray: [ String(value ?? '') ]
-  };
-}
-
-async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
-  const payload = listInfo({ type, filters, sortProp, dir, page, size });
-  const res = await otPost('/list', payload);
-  return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
-}
-
-// recursive “does any string field include needle?”
-function rowContainsAnyString(value, needle) {
-  if (!value) return false;
-  if (typeof value === 'string') return value.toLowerCase().includes(needle);
-  if (Array.isArray(value)) return value.some(v => rowContainsAnyString(v, needle));
-  if (typeof value === 'object') return Object.values(value).some(v => rowContainsAnyString(v, needle));
-  return false;
-}
-
-async function listSearch({
-  type, q, columns,
-  sortProp = 'Id', dir = 'Asc',
-  pageSize = 100, maxPages = 8
-}) {
-  const needle = String(q || '').toLowerCase().trim();
-  const filterable = (columns || []).filter(c => c && !c.includes('.')); // only simple fields
-
-  const seen = new Set();
-  let merged = [];
-
-  // Try server-side filters, but never fail the whole search.
-  for (const col of filterable) {
-    try {
-      const rows = await listPage({
-        type,
-        filters: [contains(col, needle)],
-        sortProp, dir, page: 1, size: pageSize
-      });
-      for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
-    } catch (e) {
-      console.warn('listSearch filter skipped:', type, col, e.message);
-    }
+  // Pull the full RecordType enum map once and reverse-index it
+  let map = get('recordtype:map');
+  if (!map) {
+    const res = await fetch(`${OT_BASE}/enums/RecordTypeEnum`, { headers: otHeaders() });
+    if (!res.ok) throw new Error(`/enums/RecordTypeEnum ${res.status}`);
+    const json = await res.json();           // { "1":"...", "2":"...", ... }
+    // build reverse { "Customer": 120, "Item": 100, "SalesOrder": 7, ... }
+    map = Object.fromEntries(Object.entries(json).map(([code,name]) => [name, Number(code)]));
+    put('recordtype:map', map, 12*60*60*1000); // 12h
   }
-
-  // Post-filter whatever we collected using the provided columns (incl. nested)
-  const usesColumns = (columns && columns.length > 0);
-  const postMatch = (row) => {
-    if (usesColumns) {
-      return columns.some(c => {
-        const v = c.split('.').reduce((a,k) => (a ? a[k] : undefined), row);
-        return typeof v === 'string' && v.toLowerCase().includes(needle);
-      });
-    }
-    return rowContainsAnyString(row, needle);
-  };
-
-  const filtered = merged.filter(postMatch);
-  if (filtered.length) return filtered;
-
-  // Fallback: page through without filters and match across ANY string fields
-  const out = [];
-  for (let p = 1; p <= maxPages; p++) {
-    const rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
-    if (!rows.length) break;
-    for (const r of rows) if (rowContainsAnyString(r, needle)) out.push(r);
-    if (out.length >= 50) break;
-  }
-  return out;
+  const code = map[typeName];
+  if (!code) throw new Error(`RecordTypeEnum missing: ${typeName}`);
+  put(key, code);
+  return code;
 }
 
-// Entity GETs (note the correct casing)
-async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderById(id){   return otGet(`/SalesOrder?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderByDocNo(n){ return otGet(`/SalesOrder?docNo=${encodeURIComponent(n)}`); }
+/* ---- generic LIST helper ---- */
+async function otList(listInfo) {
+  const res = await fetch(`${OT_BASE}/list`, {
+    method: 'POST',
+    headers: otHeaders(),
+    body: JSON.stringify(listInfo),
+  });
+  if (!res.ok) throw new Error(`/list failed ${res.status} ${await res.text().catch(()=> '')}`);
+  return res.json();
+}
 
-module.exports = {
-  otGet, otPost,
-  listSearch,
-  getCustomerById, getSalesOrderById, getSalesOrderByDocNo,
-};
+/* ---- entity GET by id ---- */
+async function otGetEntity(path, id) {
+  const url = `${OT_BASE}/${path}?id=${encodeURIComponent(id)}`;
+  const res = await fetch(url, { headers: otHeaders() });
+  if (!res.ok) throw new Error(`GET ${path} failed ${res.status}`);
+  return res.json();
+}
+
+/* ================== SPECIFIC QUERIES ================== */
+
+// 1) Customers (entity: Customer)
+export async function searchCustomersByName(q, page=1, take=25) {
+  const Type = await getRecordType('Customer');
+  return otList({
+    Type,
+    Filters: [{ PropertyName: 'Name', Operator: 12, FilterValueArray: q }],
+    PageNumber: page, NumberOfRecords: take,
+    Sortation: { PropertyName: 'Name' },
+  });
+}
+export async function getCustomerById(id) { return otGetEntity('customer', id); }
+
+// CustomerAddresses for a given Customer
+export async function listCustomerAddresses(customerId, page=1, take=50) {
+  const Type = await getRecordType('CustomerAddress');
+  return otList({
+    Type,
+    Filters: [{ PropertyName: 'CustomerRef.Id', Operator: 1, FilterValueArray: String(customerId) }],
+    PageNumber: page, NumberOfRecords: take,
+    Sortation: { PropertyName: 'IsDefault', Direction: 2 },
+  });
+}
+
+// 2) Items = Parts + NonPart (two list calls, then merge)
+export async function searchItemsByText(q, page=1, take=25) {
+  const [PartType, NonPartType] = await Promise.all([
+    getRecordType('Part'), getRecordType('NonPart')
+  ]);
+  const makeList = (Type)=> otList({
+    Type,
+    Filters: [{
+      // try name OR item number: run two LIKE filters in two calls if you want
+      PropertyName: 'Name',
+      Operator: 12,
+      FilterValueArray: q
+    }],
+    PageNumber: page, NumberOfRecords: take,
+    Sortation: { PropertyName: 'Name' },
+  });
+  const [parts, nonparts] = await Promise.all([makeList(PartType), makeList(NonPartType)]);
+  return [...parts, ...nonparts]; // caller can slice if needed
+}
+export async function getPartById(id){ return otGetEntity('parts', id); }
+export async function getNonPartById(id){ return otGetEntity('nonpart', id); }
+
+// 3) Sales Orders (search by DocNo or Customer name)
+export async function searchSalesOrders({ q, customer, page=1, take=25 }) {
+  const Type = await getRecordType('SalesOrder');
+  const filters = [];
+  if (q) filters.push({ PropertyName: 'DocNo', Operator: 12, FilterValueArray: q });
+  if (customer) filters.push({ PropertyName: 'CustomerRef.Name', Operator: 12, FilterValueArray: customer });
+  return otList({
+    Type, Filters: filters.length?filters:undefined,
+    PageNumber: page, NumberOfRecords: take,
+    Sortation: { PropertyName: 'DocNo', Direction: 2 }
+  });
+}
+export async function getSalesOrderById(id){ return otGetEntity('sales-order', id); }
+
+// 4) Customer Return (RMA) — search by RMA No or Customer
+export async function searchCustomerReturns({ rma, customer, page=1, take=25 }) {
+  const Type = await getRecordType('CustomerReturn');
+  const Filters = [];
+  if (rma) Filters.push({ PropertyName: 'DocNo', Operator: 12, FilterValueArray: rma });
+  if (customer) Filters.push({ PropertyName: 'CustomerRef.Name', Operator: 12, FilterValueArray: customer });
+  return otList({ Type, Filters: Filters.length?Filters:undefined, PageNumber: page, NumberOfRecords: take });
+}
+export async function getCustomerReturnById(id){ return otGetEntity('customer-return', id); }
+
+export { getRecordType }; // if you need it elsewhere
