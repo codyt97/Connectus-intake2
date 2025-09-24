@@ -1,18 +1,16 @@
-const { listSearchWithFallback } = require('../../_ot');
+const { listSearch } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const rows = await listSearchWithFallback({
+    const rows = await listSearch({
       type: 'PartItem',
       q,
-      columns: ['Name', 'Number', 'ManufacturerPartNo', 'UPC', 'Description'],
+      columns: ['Name','Number','ManufacturerPartNo','UPC','Description'],
       sortProp: 'Name',
-      desc: false,
-      take: 50,
-      fallbackTake: 500
+      dir: 'Asc'
     });
 
     const seen = new Set();
