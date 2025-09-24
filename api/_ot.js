@@ -40,9 +40,16 @@ function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100
   };
 }
 
-function contains(field, value){
-  return { PropertyName: field, FieldType: 'String', Operator: OP.Contains, FilterValueArray: String(value ?? '') };
+// keeps the same OP ids you already set above
+function contains(field, value) {
+  return {
+    PropertyName: field,
+    Operator: OP.Contains,
+    // IMPORTANT: must be an array, not a string
+    FilterValueArray: [ String(value ?? '') ]
+  };
 }
+
 
 
 
@@ -54,40 +61,55 @@ async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, si
   return Array.isArray(res?.Records) ? res.Records : (Array.isArray(res) ? res : []);
 }
 
-// Search: try filtered pages (OR across columns), post-filter, then fallback scan
-async function listSearch({ type, q, columns, sortProp='Id', dir='Asc', pageSize=100, maxPages=8 }){
-  const needle = String(q || '').toLowerCase();
-  const seen   = new Set();
-  let merged   = [];
+async function listSearch({
+  type, q, columns,
+  sortProp = 'Id', dir = 'Asc',
+  pageSize = 100, maxPages = 8
+}) {
+  const needle = String(q || '').toLowerCase().trim();
 
-  // Try each column as a separate filter
-  for (const col of columns) {
-    const rows = await listPage({ type, filters:[contains(col, q)], sortProp, dir, page:1, size:pageSize });
-    for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
+  // Only use server-side filters for simple (non-nested) fields.
+  const filterable = (columns || []).filter(c => c && !c.includes('.'));
+
+  const seen = new Set();
+  let merged = [];
+
+  // Try server-side filter column-by-column, but never fail the whole search.
+  for (const col of filterable) {
+    try {
+      const rows = await listPage({
+        type,
+        filters: [contains(col, needle)],
+        sortProp, dir, page: 1, size: pageSize
+      });
+      for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
+    } catch (e) {
+      // Unknown/invalid column for this tenant -> skip it and keep going
+      console.warn('listSearch filter skipped:', type, col, e.message);
+    }
   }
 
-  // Always post-filter what we have (some tenants may ignore a filter)
-  const filtered = merged.filter(r => columns.some(c => {
-    const v = c.split('.').reduce((a,k)=>a?.[k], r);
+  // Post-filter whatever we collected using *all* columns (incl. nested).
+  const allCols = columns || [];
+  const postFilterMatch = (row) => allCols.some(c => {
+    const v = c.split('.').reduce((a,k) => (a ? a[k] : undefined), row);
     return typeof v === 'string' && v.toLowerCase().includes(needle);
-  }));
+  });
+
+  const filtered = merged.filter(postFilterMatch);
   if (filtered.length) return filtered;
 
-  // Fallback: scan more pages and post-filter until we find enough
-  merged = [];
-  for (let p=1; p<=maxPages; p++){
-    const rows = await listPage({ type, filters:[], sortProp, dir, page:p, size:pageSize });
+  // Fallback: page through the list without filters and post-filter client-side
+  const out = [];
+  for (let p = 1; p <= maxPages; p++) {
+    const rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
     if (!rows.length) break;
-    for (const r of rows) {
-      if (columns.some(c => {
-        const v = c.split('.').reduce((a,k)=>a?.[k], r);
-        return typeof v === 'string' && v.toLowerCase().includes(needle);
-      })) merged.push(r);
-    }
-    if (merged.length >= 50) break; // enough to render
+    for (const r of rows) if (postFilterMatch(r)) out.push(r);
+    if (out.length >= 50) break; // enough to render the modal
   }
-  return merged;
+  return out;
 }
+
 
 // Entity GETs
 async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
