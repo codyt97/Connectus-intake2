@@ -627,7 +627,6 @@
       <input id="soQuery" placeholder="DocNo (e.g., 10234) or Customer name (e.g., Acme)" />
       <button id="soSearchBtn" class="ghost">Search</button>
     </div>
-
     <div id="soResults" class="drawer-results muted">Type a search and hit Enter or click Search.</div>
   </div>
 </aside>
@@ -1523,23 +1522,9 @@ function applyClonedOrder(){
   refreshCSVPreview();
 }
 
-/* ===== Clone Existing Order helper ===== */
-// ---------- Clone Existing Sales Order (OrderTime) ----------
-// Map SO header → your form field IDs (CHANGE THESE RIGHT-SIDE IDs)
-const SO_HEADER_MAP = [
-  { val: r => r.docNo,    id: 'so_docno' },
-  { val: r => r.customer, id: 'so_customer' },
-  { val: r => r.status,   id: 'so_status' },
-  { val: r => r.date,     id: 'so_date' }
-];
-
-// Optional deeper mapping once full SO is fetched:
-const SO_DETAIL_MAP = [
-  { val: so => so?.Id,                           id: 'so_id' },
-  { val: so => so?.TotalAmount ?? so?.Total,     id: 'so_total' },
-  { val: so => so?.BillingAddress?.Name,         id: 'so_bill_to_name' },
-  { val: so => so?.ShippingAddress?.Name,        id: 'so_ship_to_name' }
-];
+// ---------- Sales Orders: search & apply (OrderTime) ----------
+function escapeHtml(s){return String(s??'').replace(/[&<>"']/g,m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m]));}
+function setVal(id,v){ const el=document.getElementById(id); if(!el) return; el.value = v ?? ''; el.dispatchEvent(new Event('input',{bubbles:true})); }
 
 function renderSORow(r){
   const title = `${escapeHtml(r.docNo||'')} — ${escapeHtml(r.customer||'')}`;
@@ -1551,27 +1536,24 @@ function renderSORow(r){
         <div class="row-meta">${meta}</div>
       </div>
       <div class="row-cta">
-        <button onclick='applySalesOrder(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
+        <button class="ok" onclick='applySalesOrder(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
       </div>
-    </div>
-  `;
+    </div>`;
 }
 
 async function doSOSearch(){
-  const q = document.getElementById('soQuery').value.trim();
+  const q   = document.getElementById('soQuery').value.trim();
   const btn = document.getElementById('soSearchBtn');
   const out = document.getElementById('soResults');
   if(!q){ out.innerHTML = '<div class="muted">Type something…</div>'; return; }
   btn.disabled = true; out.innerHTML = '<div class="muted">Searching…</div>';
-
   try{
-    const res = await fetch(`/api/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
+    const res  = await fetch(`/api/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
+    if(!res.ok) throw new Error(await res.text());
     const rows = await res.json(); // [{id,docNo,customer,status,date}]
-    if(!Array.isArray(rows) || rows.length===0){
-      out.innerHTML = '<div class="muted">No results.</div>';
-      return;
-    }
-    out.innerHTML = rows.map(renderSORow).join('');
+    out.innerHTML = (Array.isArray(rows) && rows.length)
+      ? rows.map(renderSORow).join('')
+      : '<div class="muted">No results.</div>';
   }catch(e){
     out.innerHTML = `<div class="error">Error: ${escapeHtml(e.message||e)}</div>`;
   }finally{
@@ -1579,11 +1561,7 @@ async function doSOSearch(){
   }
 }
 
-document.getElementById('soSearchBtn')?.addEventListener('click', doSOSearch);
-document.getElementById('soQuery')?.addEventListener('keydown', (e) => {
-  if (e.key === 'Enter') doSOSearch();
-});
-
+// Normalize OT → the shape your form expects
 function normalizeOrderTimeSO(soRaw){
   const safe = v => (v ?? '');
   const addr = (a = {}) => ({
@@ -1615,39 +1593,48 @@ function normalizeOrderTimeSO(soRaw){
     date:     safe(soRaw.Date),
     customer: safe(soRaw.CustomerRef?.Name),
     company:  safe(soRaw.CustomerRef?.Name),
-    billing,
-    shipping,
+    billing, shipping,
     payment: {
       method: safe(soRaw.PaymentMethodRef?.Name ?? soRaw.PaymentMethod),
-      terms:  safe(soRaw.TermsRef?.Name ?? soRaw.PaymentTerms)
+      terms:  safe(soRaw.TermsRef?.Name        ?? soRaw.PaymentTerms)
     },
     shippingOptions: {
-      pay:      safe(soRaw.ShipPaymentMethod ?? soRaw.ShippingPaymentMethod),
-      speed:    safe(soRaw.ShipSpeed ?? soRaw.ShippingSpeed),
+      pay:      safe(soRaw.ShipPaymentMethod       ?? soRaw.ShippingPaymentMethod),
+      speed:    safe(soRaw.ShipSpeed               ?? soRaw.ShippingSpeed),
       shortShip:safe(soRaw.ShortShip)
     },
     lines
   };
-  
+}
+
 async function applySalesOrder(row){
   try{
     const docNo = row?.docNo || row?.DocNo;
     if (!docNo) { alert('Missing DocNo'); return; }
 
-    const res = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`);
+    // Pull full SO by DocNo
+    const res   = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`);
     if (!res.ok) throw new Error(await res.text());
-
     const soRaw  = await res.json();
     const soNorm = normalizeOrderTimeSO(soRaw);
 
-    // your page already reads from #clonePaste in applyClonedOrder()
-    document.getElementById('clonePaste').value = JSON.stringify(soNorm, null, 2);
-    applyClonedOrder();                     // <- fills Customer + Shipping + Items + MDM
-    closeDrawer?.('drawerClone');
+    // Your page already reads from #clonePaste in applyClonedOrder()
+    const ta = document.getElementById('clonePaste');
+    if (!ta) { alert('#clonePaste not found'); return; }
+    ta.value = JSON.stringify(soNorm, null, 2);
+
+    // This populates Customer + Shipping + Items + MDM
+    if (typeof applyClonedOrder === 'function') applyClonedOrder();
+    if (typeof closeDrawer === 'function') closeDrawer('drawerClone');
   }catch(e){
     alert('Failed to apply Sales Order: ' + (e.message || e));
   }
 }
+
+// Wire button + Enter key
+document.getElementById('soSearchBtn')?.addEventListener('click', doSOSearch);
+document.getElementById('soQuery')?.addEventListener('keydown', (e)=>{ if(e.key==='Enter') doSOSearch(); });
+
   
 
 
