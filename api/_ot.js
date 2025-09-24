@@ -7,6 +7,13 @@ const DEVKEY  = process.env.OT_DEV_KEY || '';
 
 function assertEnv(){ if(!BASE) throw new Error('Missing OT_BASE_URL'); if(!API_KEY) throw new Error('Missing OT_API_KEY'); }
 
+// add near top
+function normalize(s) {
+  return String(s || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');            // collapse spaces & punctuation
+}
+
 function authHeaders(){
   const h = { 'Content-Type':'application/json', ApiKey:API_KEY, apiKey:API_KEY };
   if (EMAIL)  h.email = EMAIL;
@@ -99,90 +106,66 @@ async function scanList({ type, sortProp='Id', dir='Asc', pageSize=50, maxPages=
 }
 
 
-// PUT THIS IN /api/_ot.js, replacing the existing listSearch
+// PUT THIS IN /api/_ot.js, replacing the existing 
 
+// Replace your current listSearch with this:
 async function listSearch({
-  type,
-  q,
-  columns,
-  sortProp = 'Id',
-  dir = 'Asc',
-  pageSize = 100,
-  maxPages = 12,          // scan a bit deeper for two-word queries
+  type, q, columns,
+  sortProp = 'Id', dir = 'Asc',
+  pageSize = 100, maxPages = 8,
+  minHits = 50        // how many client-side matches before we stop scanning
 }) {
-  const tokens = String(q || '').toLowerCase().split(/\s+/).filter(Boolean);
-  const seen   = new Set();
-  const merged = [];
+  const needleRaw = String(q || '').trim();
+  const needle = normalize(needleRaw);
+  const tokens = needleRaw.toLowerCase().split(/\s+/).filter(Boolean).map(normalize);
+  const seen = new Set();
+  let merged = [];
 
-  const addUnique = (rows) => {
-    if (!Array.isArray(rows)) return;
-    for (const r of rows) {
-      if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
-    }
-  };
-
-  // Try a filtered call per column, but NEVER fail the whole search
+  // server-side filters (best effort)
   for (const col of columns) {
     try {
       const rows = await listPage({
         type,
-        filters: [contains(col, q)],
-        sortProp,
-        dir,
-        page: 1,
-        size: pageSize,
+        filters: [contains(col, needleRaw)],
+        sortProp, dir, page: 1, size: pageSize
       });
-      addUnique(rows);
+      for (const r of rows) if (!seen.has(r.Id)) { seen.add(r.Id); merged.push(r); }
     } catch (e) {
-      console.warn(`listSearch filter skipped: ${type} ${col} ${e.message}`);
-      // ignore and move on; some tenants/properties explode on filter
+      console.warn('listSearch filter skipped:', type, col, e?.message || e);
     }
   }
 
-  // Post-filter what we collected using token AND across all provided columns
-  const postMatch = (r) => {
-    const hay = columns
-      .map(c => c.split('.').reduce((a, k) => a?.[k], r))
-      .filter(v => typeof v === 'string')
-      .join(' ')
-      .toLowerCase();
-    return tokens.every(t => hay.includes(t));
+  // tokenized client-side match (handles "iphone 14" vs "iphone14", punctuation, etc.)
+  const matches = (row) => {
+    for (const c of columns) {
+      const v = c.split('.').reduce((a,k)=>a?.[k], row);
+      if (typeof v !== 'string') continue;
+      const nv = normalize(v);
+      if (nv.includes(needle)) return true;
+      if (tokens.length > 1 && tokens.every(t => nv.includes(t))) return true;
+    }
+    return false;
   };
 
-  let filtered = merged.filter(postMatch);
+  const filtered = merged.filter(matches);
   if (filtered.length) return filtered;
 
-  // Fallback: scan pages with NO filters, then post-filter
-  const out = [];
+  // fallback: scan pages without filters and match client-side
+  merged = [];
   for (let p = 1; p <= maxPages; p++) {
-    let rows;
+    let rows = [];
     try {
-      rows = await listPage({
-        type,
-        filters: [],
-        sortProp,
-        dir,
-        page: p,
-        size: pageSize,
-      });
+      rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
     } catch (e) {
-      console.warn(`listSearch fallback page ${p} failed: ${e.message}`);
-      break;
+      console.warn('listSearch fallback page', p, 'failed for', type, e?.message || e);
+      break; // stop scanning on hard OT errors
     }
-    if (!rows?.length) break;
-
-    for (const r of rows) if (postMatch(r)) out.push(r);
-    if (out.length >= 75) break; // enough to render quickly
+    if (!rows.length) break;
+    for (const r of rows) if (matches(r)) merged.push(r);
+    if (merged.length >= minHits) break;
   }
-  return out;
+  return merged;
 }
-
-module.exports = {
-  otGet, otPost,
-  listSearch,
-  getCustomerById, getSalesOrderById, getSalesOrderByDocNo,
-};
-
 
 // Entity GETs (note the correct casing)
 async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
