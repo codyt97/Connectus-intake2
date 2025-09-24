@@ -33,7 +33,7 @@ module.exports = async function handler(req, res) {
       maxPages: 15,
       minHits: 200
     });
-
+ 
     const seen = new Set();
     const out = rows
       .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
