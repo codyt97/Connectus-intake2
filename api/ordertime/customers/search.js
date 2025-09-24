@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
       take: 50,
       fallbackTake: 400
     });
-
+    
     const out = rows.map(x => ({
       id: x.Id,
       company: x.CompanyName || x.Name || '',
