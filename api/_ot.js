@@ -41,8 +41,10 @@ function listInfo({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100
 }
 
 function contains(field, value){
-  return { PropertyName: field, Operator: OP.Contains, FilterValueArray: String(value ?? '') };
+  return { PropertyName: field, FieldType: 'String', Operator: OP.Contains, FilterValueArray: String(value ?? '') };
 }
+
+
 
 // Try to fetch one page using canonical shape
 async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, size=100 }){
@@ -88,9 +90,10 @@ async function listSearch({ type, q, columns, sortProp='Id', dir='Asc', pageSize
 }
 
 // Entity GETs
-async function getCustomerById(id){     return otGet(`/customer?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderById(id){   return otGet(`/salesorder?id=${encodeURIComponent(id)}`); }
-async function getSalesOrderByDocNo(n){ return otGet(`/salesorder?docNo=${encodeURIComponent(n)}`); }
+async function getCustomerById(id){     return otGet(`/Customer?id=${encodeURIComponent(id)}`); }
+async function getSalesOrderById(id){   return otGet(`/SalesOrder?id=${encodeURIComponent(id)}`); }
+async function getSalesOrderByDocNo(n){ return otGet(`/SalesOrder?docNo=${encodeURIComponent(n)}`); }
+
 
 module.exports = {
   otGet, otPost,
