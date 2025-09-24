@@ -14,7 +14,7 @@ module.exports = async function handler(req, res) {
       take: 50,
       fallbackTake: 400
     });
-    
+
     const out = rows.map(x => ({
       id: x.Id,
       company: x.CompanyName || x.Name || '',
@@ -23,7 +23,6 @@ module.exports = async function handler(req, res) {
       city: x.BillingCity || x.City || '',
       state: x.BillingState || x.State || '',
     }));
-
     res.status(200).json(out);
   } catch (err) {
     res.status(500).json({ error: `API GET /ordertime/customers/search failed: ${err.message || err}` });
