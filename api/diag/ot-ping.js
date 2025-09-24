@@ -1,3 +1,4 @@
+// /api/ordertime/diag/ot-ping..js 
 // Keep ping simple: hit a tiny page and confirm auth
 const { otPost } = require('../_ot');
 
