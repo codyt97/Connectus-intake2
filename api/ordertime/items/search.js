@@ -1,36 +1,47 @@
 // /api/ordertime/items/search.js
 const { listSearch } = require('../../_ot');
 
-module.exports = async function handler(req, res) {
+module.exports = async (req, res) => {
   try {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    // Covers name/description + SKU/Number + Mfg Part + UPC
-    const columns = [
-      'Name','ItemName','Number','ItemNumber','SKU',
-      'ManufacturerPartNo','ManufacturerPartNumber','MfgPartNo',
-      'UPC','UPCCode','Description'
+    // Use a conservative set of columns to avoid noisy OT warnings
+    const COLUMNS = [
+      'ItemNumber', 'Number', 'SKU',
+      'Name', 'Description',
+      'ManufacturerPartNumber', 'ManufacturerPartNo', 'MfgPartNo',
+      'UPC', 'UPCCode'
     ];
 
-    const rows = await listSearch({ type: 'PartItem', q, columns, sortProp: 'Id', dir: 'Asc' });
+    const rows = await listSearch({
+      type: 'PartItem',
+      q,
+      columns: COLUMNS,
+      sortProp: 'Id',
+      dir: 'Asc',
+      pageSize: 100,
+      maxPages: 8,
+    });
 
-    const pick = (o, keys) => { for (const k of keys) if (o && o[k]) return o[k]; return ''; };
     const seen = new Set();
-    const out = rows
-      .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
-      .map(x => ({
-        id: x.Id,
-        name: pick(x, ['Name','ItemName','Description','Number','ItemNumber','SKU']) || '',
-        description: pick(x, ['Description']) || '',
-        mfgPart: pick(x, ['ManufacturerPartNo','ManufacturerPartNumber','MfgPartNo']) || '',
-        upc: pick(x, ['UPC','UPCCode']) || '',
-        price: (x.SalesPrice ?? x.Price ?? x.UnitPrice ?? 0) || 0,
-        sku: pick(x, ['Number','ItemNumber','SKU']) || ''
-      }));
+    const out = [];
+    for (const x of rows) {
+      if (seen.has(x.Id)) continue;
+      seen.add(x.Id);
+      out.push({
+        id:  x.Id,
+        sku: x.ItemNumber ?? x.Number ?? x.SKU ?? '',
+        name: x.Name ?? x.Description ?? '',
+        description: x.Description ?? '',
+        mfgPart: x.ManufacturerPartNumber ?? x.ManufacturerPartNo ?? x.MfgPartNo ?? '',
+        upc: x.UPC ?? x.UPCCode ?? '',
+        price: x.SalesPrice ?? x.Price ?? x.UnitPrice ?? 0
+      });
+    }
 
     res.status(200).json(out);
-  } catch (err) {
-    res.status(500).json({ error: `API GET /ordertime/items/search failed: ${err.message || err}` });
+  } catch (e) {
+    res.status(500).json({ error: `API GET /ordertime/items/search failed: ${e.message || e}` });
   }
 };
