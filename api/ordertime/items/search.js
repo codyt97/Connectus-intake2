@@ -6,6 +6,7 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
+    // Covers name/description + SKU/Number + Mfg Part + UPC
     const columns = [
       'Name','ItemName','Number','ItemNumber','SKU',
       'ManufacturerPartNo','ManufacturerPartNumber','MfgPartNo',
