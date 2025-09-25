@@ -631,6 +631,8 @@
   </div>
 </aside>
 <!-- ===================== SALES ORDERS: SEARCH UI (END) ===================== -->
+<!-- Hidden paste buffer used by applyClonedOrder() -->
+<textarea id="clonePaste" style="display:none"></textarea>
 
 <!-- ===================== ITEMS: SEARCH UI (BEGIN) ===================== -->
 <aside class="drawer" id="drawerItems" aria-hidden="true">
@@ -2594,7 +2596,7 @@ function renderItemRow(r){
         <div class="row-meta">${meta}</div>
       </div>
       <div class="row-cta">
-        <button onclick='applyItem(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
+        <button onclick='addItemFromSearch(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
       </div>
     </div>
   `;
