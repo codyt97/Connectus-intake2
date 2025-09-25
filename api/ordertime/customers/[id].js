@@ -2,10 +2,8 @@
 const { getCustomerById } = require('../../_ot');
 
 function pick(...vals){ for(const v of vals){ if(v!==undefined && v!==null && String(v).trim()!=='') return v; } return ''; }
-
 function normAddr(r, keyPrefix, obj){
   const A = obj || {};
-  const pref = s => pick(A[s], r[`${keyPrefix}${s}`]);
   return {
     company: pick(A.CompanyName, A.Name, r.CompanyName, r.Name),
     contact: pick(A.Contact, A.Name, r[`${keyPrefix}Contact`]),
@@ -22,13 +20,11 @@ function normAddr(r, keyPrefix, obj){
 module.exports = async function handler(req, res) {
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-
     const { id } = req.query;
     if (!id) return res.status(400).json({ error: 'Missing :id' });
 
     const raw = await getCustomerById(id);
 
-    // OT often nests addresses; support both nested & flat
     const billing  = normAddr(raw, 'Billing',  raw.BillingAddress  || raw.Billing);
     const shipping = normAddr(raw, 'Shipping', raw.ShippingAddress || raw.ShipTo);
 
