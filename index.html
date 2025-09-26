@@ -614,6 +614,60 @@
   </div>
 </aside>
 
+<script>
+// ---------- Customer: apply by ID using rich /customers/[id] ----------
+async function applyCustomerById(id){
+  const data = await api(`/ordertime/customers/${encodeURIComponent(id)}`, { method:'GET' }); // rich shape
+  // Billing
+  setVal('billCompany', data.company || '');
+  setVal('billContact', data.billing?.contact || '');
+  setVal('billPhone',   data.billing?.phone || '');
+  setVal('billEmail',   data.billing?.email || '');
+  setVal('billStreet',  data.billing?.street || '');
+  setVal('billSuite',   data.billing?.suite || '');
+  setVal('billCity',    data.billing?.city || '');
+  setVal('billState',   data.billing?.state || '');
+  setVal('billZip',     data.billing?.zip || '');
+  // Shipping
+  setVal('shipCompany', data.shipping?.company || data.company || '');
+  setVal('shipContact', data.shipping?.contact || '');
+  setVal('shipPhone',   data.shipping?.phone || '');
+  setVal('shipEmail',   data.shipping?.email || '');
+  setVal('shipStreet',  data.shipping?.street || '');
+  setVal('shipSuite',   data.shipping?.suite || '');
+  setVal('shipCity',    data.shipping?.city || '');
+  setVal('shipState',   data.shipping?.state || '');
+  setVal('shipZip',     data.shipping?.zip || '');
+  // Options
+  const resShip = document.getElementById('resShip'); if (resShip) resShip.checked = !!data.shipping?.residence;
+  selectByTextExact('payMethod', data.payment?.method || '');
+  setVal('payTerms', data.payment?.terms || '');
+  const taxEx = document.getElementById('taxExempt'); if (taxEx) taxEx.checked = !!data.payment?.taxExempt;
+  const hasAgr = document.getElementById('hasAgreement'); if (hasAgr) hasAgr.checked = !!data.payment?.agreement;
+  selectByTextExact('shipPay',   data.shippingOptions?.pay || '');
+  selectByTextExact('shipSpeed', data.shippingOptions?.speed || '');
+  selectByTextExact('shortShip', data.shippingOptions?.shortShip || '');
+  setVal('carrierRepName',  data.carrierRep?.name || '');
+  setVal('carrierRepEmail', data.carrierRep?.email || '');
+  selectByTextExact('rep1', data.rep?.primary || '');
+  selectByTextExact('rep2', data.rep?.secondary || '');
+}
+
+// If your customer results include Apply buttons with data-apply-customer="<id>", wire them here:
+(function initCustomerResultApply(){
+  const host = document.getElementById('wcpResults');
+  if(!host) return;
+  host.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-apply-customer]');
+    if(!btn) return;
+    const id = btn.getAttribute('data-apply-customer');
+    if(!id) return;
+    applyCustomerById(id).then(()=>{ if(window.closeDrawer) closeDrawer('drawerWCP'); });
+  });
+})();
+</script>
+
+
 <!-- Clone Existing Order -->
 <!-- ===================== SALES ORDERS: SEARCH UI (BEGIN) ===================== -->
 <aside class="drawer" id="drawerClone" aria-hidden="true">
@@ -633,6 +687,101 @@
 <!-- ===================== SALES ORDERS: SEARCH UI (END) ===================== -->
 <!-- Hidden paste buffer used by applyClonedOrder() -->
 <textarea id="clonePaste" style="display:none"></textarea>
+
+<script>
+// ---------- Sales Orders: search + apply (Clone) ----------
+async function searchSalesOrders(q){
+  return api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`, { method:'GET' }); // skinny: id,docNo,customer,status,date
+}
+
+function renderSoResults(list){
+  const box = document.getElementById('soResults');
+  if (!Array.isArray(list) || list.length === 0){
+    box.className = 'drawer-results muted';
+    box.textContent = 'No sales orders found.';
+    return;
+  }
+  const html = list.map(r => `
+    <div class="card" style="margin:8px 0;padding:10px">
+      <div><strong>${r.docNo || '—'}</strong> — ${r.customer || 'Unknown'}</div>
+      <div class="tiny">Status: ${r.status || '—'} • Date: ${r.date ? new Date(r.date).toLocaleDateString() : '—'}</div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="ok" data-apply-so="${r.docNo}">Apply</button>
+        <button class="ghost" onclick="if(window.closeDrawer) closeDrawer('drawerClone')">Close</button>
+      </div>
+    </div>
+  `).join('');
+  box.className = 'drawer-results';
+  box.innerHTML = html;
+}
+
+async function applyClonedOrderByDocNo(docNo){
+  const so = await api(`/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`, { method:'GET' }); // full SO
+  // BillTo
+  const bt = so.BillTo || so.BillingAddress || {};
+  setVal('billCompany', bt.CompanyName || bt.Name || '');
+  setVal('billContact', bt.Contact || bt.Attention || '');
+  setVal('billPhone',   bt.Phone || '');
+  setVal('billEmail',   bt.Email || '');
+  setVal('billStreet',  bt.Address1 || bt.Street || bt.Line1 || '');
+  setVal('billSuite',   bt.Address2 || bt.Suite  || bt.Line2 || '');
+  setVal('billCity',    bt.City || '');
+  setVal('billState',   bt.State || bt.Region || '');
+  setVal('billZip',     bt.PostalCode || bt.Zip || '');
+
+  // ShipTo
+  const st = so.ShipTo || so.ShippingAddress || {};
+  setVal('shipCompany', st.CompanyName || st.Name || '');
+  setVal('shipContact', st.Contact || st.Attention || '');
+  setVal('shipPhone',   st.Phone || '');
+  setVal('shipEmail',   st.Email || '');
+  setVal('shipStreet',  st.Address1 || st.Street || st.Line1 || '');
+  setVal('shipSuite',   st.Address2 || st.Suite  || st.Line2 || '');
+  setVal('shipCity',    st.City || '');
+  setVal('shipState',   st.State || st.Region || '');
+  setVal('shipZip',     st.PostalCode || st.Zip || '');
+
+  // Optional: seed first SO line into Items table
+  if (Array.isArray(so.Lines) && so.Lines.length){
+    const first = so.Lines[0];
+    if (typeof addRow === 'function') addRow();
+    applyItemToRow({
+      name: first.Description || first.ItemRef?.Name || '',
+      sku:  first.ItemRef?.Number || first.ItemNumber || ''
+    });
+  }
+
+  if (window.closeDrawer) closeDrawer('drawerClone');
+}
+
+(function initSoSearchHooks(){
+  const input = document.getElementById('soQuery');
+  const btn   = document.getElementById('soSearchBtn');
+  async function run(){
+    const q = (input.value || '').trim();
+    if(!q){ renderSoResults([]); return; }
+    try{
+      const rows = await searchSalesOrders(q);
+      renderSoResults(rows || []);
+    }catch(err){
+      const box = document.getElementById('soResults');
+      box.className = 'drawer-results muted';
+      box.textContent = `Search failed: ${err.message || err}`;
+    }
+  }
+  btn?.addEventListener('click', run);
+  input?.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter') run(); });
+
+  const host = document.getElementById('soResults');
+  host?.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-apply-so]');
+    if(!btn) return;
+    const docNo = btn.getAttribute('data-apply-so');
+    if(!docNo) return;
+    applyClonedOrderByDocNo(docNo);
+  });
+})();
+</script>
 
 <!-- ===================== ITEMS: SEARCH UI (BEGIN) ===================== -->
 <aside class="drawer" id="drawerItems" aria-hidden="true">
