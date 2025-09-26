@@ -596,25 +596,37 @@
 <aside class="drawer" id="drawerWCP" aria-label="WCP Drawer">
   <header><strong>Current Customer — OrderTime Search</strong><button class="ghost" onclick="closeDrawer('drawerWCP')">Close</button></header>
   <div class="content">
-    <label class="tiny">Search in OrderTime (opens in a new tab)</label>
-    <div class="row"><input id="wcpQuery" placeholder="Type company name…" /><button onclick="openOTSearch()" class="ghost">Search</button></div>
-    <div id="wcpResults" class="tiny" style="margin-top:8px"></div>
+    <label class="tiny">Search in OrderTime via API</label>
+    <div class="row">
+      <input id="wcpQuery" placeholder="Type company or domain (e.g., Acme or acme.com)" />
+      <button id="wcpSearchBtn" class="ghost">Search</button>
+    </div>
+    <div id="wcpResults" style="margin-top:8px"></div>
+
     <div class="divider"></div>
-    <div class="tiny">After selecting the customer in OrderTime, paste the exported details below (JSON or key:value). Supports billing, shipping, payment, shipping options.</div>
+    <div class="tiny">Alternatively, paste JSON/key:value export from OT and click Apply.</div>
     <textarea id="wcpPaste" rows="10" style="width:100%;margin-top:8px" placeholder='{
   "company":"Acme Corp",
   "billing":{"contact":"John","phone":"555-1111","email":"billing@acme.com","street":"1 Main","suite":"Ste 100","city":"Phila","state":"PA","zip":"19104"},
-  "shipping":{"company":"Acme WH","contact":"Jane","phone":"555-2222","email":"wh@acme.com","street":"500 Dock","suite":"","city":"Phila","state":"PA","zip":"19112"},
-  "payment":{"method":"Net Terms","terms":"Net 30","taxExempt":true,"agreement":false},
-  "shippingOptions":{"pay":"Prepaid","speed":"Ground","shortShip":"No"},
-  "carrierRep":{"name":"Verizon Rep","email":"vrep@vz.com"},
-  "rep":{"primary":"Chris Samaras","secondary":"—"}
+  "shipping":{"company":"Acme WH","contact":"Jane","phone":"555-2222","email":"wh@acme.com","street":"500 Dock","suite":"","city":"Phila","state":"PA","zip":"19112"}
 }'></textarea>
-    <div class="row" style="gap:10px;margin-top:8px"><button class="ok" onclick="applyPastedCustomer('wcpPaste')">Apply to Form</button><button class="ghost" onclick="fillWCPExample()">Load Example</button></div>
+    <div class="row" style="gap:10px;margin-top:8px">
+      <button class="ok" onclick="applyPastedCustomer('wcpPaste')">Apply to Form</button>
+      <button class="ghost" onclick="fillWCPExample()">Load Example</button>
+    </div>
   </div>
 </aside>
 
 <script>
+// --- guards (in case not defined elsewhere) ---
+function setVal(id,v){ const el=document.getElementById(id); if(el){ el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); } }
+function selectByTextExact(id,text){
+  const s=document.getElementById(id); if(!s) return;
+  const t=String(text||'').trim().toLowerCase();
+  const opt=[...s.options].find(o=>o.text.trim().toLowerCase()===t);
+  if(opt){ s.value=opt.value; s.dispatchEvent(new Event('change',{bubbles:true})); }
+}
+
 // ---------- Customer: apply by ID using rich /customers/[id] ----------
 async function applyCustomerById(id){
   const data = await api(`/ordertime/customers/${encodeURIComponent(id)}`, { method:'GET' }); // rich shape
@@ -653,19 +665,57 @@ async function applyCustomerById(id){
   selectByTextExact('rep2', data.rep?.secondary || '');
 }
 
-// If your customer results include Apply buttons with data-apply-customer="<id>", wire them here:
-(function initCustomerResultApply(){
-  const host = document.getElementById('wcpResults');
-  if(!host) return;
-  host.addEventListener('click', (e)=>{
+// --- search customers via API, render, and apply by ID ---
+async function searchCustomers(q){
+  return api(`/ordertime/customers/search?q=${encodeURIComponent(q)}`, { method:'GET' });
+}
+function renderCustomerResults(list){
+  const box = document.getElementById('wcpResults');
+  if(!Array.isArray(list) || list.length===0){
+    box.className = 'muted';
+    box.textContent = 'No customers found.';
+    return;
+  }
+  box.className = '';
+  box.innerHTML = list.map(c=>`
+    <div class="card" style="margin:8px 0;padding:10px">
+      <div><strong>${c.company || '(no name)'}</strong>${(c.city||c.state)?` — <span class="tiny">${c.city||''}${c.state?(', '+c.state):''}</span>`:''}</div>
+      <div class="tiny">${c.email || ''} ${c.phone?('• '+c.phone):''}</div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="ok" data-apply-customer="${c.id}">Apply</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+// wire search + apply
+(function initCustomerSearch(){
+  const input = document.getElementById('wcpQuery');
+  const btn   = document.getElementById('wcpSearchBtn');
+  async function run(){
+    const q = (input.value||'').trim();
+    if(!q){ renderCustomerResults([]); return; }
+    try{
+      const rows = await searchCustomers(q);
+      renderCustomerResults(rows||[]);
+    }catch(e){
+      const box = document.getElementById('wcpResults');
+      box.className = 'muted';
+      box.textContent = `Search failed: ${e.message||e}`;
+    }
+  }
+  btn?.addEventListener('click', run);
+  input?.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+
+  document.getElementById('wcpResults')?.addEventListener('click', (e)=>{
     const btn = e.target.closest('[data-apply-customer]');
     if(!btn) return;
     const id = btn.getAttribute('data-apply-customer');
-    if(!id) return;
-    applyCustomerById(id).then(()=>{ if(window.closeDrawer) closeDrawer('drawerWCP'); });
+    if(id) applyCustomerById(id).then(()=>{ if(window.closeDrawer) closeDrawer('drawerWCP'); });
   });
 })();
 </script>
+
 
 
 <!-- Clone Existing Order -->
@@ -691,9 +741,8 @@ async function applyCustomerById(id){
 <script>
 // ---------- Sales Orders: search + apply (Clone) ----------
 async function searchSalesOrders(q){
-  return api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`, { method:'GET' }); // skinny: id,docNo,customer,status,date
+  return api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`, { method:'GET' });
 }
-
 function renderSoResults(list){
   const box = document.getElementById('soResults');
   if (!Array.isArray(list) || list.length === 0){
@@ -707,47 +756,49 @@ function renderSoResults(list){
       <div class="tiny">Status: ${r.status || '—'} • Date: ${r.date ? new Date(r.date).toLocaleDateString() : '—'}</div>
       <div class="row" style="gap:8px;margin-top:8px">
         <button class="ok" data-apply-so="${r.docNo}">Apply</button>
-        <button class="ghost" onclick="if(window.closeDrawer) closeDrawer('drawerClone')">Close</button>
       </div>
     </div>
   `).join('');
   box.className = 'drawer-results';
   box.innerHTML = html;
 }
+function _pick(...vals){ for(const v of vals){ if(v!==undefined && v!==null && String(v).trim()!=='') return v; } return ''; }
 
 async function applyClonedOrderByDocNo(docNo){
-  const so = await api(`/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`, { method:'GET' }); // full SO
+  const so = await api(`/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`, { method:'GET' });
+
+  const bt = so.BillTo || so.BillingAddress || so.BillAddress || {};
+  const st = so.ShipTo  || so.ShippingAddress || so.ShipAddress || {};
+
   // BillTo
-  const bt = so.BillTo || so.BillingAddress || {};
-  setVal('billCompany', bt.CompanyName || bt.Name || '');
-  setVal('billContact', bt.Contact || bt.Attention || '');
-  setVal('billPhone',   bt.Phone || '');
-  setVal('billEmail',   bt.Email || '');
-  setVal('billStreet',  bt.Address1 || bt.Street || bt.Line1 || '');
-  setVal('billSuite',   bt.Address2 || bt.Suite  || bt.Line2 || '');
-  setVal('billCity',    bt.City || '');
-  setVal('billState',   bt.State || bt.Region || '');
-  setVal('billZip',     bt.PostalCode || bt.Zip || '');
+  setVal('billCompany', _pick(bt.CompanyName, bt.Name, bt.company));
+  setVal('billContact', _pick(bt.Contact, bt.Attention, bt.contact));
+  setVal('billPhone',   _pick(bt.Phone, bt.phone));
+  setVal('billEmail',   _pick(bt.Email, bt.email));
+  setVal('billStreet',  _pick(bt.Address1, bt.Street, bt.Line1, bt.street));
+  setVal('billSuite',   _pick(bt.Address2, bt.Suite,  bt.Line2, bt.suite));
+  setVal('billCity',    _pick(bt.City, bt.city));
+  setVal('billState',   _pick(bt.State, bt.Region, bt.state));
+  setVal('billZip',     _pick(bt.PostalCode, bt.Zip, bt.zip));
 
   // ShipTo
-  const st = so.ShipTo || so.ShippingAddress || {};
-  setVal('shipCompany', st.CompanyName || st.Name || '');
-  setVal('shipContact', st.Contact || st.Attention || '');
-  setVal('shipPhone',   st.Phone || '');
-  setVal('shipEmail',   st.Email || '');
-  setVal('shipStreet',  st.Address1 || st.Street || st.Line1 || '');
-  setVal('shipSuite',   st.Address2 || st.Suite  || st.Line2 || '');
-  setVal('shipCity',    st.City || '');
-  setVal('shipState',   st.State || st.Region || '');
-  setVal('shipZip',     st.PostalCode || st.Zip || '');
+  setVal('shipCompany', _pick(st.CompanyName, st.Name, st.company, so.CustomerName));
+  setVal('shipContact', _pick(st.Contact, st.Attention, st.contact));
+  setVal('shipPhone',   _pick(st.Phone, st.phone));
+  setVal('shipEmail',   _pick(st.Email, st.email));
+  setVal('shipStreet',  _pick(st.Address1, st.Street, st.Line1, st.street));
+  setVal('shipSuite',   _pick(st.Address2, st.Suite,  st.Line2, st.suite));
+  setVal('shipCity',    _pick(st.City, st.city));
+  setVal('shipState',   _pick(st.State, st.Region, st.state));
+  setVal('shipZip',     _pick(st.PostalCode, st.Zip, st.zip));
 
   // Optional: seed first SO line into Items table
   if (Array.isArray(so.Lines) && so.Lines.length){
     const first = so.Lines[0];
     if (typeof addRow === 'function') addRow();
     applyItemToRow({
-      name: first.Description || first.ItemRef?.Name || '',
-      sku:  first.ItemRef?.Number || first.ItemNumber || ''
+      name: _pick(first.Description, first.ItemRef?.Name),
+      sku:  _pick(first.ItemRef?.Number, first.ItemNumber, first.SKU)
     });
   }
 
@@ -772,16 +823,15 @@ async function applyClonedOrderByDocNo(docNo){
   btn?.addEventListener('click', run);
   input?.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter') run(); });
 
-  const host = document.getElementById('soResults');
-  host?.addEventListener('click', (e)=>{
+  document.getElementById('soResults')?.addEventListener('click', (e)=>{
     const btn = e.target.closest('[data-apply-so]');
     if(!btn) return;
     const docNo = btn.getAttribute('data-apply-so');
-    if(!docNo) return;
-    applyClonedOrderByDocNo(docNo);
+    if(docNo) applyClonedOrderByDocNo(docNo);
   });
 })();
 </script>
+
 
 <!-- ===================== ITEMS: SEARCH UI (BEGIN) ===================== -->
 <aside class="drawer" id="drawerItems" aria-hidden="true">
@@ -804,76 +854,75 @@ async function applyClonedOrderByDocNo(docNo){
 <script>
 // ---------- Items: helpers + renderer + apply ----------
 
-// Write selected item into current row (fills OrderTime SKU, too)
 function applyItemToRow(item, rowIndex = null){
   const body = document.getElementById('itemsBody');
   const row = rowIndex !== null ? body.children[rowIndex] : body.lastElementChild;
   if (!row) return;
 
   const cells = row.querySelectorAll('td');
-  // 0: Description, 1: Model/Part#, 2: Color, 3: OrderTime SKU, 10: Sell Price
-  cells[0]?.querySelector('input')?.value = (item.name || item.description || '').trim();
-  cells[1]?.querySelector('input')?.value = (item.mfgPart || '').trim();
-  cells[3]?.querySelector('input')?.value = (item.sku || '').trim();   // *** SKU populated ***
-  const sell = cells[10]?.querySelector('input');
+  cells[0]?.querySelector('input')?.value = (item.name || item.description || '').trim();  // Description
+  cells[1]?.querySelector('input')?.value = (item.mfgPart || '').trim();                   // Model/Part#
+  cells[3]?.querySelector('input')?.value = (item.sku || '').trim();                       // OrderTime SKU
+  const sell = cells[10]?.querySelector('input');                                          // Sell Price
   if (sell && typeof item.price === 'number') sell.value = item.price.toFixed(2);
-
-  row.querySelectorAll('input').forEach(i => i.dispatchEvent(new Event('input', { bubbles:true })));
+  row.querySelectorAll('input').forEach(i => i.dispatchEvent(new Event('input',{bubbles:true})));
 }
 
+async function searchItems(q){
+  return api(`/ordertime/items/search?q=${encodeURIComponent(q)}`, { method:'GET' });
+}
 function renderItemResults(list){
   const box = document.getElementById('itemResults');
-  if (!Array.isArray(list) || list.length === 0){
-    box.className = 'drawer-results muted';
-    box.textContent = 'No items found.';
+  if(!Array.isArray(list) || list.length===0){
+    box.className='drawer-results muted';
+    box.textContent='No items found.';
     return;
   }
-  const html = list.map(it => `
+  box.className='drawer-results';
+  box.innerHTML = list.map(it => `
     <div class="card" style="margin:8px 0;padding:10px">
       <div><strong>${(it.name || it.description || '').trim()}</strong></div>
       <div class="tiny">SKU: ${it.sku || '—'} • MfgPart: ${it.mfgPart || '—'} • UPC: ${it.upc || '—'}</div>
       <div class="row" style="gap:8px;margin-top:8px">
         <button class="ok" data-apply-item='${JSON.stringify(it).replace(/'/g,"&#39;")}'>Apply</button>
-        <button class="ghost" onclick="if(window.closeDrawer) closeDrawer('drawerItems')">Close</button>
       </div>
     </div>
   `).join('');
-  box.className = 'drawer-results';
-  box.innerHTML = html;
-
-  // Delegate Apply
-  box.addEventListener('click', (e)=>{
-    const btn = e.target.closest('[data-apply-item]');
-    if(!btn) return;
-    const data = btn.getAttribute('data-apply-item');
-    try{
-      const item = JSON.parse(data.replace(/&#39;/g,"'"));
-      if (!document.getElementById('itemsBody')?.children?.length && typeof addRow === 'function') addRow();
-      applyItemToRow(item);
-      if (window.closeDrawer) closeDrawer('drawerItems');
-    }catch(_){}
-  }, { once:true });
 }
 
 (function initItemSearchHooks(){
   const input = document.getElementById('itemQuery');
   const btn   = document.getElementById('itemSearchBtn');
+
   async function run(){
-    const q = (input.value || '').trim();
+    const q = (input.value||'').trim();
     if(!q){ renderItemResults([]); return; }
     try{
-      const rows = await api(`/ordertime/items/search?q=${encodeURIComponent(q)}`, { method:'GET' });
-      renderItemResults(rows || []);
-    }catch(err){
+      const rows = await searchItems(q);
+      renderItemResults(rows||[]);
+    }catch(e){
       const box = document.getElementById('itemResults');
-      box.className = 'drawer-results muted';
-      box.textContent = `Search failed: ${err.message || err}`;
+      box.className='drawer-results muted';
+      box.textContent=`Search failed: ${e.message||e}`;
     }
   }
+
   btn?.addEventListener('click', run);
-  input?.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter') run(); });
+  input?.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
+
+  // IMPORTANT: multi-apply across multiple searches (no { once:true })
+  document.getElementById('itemResults')?.addEventListener('click', (e)=>{
+    const b = e.target.closest('[data-apply-item]');
+    if(!b) return;
+    const raw = b.getAttribute('data-apply-item');
+    const item = JSON.parse(raw.replace(/&#39;/g,"'"));
+    if (!document.getElementById('itemsBody')?.children?.length && typeof addRow === 'function') addRow();
+    applyItemToRow(item);
+    if(window.closeDrawer) closeDrawer('drawerItems');
+  });
 })();
 </script>
+
 
 
 <!-- NEW Customer invite -->
