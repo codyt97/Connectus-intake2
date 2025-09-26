@@ -652,6 +652,81 @@
 </aside>
 <!-- ===================== ITEMS: SEARCH UI (END) ===================== -->
 
+<script>
+// ---------- Items: helpers + renderer + apply ----------
+
+// Write selected item into current row (fills OrderTime SKU, too)
+function applyItemToRow(item, rowIndex = null){
+  const body = document.getElementById('itemsBody');
+  const row = rowIndex !== null ? body.children[rowIndex] : body.lastElementChild;
+  if (!row) return;
+
+  const cells = row.querySelectorAll('td');
+  // 0: Description, 1: Model/Part#, 2: Color, 3: OrderTime SKU, 10: Sell Price
+  cells[0]?.querySelector('input')?.value = (item.name || item.description || '').trim();
+  cells[1]?.querySelector('input')?.value = (item.mfgPart || '').trim();
+  cells[3]?.querySelector('input')?.value = (item.sku || '').trim();   // *** SKU populated ***
+  const sell = cells[10]?.querySelector('input');
+  if (sell && typeof item.price === 'number') sell.value = item.price.toFixed(2);
+
+  row.querySelectorAll('input').forEach(i => i.dispatchEvent(new Event('input', { bubbles:true })));
+}
+
+function renderItemResults(list){
+  const box = document.getElementById('itemResults');
+  if (!Array.isArray(list) || list.length === 0){
+    box.className = 'drawer-results muted';
+    box.textContent = 'No items found.';
+    return;
+  }
+  const html = list.map(it => `
+    <div class="card" style="margin:8px 0;padding:10px">
+      <div><strong>${(it.name || it.description || '').trim()}</strong></div>
+      <div class="tiny">SKU: ${it.sku || '—'} • MfgPart: ${it.mfgPart || '—'} • UPC: ${it.upc || '—'}</div>
+      <div class="row" style="gap:8px;margin-top:8px">
+        <button class="ok" data-apply-item='${JSON.stringify(it).replace(/'/g,"&#39;")}'>Apply</button>
+        <button class="ghost" onclick="if(window.closeDrawer) closeDrawer('drawerItems')">Close</button>
+      </div>
+    </div>
+  `).join('');
+  box.className = 'drawer-results';
+  box.innerHTML = html;
+
+  // Delegate Apply
+  box.addEventListener('click', (e)=>{
+    const btn = e.target.closest('[data-apply-item]');
+    if(!btn) return;
+    const data = btn.getAttribute('data-apply-item');
+    try{
+      const item = JSON.parse(data.replace(/&#39;/g,"'"));
+      if (!document.getElementById('itemsBody')?.children?.length && typeof addRow === 'function') addRow();
+      applyItemToRow(item);
+      if (window.closeDrawer) closeDrawer('drawerItems');
+    }catch(_){}
+  }, { once:true });
+}
+
+(function initItemSearchHooks(){
+  const input = document.getElementById('itemQuery');
+  const btn   = document.getElementById('itemSearchBtn');
+  async function run(){
+    const q = (input.value || '').trim();
+    if(!q){ renderItemResults([]); return; }
+    try{
+      const rows = await api(`/ordertime/items/search?q=${encodeURIComponent(q)}`, { method:'GET' });
+      renderItemResults(rows || []);
+    }catch(err){
+      const box = document.getElementById('itemResults');
+      box.className = 'drawer-results muted';
+      box.textContent = `Search failed: ${err.message || err}`;
+    }
+  }
+  btn?.addEventListener('click', run);
+  input?.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter') run(); });
+})();
+</script>
+
+
 <!-- NEW Customer invite -->
 <!-- NEW Customer invite -->
 <aside class="drawer" id="drawerNew" aria-label="New Customer Drawer">
