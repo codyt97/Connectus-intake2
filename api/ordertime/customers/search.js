@@ -6,13 +6,18 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const rows = await listSearch({
-      type: 'Customer',
-      q,
-      columns: ['Name','CompanyName','Email','Phone','BillingCity','BillingState'],
-      sortProp: 'Name',
-      dir: 'Asc'
-    });
+    // Avoid server-side filter loop for Customers; rely on safe post-filter.
+// This eliminates noisy OT "Object reference ..." warnings.
+const rows = await listSearch({
+  type: 'Customer',
+  q,
+  columns: [],          // <- skip server filters, deep post-filter instead
+  sortProp: 'Id',
+  dir: 'Asc',
+  pageSize: 200,
+  maxPages: 5
+});
+
 
     res.status(200).json(rows.map(x => ({
       id: x.Id,
