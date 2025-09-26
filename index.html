@@ -854,19 +854,30 @@ async function applyClonedOrderByDocNo(docNo){
 <script>
 // ---------- Items: helpers + renderer + apply ----------
 
+// Write selected item into the current (last) row; prefer named inputs, fallback to cells
 function applyItemToRow(item, rowIndex = null){
   const body = document.getElementById('itemsBody');
-  const row = rowIndex !== null ? body.children[rowIndex] : body.lastElementChild;
+  const row  = rowIndex !== null ? body?.children?.[rowIndex] : body?.lastElementChild;
   if (!row) return;
 
+  // Prefer explicit field IDs if your row inputs have them
+  const byId = (id) => row.querySelector(`#${id}, input#${id}, [name="${id}"]`);
+  const set  = (el, v) => { if (!el) return; el.value = v ?? ''; el.dispatchEvent(new Event('input',{bubbles:true})); };
+
+  // Try named/ID inputs first
+  set(byId('item_description'), (item.description || item.name || '').trim());
+  set(byId('item_mfg_part'),    (item.mfgPart || '').trim());
+  set(byId('item_sku'),         (item.sku || '').trim());
+  set(byId('item_price'),       (typeof item.price === 'number' ? item.price.toFixed(2) : (item.price || '')));
+
+  // Fallback to table cell positions if named inputs weren’t found
   const cells = row.querySelectorAll('td');
-  cells[0]?.querySelector('input')?.value = (item.name || item.description || '').trim();  // Description
-  cells[1]?.querySelector('input')?.value = (item.mfgPart || '').trim();                   // Model/Part#
-  cells[3]?.querySelector('input')?.value = (item.sku || '').trim();                       // OrderTime SKU
-  const sell = cells[10]?.querySelector('input');                                          // Sell Price
-  if (sell && typeof item.price === 'number') sell.value = item.price.toFixed(2);
-  row.querySelectorAll('input').forEach(i => i.dispatchEvent(new Event('input',{bubbles:true})));
+  if (!byId('item_description') && cells[0]?.querySelector('input')) set(cells[0].querySelector('input'), (item.name || item.description || '').trim());
+  if (!byId('item_mfg_part')    && cells[1]?.querySelector('input')) set(cells[1].querySelector('input'), (item.mfgPart || '').trim());
+  if (!byId('item_sku')         && cells[3]?.querySelector('input')) set(cells[3].querySelector('input'), (item.sku || '').trim());
+  if (!byId('item_price')       && cells[10]?.querySelector('input')) set(cells[10].querySelector('input'), (typeof item.price === 'number' ? item.price.toFixed(2) : (item.price || '')));
 }
+
 
 async function searchItems(q){
   return api(`/ordertime/items/search?q=${encodeURIComponent(q)}`, { method:'GET' });
@@ -1594,18 +1605,19 @@ async function openOTSearch(){
       </div>
     `).join('');
 
-    // Wire up Apply buttons to fetch full record then paste to form
-    target.querySelectorAll('[data-cust-id]').forEach(btn => {
-      btn.addEventListener('click', async (e) => {
-        const id = e.currentTarget.getAttribute('data-cust-id');
-        try{
-          const full = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
-          applyCustomerFromApi(full);
-        }catch(err){
-          alert(`Load customer failed: ${err.message}`);
-        }
-      });
-    });
+   // Wire up Apply buttons: load by ID and map directly into the form
+target.querySelectorAll('[data-cust-id]').forEach(btn => {
+  btn.addEventListener('click', async (e) => {
+    const id = e.currentTarget.getAttribute('data-cust-id');
+    try{
+      await applyCustomerById(id);        // uses /customers/[id] rich shape → full field mapping
+      if (window.closeDrawer) closeDrawer('drawerWCP');
+    }catch(err){
+      alert(`Load customer failed: ${err.message}`);
+    }
+  });
+});
+
   } catch (err) {
     target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
   }
@@ -2790,19 +2802,24 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
     if (el.disabled !== undefined) el.disabled = !!on;
     (el.querySelectorAll ? el.querySelectorAll('button,input') : []).forEach(x => x.disabled = !!on);
   }
-
-
-// one handler for all "Add" clicks in the Item results list
+// Delegate clicks for item Apply buttons rendered as data-apply-item
 (function () {
   const el = document.getElementById('itemResults');
   if (!el) return;
   el.addEventListener('click', (e) => {
-    const btn = e.target.closest('button[data-item]');
+    const btn = e.target.closest('[data-apply-item]');
     if (!btn) return;
-    const r = JSON.parse(btn.dataset.item);
-    addItemFromSearch(r);
+    try {
+      const raw  = btn.getAttribute('data-apply-item');
+      const item = JSON.parse(raw.replace(/&#39;/g,"'"));
+      // Ensure there’s at least one row to write into
+      if (!document.getElementById('itemsBody')?.children?.length && typeof addRow === 'function') addRow();
+      applyItemToRow(item);
+      if (window.closeDrawer) closeDrawer('drawerItems');
+    } catch (_) {}
   });
 }());
+
 
 // search row -> items table
 function addItemFromSearch(r){
