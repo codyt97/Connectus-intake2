@@ -1125,13 +1125,64 @@ const SIM_CARD_OPTIONS = [
   'AT-FIRSTSIMA00',
   'TM-SIM3IN14G',
   'HE-HELIXTRIAA00',
-  'Helix eSIM(TriA) ',
+  'Helix eSIM(TriA)',
   'HE TRI-B Static IP Helix',
   'MW-SIMVZTMATT-E',
   'US-SIM3IN15G',
   'eSim Embendded in the phone',
   'NO SIM CARD',
 ];
+ // Exact mapping from visible SIM dropdown option to OrderTime SKU + Description
+const SIM_CARD_SKU_MAP = {
+  'VZ-SIM3IN1': {
+    sku: 'VZ-SIM3IN1',
+    desc: '3IN1 Verizon Locked 5G SIM Card (Black)'
+  },
+  'AT-SIM3IN1': {
+    sku: 'AT-SIM3IN1',
+    desc: '3 in 1 AT&T SIM Card'
+  },
+  'AT-FIRSTSIMA00': {
+    sku: 'AT-FIRSTSIMA00',
+    desc: '3 in 1 FirstNet AT&T Locked 5G SIM Card (Black)'
+  },
+  'TM-SIM3IN14G': {
+    sku: 'TM-SIM3IN14G',
+    desc: '3 in 1 T-Mobile Locked 4G SIM Card'
+  },
+  'HE-HELIXTRIAA00': {
+    sku: 'HE-HELIXTRIAA00',
+    desc: 'Helix Wireless Tri A SIM Card'
+  },
+  'Helix eSIM(TriA)': {
+    sku: 'HE-eSIM-TRIA',
+    desc: 'Helix Wireless eSIM (TriA)'
+  },
+  'HE TRI-B Static IP Helix': {
+    sku: 'HE-0007SFFB00',
+    desc: 'Helix Wireless SIM Card TRI-B for Static IP (EID required)'
+  },
+  'MW-SIMVZTMATT-E': {
+    sku: 'MW-SIMVZTMATT-E',
+    desc: 'ConnectUs Dynamic IP Multi-Carrier Access 3in1 SIM Card – VZ/ATT/TMO'
+  },
+  'US-SIM3IN15G': {
+    sku: 'US-SIM3IN15G',
+    desc: '3 in 1 US Cellular Locked 5G SIM Card'
+  },
+  'eSim Embendded in the phone': {
+    sku: 'ESIM-EMBED',
+    desc: 'eSIM embedded in the phone'
+  },
+  'NO SIM CARD': {
+    sku: 'NO-SIM',
+    desc: 'No SIM card required'
+  },
+};
+
+// Set of SKUs we consider “SIM lines” — used for delete/replace enforcement.
+const SIM_SKUS = new Set(Object.values(SIM_CARD_SKU_MAP).map(v => v.sku));
+
 
 // If your Word template has the full lists, add them here later.
 const SIM_HANDLING_OPTIONS = [
@@ -1507,6 +1558,12 @@ window.addEventListener('DOMContentLoaded', () => {
   if (pairingSel) {
     pairingSel.addEventListener('change', addOrUpdatePairingLineFromSelect);
   }
+  // SIM change → add/replace SIM line item
+const simSel = document.getElementById('simCard');
+if (simSel) {
+  simSel.addEventListener('change', addOrUpdateSimLineFromSelect);
+}
+
 });
 
   
@@ -3136,7 +3193,8 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
- 
+
+
 </script>
 </body>
 </html>
