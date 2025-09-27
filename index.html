@@ -1241,6 +1241,74 @@ const PAIRING_SKUS = new Set(Object.values(PAIRING_SKU_MAP).map(x => String(x.sk
 if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
 if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
 
+  // Column index for "New / CPO" (0-based from your header)
+if (typeof window.COL_COND === 'undefined') window.COL_COND = 11;
+
+// Suffix rules:
+// - ends with 00  -> "New"
+// - ends with 10,20,29,31 -> "CPO"
+const CPO_SUFFIXES = new Set(['10','20','29','31']);
+
+function inferCondFromSku(skuRaw){
+  const sku = String(skuRaw || '').trim();
+  if (!sku) return null;
+  const last2 = sku.slice(-2); // last two characters
+  if (last2 === '00') return 'New';
+  if (CPO_SUFFIXES.has(last2)) return 'CPO';
+  return null; // no change
+}
+
+function applyCondForRow(tr){
+  const tds = tr?.querySelectorAll('td');
+  if (!tds || !tds.length) return;
+
+  const skuEl  = tds[window.COL_SKU ]?.querySelector('input,textarea,select');
+  const condEl = tds[window.COL_COND]?.querySelector('input,textarea,select');
+  if (!skuEl || !condEl) return;
+
+  const inferred = inferCondFromSku(skuEl.value);
+  if (inferred) {
+    condEl.value = inferred;
+    condEl.dispatchEvent(new Event('input', { bubbles: true }));
+  }
+
+  // Optional: keep the New Device Details tab in sync if you have UI toggling elsewhere
+  if (typeof anySkuEndsWith00 === 'function') {
+    const show = anySkuEndsWith00();
+    const tab  = document.getElementById('tabNewDevice');
+    const pane = document.getElementById('panelNewDevice');
+    if (tab)  tab.style.display  = show ? '' : 'none';
+    if (pane) pane.style.display = show ? '' : 'none';
+  }
+}
+
+// 1) React when the SKU cell is edited
+const itemsBody = document.getElementById('itemsBody');
+if (itemsBody){
+  itemsBody.addEventListener('input', (e)=>{
+    const td = e.target.closest('td');
+    if (!td) return;
+    const tr = e.target.closest('tr');
+    const idx = [...tr.children].indexOf(td);
+    if (idx === window.COL_SKU) applyCondForRow(tr);
+  });
+
+  // 2) Also react when rows are added (from addRow/clone/etc.)
+  const mo = new MutationObserver((muts)=>{
+    for (const m of muts){
+      m.addedNodes.forEach(n=>{
+        if (n.nodeType === 1 && n.tagName === 'TR') applyCondForRow(n);
+      });
+    }
+  });
+  mo.observe(itemsBody, { childList:true });
+}
+
+// 3) One-time sweep in case SKUs already exist (e.g., after paste/clone/load)
+(function initialSweep(){
+  document.querySelectorAll('#itemsBody tr').forEach(applyCondForRow);
+})();
+
 // === Helper: add/update a line from Pairing selection ===
 function addOrUpdatePairingLineFromSelect() {
   const sel = document.getElementById('pairingOption');
