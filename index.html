@@ -596,127 +596,23 @@
 <aside class="drawer" id="drawerWCP" aria-label="WCP Drawer">
   <header><strong>Current Customer — OrderTime Search</strong><button class="ghost" onclick="closeDrawer('drawerWCP')">Close</button></header>
   <div class="content">
-    <label class="tiny">Search in OrderTime via API</label>
-    <div class="row">
-      <input id="wcpQuery" placeholder="Type company or domain (e.g., Acme or acme.com)" />
-      <button id="wcpSearchBtn" class="ghost">Search</button>
-    </div>
-    <div id="wcpResults" style="margin-top:8px"></div>
-
+    <label class="tiny">Search in OrderTime (opens in a new tab)</label>
+    <div class="row"><input id="wcpQuery" placeholder="Type company name…" /><button onclick="openOTSearch()" class="ghost">Search</button></div>
+    <div id="wcpResults" class="tiny" style="margin-top:8px"></div>
     <div class="divider"></div>
-    <div class="tiny">Alternatively, paste JSON/key:value export from OT and click Apply.</div>
+    <div class="tiny">After selecting the customer in OrderTime, paste the exported details below (JSON or key:value). Supports billing, shipping, payment, shipping options.</div>
     <textarea id="wcpPaste" rows="10" style="width:100%;margin-top:8px" placeholder='{
   "company":"Acme Corp",
   "billing":{"contact":"John","phone":"555-1111","email":"billing@acme.com","street":"1 Main","suite":"Ste 100","city":"Phila","state":"PA","zip":"19104"},
-  "shipping":{"company":"Acme WH","contact":"Jane","phone":"555-2222","email":"wh@acme.com","street":"500 Dock","suite":"","city":"Phila","state":"PA","zip":"19112"}
+  "shipping":{"company":"Acme WH","contact":"Jane","phone":"555-2222","email":"wh@acme.com","street":"500 Dock","suite":"","city":"Phila","state":"PA","zip":"19112"},
+  "payment":{"method":"Net Terms","terms":"Net 30","taxExempt":true,"agreement":false},
+  "shippingOptions":{"pay":"Prepaid","speed":"Ground","shortShip":"No"},
+  "carrierRep":{"name":"Verizon Rep","email":"vrep@vz.com"},
+  "rep":{"primary":"Chris Samaras","secondary":"—"}
 }'></textarea>
-    <div class="row" style="gap:10px;margin-top:8px">
-      <button class="ok" onclick="applyPastedCustomer('wcpPaste')">Apply to Form</button>
-      <button class="ghost" onclick="fillWCPExample()">Load Example</button>
-    </div>
+    <div class="row" style="gap:10px;margin-top:8px"><button class="ok" onclick="applyPastedCustomer('wcpPaste')">Apply to Form</button><button class="ghost" onclick="fillWCPExample()">Load Example</button></div>
   </div>
 </aside>
-
-<script>
-// --- guards (in case not defined elsewhere) ---
-function setVal(id,v){ const el=document.getElementById(id); if(el){ el.value=v; el.dispatchEvent(new Event('input',{bubbles:true})); } }
-function selectByTextExact(id,text){
-  const s=document.getElementById(id); if(!s) return;
-  const t=String(text||'').trim().toLowerCase();
-  const opt=[...s.options].find(o=>o.text.trim().toLowerCase()===t);
-  if(opt){ s.value=opt.value; s.dispatchEvent(new Event('change',{bubbles:true})); }
-}
-
-// ---------- Customer: apply by ID using rich /customers/[id] ----------
-async function applyCustomerById(id){
-  const data = await api(`/ordertime/customers/${encodeURIComponent(id)}`, { method:'GET' }); // rich shape
-  // Billing
-  setVal('billCompany', data.company || '');
-  setVal('billContact', data.billing?.contact || '');
-  setVal('billPhone',   data.billing?.phone || '');
-  setVal('billEmail',   data.billing?.email || '');
-  setVal('billStreet',  data.billing?.street || '');
-  setVal('billSuite',   data.billing?.suite || '');
-  setVal('billCity',    data.billing?.city || '');
-  setVal('billState',   data.billing?.state || '');
-  setVal('billZip',     data.billing?.zip || '');
-  // Shipping
-  setVal('shipCompany', data.shipping?.company || data.company || '');
-  setVal('shipContact', data.shipping?.contact || '');
-  setVal('shipPhone',   data.shipping?.phone || '');
-  setVal('shipEmail',   data.shipping?.email || '');
-  setVal('shipStreet',  data.shipping?.street || '');
-  setVal('shipSuite',   data.shipping?.suite || '');
-  setVal('shipCity',    data.shipping?.city || '');
-  setVal('shipState',   data.shipping?.state || '');
-  setVal('shipZip',     data.shipping?.zip || '');
-  // Options
-  const resShip = document.getElementById('resShip'); if (resShip) resShip.checked = !!data.shipping?.residence;
-  selectByTextExact('payMethod', data.payment?.method || '');
-  setVal('payTerms', data.payment?.terms || '');
-  const taxEx = document.getElementById('taxExempt'); if (taxEx) taxEx.checked = !!data.payment?.taxExempt;
-  const hasAgr = document.getElementById('hasAgreement'); if (hasAgr) hasAgr.checked = !!data.payment?.agreement;
-  selectByTextExact('shipPay',   data.shippingOptions?.pay || '');
-  selectByTextExact('shipSpeed', data.shippingOptions?.speed || '');
-  selectByTextExact('shortShip', data.shippingOptions?.shortShip || '');
-  setVal('carrierRepName',  data.carrierRep?.name || '');
-  setVal('carrierRepEmail', data.carrierRep?.email || '');
-  selectByTextExact('rep1', data.rep?.primary || '');
-  selectByTextExact('rep2', data.rep?.secondary || '');
-}
-
-// --- search customers via API, render, and apply by ID ---
-async function searchCustomers(q){
-  return api(`/ordertime/customers/search?q=${encodeURIComponent(q)}`, { method:'GET' });
-}
-function renderCustomerResults(list){
-  const box = document.getElementById('wcpResults');
-  if(!Array.isArray(list) || list.length===0){
-    box.className = 'muted';
-    box.textContent = 'No customers found.';
-    return;
-  }
-  box.className = '';
-  box.innerHTML = list.map(c=>`
-    <div class="card" style="margin:8px 0;padding:10px">
-      <div><strong>${c.company || '(no name)'}</strong>${(c.city||c.state)?` — <span class="tiny">${c.city||''}${c.state?(', '+c.state):''}</span>`:''}</div>
-      <div class="tiny">${c.email || ''} ${c.phone?('• '+c.phone):''}</div>
-      <div class="row" style="gap:8px;margin-top:8px">
-        <button class="ok" data-apply-customer="${c.id}">Apply</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-// wire search + apply
-(function initCustomerSearch(){
-  const input = document.getElementById('wcpQuery');
-  const btn   = document.getElementById('wcpSearchBtn');
-  async function run(){
-    const q = (input.value||'').trim();
-    if(!q){ renderCustomerResults([]); return; }
-    try{
-      const rows = await searchCustomers(q);
-      renderCustomerResults(rows||[]);
-    }catch(e){
-      const box = document.getElementById('wcpResults');
-      box.className = 'muted';
-      box.textContent = `Search failed: ${e.message||e}`;
-    }
-  }
-  btn?.addEventListener('click', run);
-  input?.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
-
-  document.getElementById('wcpResults')?.addEventListener('click', (e)=>{
-    const btn = e.target.closest('[data-apply-customer]');
-    if(!btn) return;
-    const id = btn.getAttribute('data-apply-customer');
-    if(id) applyCustomerById(id).then(()=>{ if(window.closeDrawer) closeDrawer('drawerWCP'); });
-  });
-})();
-</script>
-
-
 
 <!-- Clone Existing Order -->
 <!-- ===================== SALES ORDERS: SEARCH UI (BEGIN) ===================== -->
@@ -735,103 +631,6 @@ function renderCustomerResults(list){
   </div>
 </aside>
 <!-- ===================== SALES ORDERS: SEARCH UI (END) ===================== -->
-<!-- Hidden paste buffer used by applyClonedOrder() -->
-<textarea id="clonePaste" style="display:none"></textarea>
-
-<script>
-// ---------- Sales Orders: search + apply (Clone) ----------
-async function searchSalesOrders(q){
-  return api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`, { method:'GET' });
-}
-function renderSoResults(list){
-  const box = document.getElementById('soResults');
-  if (!Array.isArray(list) || list.length === 0){
-    box.className = 'drawer-results muted';
-    box.textContent = 'No sales orders found.';
-    return;
-  }
-  const html = list.map(r => `
-    <div class="card" style="margin:8px 0;padding:10px">
-      <div><strong>${r.docNo || '—'}</strong> — ${r.customer || 'Unknown'}</div>
-      <div class="tiny">Status: ${r.status || '—'} • Date: ${r.date ? new Date(r.date).toLocaleDateString() : '—'}</div>
-      <div class="row" style="gap:8px;margin-top:8px">
-        <button class="ok" data-apply-so="${r.docNo}">Apply</button>
-      </div>
-    </div>
-  `).join('');
-  box.className = 'drawer-results';
-  box.innerHTML = html;
-}
-function _pick(...vals){ for(const v of vals){ if(v!==undefined && v!==null && String(v).trim()!=='') return v; } return ''; }
-
-async function applyClonedOrderByDocNo(docNo){
-  const so = await api(`/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`, { method:'GET' });
-
-  const bt = so.BillTo || so.BillingAddress || so.BillAddress || {};
-  const st = so.ShipTo  || so.ShippingAddress || so.ShipAddress || {};
-
-  // BillTo
-  setVal('billCompany', _pick(bt.CompanyName, bt.Name, bt.company));
-  setVal('billContact', _pick(bt.Contact, bt.Attention, bt.contact));
-  setVal('billPhone',   _pick(bt.Phone, bt.phone));
-  setVal('billEmail',   _pick(bt.Email, bt.email));
-  setVal('billStreet',  _pick(bt.Address1, bt.Street, bt.Line1, bt.street));
-  setVal('billSuite',   _pick(bt.Address2, bt.Suite,  bt.Line2, bt.suite));
-  setVal('billCity',    _pick(bt.City, bt.city));
-  setVal('billState',   _pick(bt.State, bt.Region, bt.state));
-  setVal('billZip',     _pick(bt.PostalCode, bt.Zip, bt.zip));
-
-  // ShipTo
-  setVal('shipCompany', _pick(st.CompanyName, st.Name, st.company, so.CustomerName));
-  setVal('shipContact', _pick(st.Contact, st.Attention, st.contact));
-  setVal('shipPhone',   _pick(st.Phone, st.phone));
-  setVal('shipEmail',   _pick(st.Email, st.email));
-  setVal('shipStreet',  _pick(st.Address1, st.Street, st.Line1, st.street));
-  setVal('shipSuite',   _pick(st.Address2, st.Suite,  st.Line2, st.suite));
-  setVal('shipCity',    _pick(st.City, st.city));
-  setVal('shipState',   _pick(st.State, st.Region, st.state));
-  setVal('shipZip',     _pick(st.PostalCode, st.Zip, st.zip));
-
-  // Optional: seed first SO line into Items table
-  if (Array.isArray(so.Lines) && so.Lines.length){
-    const first = so.Lines[0];
-    if (typeof addRow === 'function') addRow();
-    applyItemToRow({
-      name: _pick(first.Description, first.ItemRef?.Name),
-      sku:  _pick(first.ItemRef?.Number, first.ItemNumber, first.SKU)
-    });
-  }
-
-  if (window.closeDrawer) closeDrawer('drawerClone');
-}
-
-(function initSoSearchHooks(){
-  const input = document.getElementById('soQuery');
-  const btn   = document.getElementById('soSearchBtn');
-  async function run(){
-    const q = (input.value || '').trim();
-    if(!q){ renderSoResults([]); return; }
-    try{
-      const rows = await searchSalesOrders(q);
-      renderSoResults(rows || []);
-    }catch(err){
-      const box = document.getElementById('soResults');
-      box.className = 'drawer-results muted';
-      box.textContent = `Search failed: ${err.message || err}`;
-    }
-  }
-  btn?.addEventListener('click', run);
-  input?.addEventListener('keydown', (ev)=>{ if(ev.key==='Enter') run(); });
-
-  document.getElementById('soResults')?.addEventListener('click', (e)=>{
-    const btn = e.target.closest('[data-apply-so]');
-    if(!btn) return;
-    const docNo = btn.getAttribute('data-apply-so');
-    if(docNo) applyClonedOrderByDocNo(docNo);
-  });
-})();
-</script>
-
 
 <!-- ===================== ITEMS: SEARCH UI (BEGIN) ===================== -->
 <aside class="drawer" id="drawerItems" aria-hidden="true">
@@ -850,91 +649,6 @@ async function applyClonedOrderByDocNo(docNo){
   </div>
 </aside>
 <!-- ===================== ITEMS: SEARCH UI (END) ===================== -->
-
-<script>
-// ---------- Items: helpers + renderer + apply ----------
-
-// Write selected item into the current (last) row; prefer named inputs, fallback to cells
-function applyItemToRow(item, rowIndex = null){
-  const body = document.getElementById('itemsBody');
-  const row  = rowIndex !== null ? body?.children?.[rowIndex] : body?.lastElementChild;
-  if (!row) return;
-
-  // Prefer explicit field IDs if your row inputs have them
-  const byId = (id) => row.querySelector(`#${id}, input#${id}, [name="${id}"]`);
-  const set  = (el, v) => { if (!el) return; el.value = v ?? ''; el.dispatchEvent(new Event('input',{bubbles:true})); };
-
-  // Try named/ID inputs first
-  set(byId('item_description'), (item.description || item.name || '').trim());
-  set(byId('item_mfg_part'),    (item.mfgPart || '').trim());
-  set(byId('item_sku'),         (item.sku || '').trim());
-  set(byId('item_price'),       (typeof item.price === 'number' ? item.price.toFixed(2) : (item.price || '')));
-
-  // Fallback to table cell positions if named inputs weren’t found
-  const cells = row.querySelectorAll('td');
-  if (!byId('item_description') && cells[0]?.querySelector('input')) set(cells[0].querySelector('input'), (item.name || item.description || '').trim());
-  if (!byId('item_mfg_part')    && cells[1]?.querySelector('input')) set(cells[1].querySelector('input'), (item.mfgPart || '').trim());
-  if (!byId('item_sku')         && cells[3]?.querySelector('input')) set(cells[3].querySelector('input'), (item.sku || '').trim());
-  if (!byId('item_price')       && cells[10]?.querySelector('input')) set(cells[10].querySelector('input'), (typeof item.price === 'number' ? item.price.toFixed(2) : (item.price || '')));
-}
-
-
-async function searchItems(q){
-  return api(`/ordertime/items/search?q=${encodeURIComponent(q)}`, { method:'GET' });
-}
-function renderItemResults(list){
-  const box = document.getElementById('itemResults');
-  if(!Array.isArray(list) || list.length===0){
-    box.className='drawer-results muted';
-    box.textContent='No items found.';
-    return;
-  }
-  box.className='drawer-results';
-  box.innerHTML = list.map(it => `
-    <div class="card" style="margin:8px 0;padding:10px">
-      <div><strong>${(it.name || it.description || '').trim()}</strong></div>
-      <div class="tiny">SKU: ${it.sku || '—'} • MfgPart: ${it.mfgPart || '—'} • UPC: ${it.upc || '—'}</div>
-      <div class="row" style="gap:8px;margin-top:8px">
-        <button class="ok" data-apply-item='${JSON.stringify(it).replace(/'/g,"&#39;")}'>Apply</button>
-      </div>
-    </div>
-  `).join('');
-}
-
-(function initItemSearchHooks(){
-  const input = document.getElementById('itemQuery');
-  const btn   = document.getElementById('itemSearchBtn');
-
-  async function run(){
-    const q = (input.value||'').trim();
-    if(!q){ renderItemResults([]); return; }
-    try{
-      const rows = await searchItems(q);
-      renderItemResults(rows||[]);
-    }catch(e){
-      const box = document.getElementById('itemResults');
-      box.className='drawer-results muted';
-      box.textContent=`Search failed: ${e.message||e}`;
-    }
-  }
-
-  btn?.addEventListener('click', run);
-  input?.addEventListener('keydown', e=>{ if(e.key==='Enter') run(); });
-
-  // IMPORTANT: multi-apply across multiple searches (no { once:true })
-  document.getElementById('itemResults')?.addEventListener('click', (e)=>{
-    const b = e.target.closest('[data-apply-item]');
-    if(!b) return;
-    const raw = b.getAttribute('data-apply-item');
-    const item = JSON.parse(raw.replace(/&#39;/g,"'"));
-    if (!document.getElementById('itemsBody')?.children?.length && typeof addRow === 'function') addRow();
-    applyItemToRow(item);
-    if(window.closeDrawer) closeDrawer('drawerItems');
-  });
-})();
-</script>
-
-
 
 <!-- NEW Customer invite -->
 <!-- NEW Customer invite -->
@@ -1605,19 +1319,18 @@ async function openOTSearch(){
       </div>
     `).join('');
 
-   // Wire up Apply buttons: load by ID and map directly into the form
-target.querySelectorAll('[data-cust-id]').forEach(btn => {
-  btn.addEventListener('click', async (e) => {
-    const id = e.currentTarget.getAttribute('data-cust-id');
-    try{
-      await applyCustomerById(id);        // uses /customers/[id] rich shape → full field mapping
-      if (window.closeDrawer) closeDrawer('drawerWCP');
-    }catch(err){
-      alert(`Load customer failed: ${err.message}`);
-    }
-  });
-});
-
+    // Wire up Apply buttons to fetch full record then paste to form
+    target.querySelectorAll('[data-cust-id]').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        const id = e.currentTarget.getAttribute('data-cust-id');
+        try{
+          const full = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
+          applyCustomerFromApi(full);
+        }catch(err){
+          alert(`Load customer failed: ${err.message}`);
+        }
+      });
+    });
   } catch (err) {
     target.innerHTML = `<span style="color:#b45309">Search failed: ${err.message}</span>`;
   }
@@ -2802,24 +2515,19 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
     if (el.disabled !== undefined) el.disabled = !!on;
     (el.querySelectorAll ? el.querySelectorAll('button,input') : []).forEach(x => x.disabled = !!on);
   }
-// Delegate clicks for item Apply buttons rendered as data-apply-item
+
+
+// one handler for all "Add" clicks in the Item results list
 (function () {
   const el = document.getElementById('itemResults');
   if (!el) return;
   el.addEventListener('click', (e) => {
-    const btn = e.target.closest('[data-apply-item]');
+    const btn = e.target.closest('button[data-item]');
     if (!btn) return;
-    try {
-      const raw  = btn.getAttribute('data-apply-item');
-      const item = JSON.parse(raw.replace(/&#39;/g,"'"));
-      // Ensure there’s at least one row to write into
-      if (!document.getElementById('itemsBody')?.children?.length && typeof addRow === 'function') addRow();
-      applyItemToRow(item);
-      if (window.closeDrawer) closeDrawer('drawerItems');
-    } catch (_) {}
+    const r = JSON.parse(btn.dataset.item);
+    addItemFromSearch(r);
   });
 }());
-
 
 // search row -> items table
 function addItemFromSearch(r){
@@ -2886,7 +2594,7 @@ function renderItemRow(r){
         <div class="row-meta">${meta}</div>
       </div>
       <div class="row-cta">
-        <button onclick='addItemFromSearch(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
+        <button onclick='applyItem(${JSON.stringify(r).replace(/'/g,"&#39;")})'>Apply</button>
       </div>
     </div>
   `;
