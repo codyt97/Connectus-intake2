@@ -1197,10 +1197,11 @@ const PAIRING_OPTIONS = [
   'SIM PAIR & CARRIER ACTIVATION',
   'SIM PAIR, BENCH TEST / ACTIVE TO ENSURE OPTIMAL PERFORMANCE',
   'VERIZON eSIM PAIRING',
-  'SIM PAIR w/ STATIC IP & DEVICE ACTIVATIO< BENCH TEST TO ENSURE OPTIOMAL PERFORMANCE',
-  'CUSTOM CONFIG DEVICE ACTIVATIO, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE/sow REQUIRED',
-  'iNTERNAL cuc sIM pAIR & ACTIVATION',
+  'SIM PAIR w/ STATIC IP & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE',
+  'CUSTOM CONFIG DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE / SOW REQUIRED',
+  'INTERNAL CUC SIM PAIR & ACTIVATION',
 ];
+
 
   // === Pairing → SKU/Description mapping ===
 const PAIRING_SKU_MAP = {
@@ -1563,6 +1564,77 @@ const simSel = document.getElementById('simCard');
 if (simSel) {
   simSel.addEventListener('change', addOrUpdateSimLineFromSelect);
 }
+
+  function addOrUpdateSimLineFromSelect() {
+  const sel = document.getElementById('simCard');
+  if (!sel) return;
+
+  const chosen = (sel.value || '').trim();
+  if (!chosen) return;
+
+  const map = SIM_CARD_SKU_MAP[chosen];
+  if (!map) return; // dropdown text must exactly match map key
+
+  const body = document.getElementById('itemsBody');
+  if (!body) return;
+
+  // 1) remove any existing SIM line (enforce "only one")
+  const rows = [...body.querySelectorAll('tr')];
+  for (const tr of rows) {
+    const skuEl = tr.cells?.[window.COL_SKU]?.querySelector('input,textarea,select');
+    const sku = (skuEl?.value || '').trim();
+    if (SIM_SKUS.has(sku)) tr.remove();
+  }
+
+  // 2) add a fresh row (use your addRow() if available)
+  let tr;
+  if (typeof addRow === 'function') {
+    addRow();
+    tr = body.lastElementChild;
+  } else {
+    tr = document.createElement('tr');
+    const cellsNeeded = Math.max(window.COL_SKU + 1, 20);
+    for (let i = 0; i < cellsNeeded; i++) {
+      const td = document.createElement('td');
+      const inp = document.createElement('input');
+      inp.type = 'text';
+      inp.className = 'autosize';
+      td.appendChild(inp);
+      tr.appendChild(td);
+    }
+    // add Remove button in last cell
+    const td = document.createElement('td');
+    td.innerHTML = `<button class="bad" onclick="this.closest('tr').remove()">Remove</button>`;
+    tr.appendChild(td);
+    body.appendChild(tr);
+  }
+
+  // 3) field-map desc + sku + qty=1
+  const tds = tr.querySelectorAll('td');
+  const descEl = tds[window.COL_DESC]?.querySelector('input,textarea');
+  const skuEl  = tds[window.COL_SKU ]?.querySelector('input,textarea');
+  const qtyEl  = tds[4]?.querySelector('input'); // adjust if your Qty index differs
+
+  if (descEl) descEl.value = map.desc;
+  if (skuEl)  skuEl.value  = map.sku;
+  if (qtyEl && !qtyEl.value) qtyEl.value = '1';
+
+  [descEl, skuEl, qtyEl].forEach(el => el && el.dispatchEvent(new Event('input', { bubbles:true })));
+}
+
+// Wire up on page load
+document.addEventListener('DOMContentLoaded', () => {
+  // ensure dropdowns are populated
+  if (typeof populateSimDropdowns === 'function') populateSimDropdowns();
+
+  // SIM change → add/replace
+  const simSel = document.getElementById('simCard');
+  if (simSel) simSel.addEventListener('change', addOrUpdateSimLineFromSelect);
+
+  // Pairing change → existing pairing handler
+  const pairingSel = document.getElementById('pairingOption');
+  if (pairingSel) pairingSel.addEventListener('change', addOrUpdatePairingLineFromSelect);
+});
 
 });
 
