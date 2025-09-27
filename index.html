@@ -963,8 +963,6 @@ function csvEscape(v) {
 
 /* ==== New-Device CSV (only when any OrderTime SKU ends with "00") ==== */
 
-// Reuse the same indexes you used earlier
-const COL_SKU = 3;  // 4th column in Items table
 
 function anySkuEndsWith00(){
   const body = document.getElementById('itemsBody');
