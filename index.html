@@ -709,13 +709,10 @@
 
     <div class="row" style="gap:10px;margin-top:12px">
   <button class="ok" onclick="copyCSVToClipboard()">Copy CSV</button>
-  <button class="ghost" onclick="downloadCSVFile()">Download CSV</button>
-  <!-- Add these two -->
-<button class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
-<button class="ghost" onclick="openGmailNoCSV()">Open in Gmail (no CSV)</button>
-
+  <button class="ghost" onclick="downloadHeaderCSVFile()">Download Sales Order Header (CSV)</button>
+  <button class="ghost" onclick="downloadLineCSVFile()">Download Sales Order Line (CSV)</button>
+  <button class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
 </div>
-
 
     <div class="tiny" style="margin-top:8px">
       Or use a direct mailto link:
@@ -751,18 +748,141 @@ function openGmailWithCSV() {
 
   openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
-
-function openGmailNoCSV() {
-  const toRaw     = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
-  const subjRaw   = document.getElementById('emailSubject')?.value || 'New Intake — Summary';
-  const summary   = (document.getElementById('summary')?.textContent || '').trim() || '(no summary available)';
-  const company   = (document.getElementById('billCompany')?.value || '').trim();
-  const header    = `Hello Order Management,\n\n${company ? `Company: ${company}\n` : ''}Below is the intake summary:\n\n`;
-  const footer    = `\n\n— ConnectUS Intake`;
-  const body      = `${header}${summary}${footer}`;
-
-  openGmailCompose({ to: toRaw, subject: subjRaw, body });
+// ---- Helper: map current wizard doc type to ERP TranType code
+function getDocTypeCode() {
+  // radios in Step 3 (Document Type): QUOTE / SALES ORDER / CLONE (clone still resolves to a base type)
+  const picked = (document.querySelector('input[name="wizDocType"]:checked')?.value || '').toUpperCase();
+  // ERP mapping per your email: Quote=13, Sales Order=7
+  if (picked === 'QUOTE') return 13;
+  if (picked === 'SALES ORDER') return 7;
+  // For CLONE, infer base from currently selected chip—fallback to Sales Order
+  return 7;
 }
+
+// ---- Helper: get current DocNo (optional UX field; safe if absent)
+function getDocNo() {
+  // If you add an input for DocNo, support any of these IDs
+  const ids = ['docNo', 'soDocNo', 'quoteDocNo'];
+  for (const id of ids) {
+    const v = document.getElementById(id)?.value?.trim();
+    if (v) return v;
+  }
+  // If cloning, maybe stored on a hidden field from the JSON paste (optional: add if you wish)
+  const cloneVal = window.__cloneDocNo;
+  if (cloneVal) return String(cloneVal).trim();
+  return ''; // blank is acceptable for header import if your ERP assigns numbers server-side
+}
+
+// ---- Helper: preferred Customer (Billing Company)
+function getCustomerName() {
+  return (document.getElementById('billCompany')?.value || '').trim();
+}
+
+// ---- Helper: Customer PO (optional field; safe if absent)
+function getCustomerPO() {
+  const ids = ['custPO', 'customerPO', 'poNumber', 'po'];
+  for (const id of ids) {
+    const v = document.getElementById(id)?.value?.trim();
+    if (v) return v;
+  }
+  return '';
+}
+
+// ---- Build Header CSV: DocNo,Customer,CustomerPO,TranType
+function buildHeaderCSV() {
+  const headers = ['DocNo','Customer','CustomerPO','TranType'];
+  const row = [
+    getDocNo(),
+    getCustomerName(),
+    getCustomerPO(),
+    getDocTypeCode()
+  ];
+  return headers.join(',') + '\n' + row.map(csvEscape).join(',');
+}
+
+// ---- Build Lines CSV: DocNo,Item,TranType,(optional)LineItemID
+function buildLineCSV() {
+  const docNo = getDocNo();
+  const tranType = getDocTypeCode();
+  const tbl = document.getElementById('itemsTbl');
+  const body = document.getElementById('itemsBody');
+  const lines = [];
+
+  if (body) {
+    // Iterate rows; pull OrderTime SKU from the 4th column input (your table column order)
+    // <th> columns: [0:Description,1:Model,2:Color,3:OrderTime SKU,...]
+    [...body.querySelectorAll('tr')].forEach(tr => {
+      const tds = [...tr.querySelectorAll('td')];
+      if (!tds.length) return;
+
+      // SKU / Item
+      let item = '';
+      const skuCell = tds[3]; // 4th column
+      const skuInput = skuCell?.querySelector('input,textarea,select');
+      if (skuInput) item = (skuInput.value || '').trim();
+
+      // Optional: look for a stored Line Item ID (hidden input or data attr if you add later)
+      let lineId = '';
+      const hiddenLineId = tr.querySelector('input[name="lineItemId"], [data-lineid]');
+      if (hiddenLineId) {
+        lineId = (hiddenLineId.value || hiddenLineId.getAttribute('data-lineid') || '').trim();
+      }
+
+      if (item) {
+        lines.push({ DocNo: docNo, Item: item, TranType: tranType, LineItemID: lineId });
+      }
+    });
+  }
+
+  // Decide header shape: include LineItemID column only if any present
+  const anyLineIds = lines.some(l => l.LineItemID);
+  const headers = anyLineIds ? ['DocNo','Item','TranType','LineItemID'] : ['DocNo','Item','TranType'];
+  const rows = lines.map(l => anyLineIds
+    ? [l.DocNo, l.Item, l.TranType, l.LineItemID]
+    : [l.DocNo, l.Item, l.TranType]
+  );
+
+  let csv = headers.join(',') + '\n';
+  csv += rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  return csv;
+}
+
+// ---- CSV escape
+function csvEscape(v) {
+  const s = String(v ?? '');
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+// ---- Download helpers
+function downloadBlobCSV(filename, csvText) {
+  const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
+}
+
+// Replaces old "downloadCSVFile"
+function downloadHeaderCSVFile() {
+  const csv = buildHeaderCSV();
+  const docNo = getDocNo();
+  const name = docNo ? `sales-order-header_${docNo}.csv` : 'sales-order-header.csv';
+  downloadBlobCSV(name, csv);
+}
+
+// New: Line CSV
+function downloadLineCSVFile() {
+  const csv = buildLineCSV();
+  const docNo = getDocNo();
+  const name = docNo ? `sales-order-lines_${docNo}.csv` : 'sales-order-lines.csv';
+  downloadBlobCSV(name, csv);
+}
+
+
 
 // Reliable mailto opener
 function openMailto(url){
