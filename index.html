@@ -208,7 +208,7 @@
           <h3>Add / Update Rep</h3>
           <label>Rep Name</label><input id="repNameInput" placeholder="e.g., Lucas Currin" />
           <label style="margin-top:10px">Email</label><input id="repEmailInput" type="email" placeholder="e.g., lucas.currin@connectuscorp.com" />
-          <label style="margin-top:10px">Portal Slug (salep-rep)</label><input id="repSlugInput" placeholder="e.g., lucas-currin" />
+          <label style="margin-top:10px">Portal Slug (sales-rep)</label><input id="repSlugInput" placeholder="e.g., lucas-currin" />
           <label style="margin-top:10px">Template</label>
           <select id="repTemplatePick">
             <option value="custom">Custom (use editor below)</option>
@@ -843,7 +843,12 @@ function openGmailCompose({to, subject, body}) {
     alert("Popup blocked. Please allow popups for this site to open Gmail.");
   }
 }
-
+function composeSSPInGmail(){
+  const to      = document.getElementById('sspTo')?.value || '';
+  const subject = document.getElementById('sspSubject')?.value || '';
+  const body    = document.getElementById('sspBody')?.value || '';
+  openGmailCompose({ to, subject, body });
+}
 function openGmailWithCSV() {
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
@@ -982,6 +987,27 @@ const ND_CSV_HEADERS = [
   'New/Additional Services SKU (if No)'
 ];
 
+if (typeof getRowSku !== 'function') {
+  function getRowSku(tr){
+    const tds  = tr?.querySelectorAll('td') || [];
+    const el   = tds[window.COL_SKU]?.querySelector('input,textarea,select');
+    return (el?.value || '').trim();
+  }
+}
+if (typeof getNdData !== 'function') {
+  function getNdData(tr){
+    try { return JSON.parse(tr?.dataset?.nd || '{}'); } catch { return {}; }
+  }
+}
+if (typeof rowQualifiesNewDevice !== 'function') {
+  // qualifies only if SKU ends with "00" and description does NOT include "license"
+  function rowQualifiesNewDevice(tr){
+    const sku  = getRowSku(tr).toLowerCase();
+    const desc = (tr?.querySelectorAll('td')[window.COL_DESC]?.querySelector('input,textarea,select')?.value || '').toLowerCase();
+    return sku.endsWith('00') && !/license/.test(desc);
+  }
+}
+
 function buildNewDeviceCSV(){
   const body = document.getElementById('itemsBody');
   if (!body) return '';
@@ -1114,7 +1140,7 @@ const SIM_CARD_OPTIONS = [
   'HE TRI-B Static IP Helix',
   'MW-SIMVZTMATT-E',
   'US-SIM3IN15G',
-  'eSim Embendded in the phone',
+  'eSIM Embendded in the phone',
   'NO SIM CARD',
 ];
  // Exact mapping from visible SIM dropdown option to OrderTime SKU + Description
@@ -2896,7 +2922,7 @@ function composeSSPInGmail(){
     alert('Add a recipient email first.');
     return;
   }
-
+  openGmailCompose({ to, subject, body });
   // Gmail web compose URL
   const gmailUrl =
     `https://mail.google.com/mail/?view=cm&fs=1` +
@@ -3413,7 +3439,21 @@ function updateMailtoLink(){
   a.href = buildMailtoHref();
   a.textContent = 'Open in default mail app';
 }
-
+function setMailAppLinkFromPreview(){
+  const to      = document.getElementById('sspTo')?.value?.trim() || '';
+  const subject = document.getElementById('sspSubject')?.value?.trim() || 'Sales Order';
+  const body    = (typeof buildCSV === 'function')
+                    ? buildCSV()
+                    : (document.getElementById('csvPreview')?.value || '');
+  const a = document.getElementById('openMailApp');
+  if (!a) return;
+  const href = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  a.setAttribute('href', href);
+}
+// update link before navigating
+document.getElementById('openMailApp')?.addEventListener('click', (e)=>{
+  setMailAppLinkFromPreview();
+});
 /* ===== Demo flow ===== */
 const DEMO_CUSTOMER_FULL={
   "company":"Acme Corp",
