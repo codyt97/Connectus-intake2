@@ -1308,6 +1308,116 @@ function populateSimDropdowns(){
     }
   });
 }
+  /* === SIM Card → Items table (single-line upsert) ===========================
+ * Uses existing elements only:
+ *   - <select id="simCard">  (your SIM dropdown)
+ *   - <table id="tblItems">  (we write SKU + DESCRIPTION columns only)
+ * Requirements:
+ *   - window.COL_SKU and window.COL_DESC should point to the correct columns.
+ *     If you don't have them yet, set:  window.COL_DESC = 2; window.COL_SKU = 3;  // example
+ * Behavior:
+ *   - Only one SIM row is kept at any time.
+ *   - Choosing "NO SIM CARD" removes any existing SIM row and adds nothing.
+ */
+
+// Map the EXACT option texts you showed in your dropdown to {sku, desc}
+const SIM_MAP = {
+  'VZ-SIM3IN1':          { sku: 'VZ-SIM3IN1',     desc: '3 IN 1 VERIZON SIM CARD' },
+  'AT-SIM3IN1':          { sku: 'AT-SIM3IN1',     desc: '3 IN 1 AT&T SIM CARD' },
+  'AT-FIRSTSIMA00':      { sku: 'AT-FIRSTSIMA00', desc: '3 IN 1 FIRST NET AT&T LOCKED 5G SIM CARD BLACK' },
+  'TM-SIM3IN14G':        { sku: 'TM-SIM3IN14G',   desc: '3IN1 T-MOBILE LOCKED 4G SIM CARD' },
+  'HE-HELIXTRIAA00':     { sku: 'HE-HELIXTRIAA00',desc: 'HELIX WIRELESS TRIA SIM CARD' },
+  'Helix eSIM(TriA)':    { sku: 'HE-HELXTRIAA00', desc: 'HELIX WIRELESS TRI-A eSIM' }, // adjust if your eSIM SKU differs
+  'HE TRI-B Static IP Helix': { sku: 'HE-00075FB00', desc: 'HELIX WIRELESS SIM CARD TRI-B FOR STATIC IP' }, // from your list
+  'MW-SIMVZTMATT-E':     { sku: 'MW-SIMVZTMATT-E',desc: 'ConnectUS Dynamic IP Multi Carrier Access 3in1 SIM Card - VZ/ATT/TMO' },
+  'US-SIM3IN15G':        { sku: 'US-SIM3IN15G',   desc: '3IN1 US CELLULAR LOCKED 5G SIM CARD' },
+  'eSim Embended in the phone': { sku: 'ESIM-EMBEDDED', desc: 'Embedded eSIM (device-integrated)' }, // placeholder SKU if you track it
+  'NO SIM CARD':         { sku: '',               desc: '' },
+};
+
+// Build a fast set of known SIM SKUs to identify rows to remove
+const _SIM_SKU_SET = new Set(
+  Object.values(SIM_MAP).map(v => (v.sku || '').toUpperCase()).filter(Boolean)
+);
+
+// Helper: get tbody and safe COL indices
+function _getItemsTbody() {
+  return document.querySelector('#tblItems tbody');
+}
+function _colSafe(idx, fallback) {
+  const n = Number(idx);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+// Helper: write plain text into a cell (supports either text cell or <input>)
+function _setCell(tr, colIdx, text) {
+  const td = tr.cells[colIdx];
+  if (!td) return;
+  const inp = td.querySelector('input,textarea');
+  if (inp) { inp.value = text; inp.dispatchEvent(new Event('input', { bubbles: true })); }
+  else { td.textContent = text; }
+}
+
+// Remove any existing SIM rows (by SKU match)
+function _removeExistingSimRows() {
+  const tbody = _getItemsTbody();
+  if (!tbody) return;
+  [...tbody.querySelectorAll('tr')].forEach(tr => {
+    const skuCell = tr.cells[_colSafe(window.COL_SKU, 3)];
+    const skuTxt = (skuCell?.innerText || skuCell?.textContent || skuCell?.querySelector('input')?.value || '').toUpperCase().trim();
+    if (_SIM_SKU_SET.has(skuTxt)) tr.remove();
+  });
+}
+
+// Add a new SIM line with {sku, desc}
+function _addSimRow(hit) {
+  const tbody = _getItemsTbody();
+  if (!tbody || !hit || !hit.sku) return;
+
+  const tr = document.createElement('tr');
+
+  // Build minimal row—only DESCRIPTION and SKU guaranteed; qty defaults to 1 if you have that column.
+  const COL_DESC = _colSafe(window.COL_DESC, 2);
+  const COL_SKU  = _colSafe(window.COL_SKU, 3);
+
+  // Create the right number of cells to avoid layout issues
+  const colCount = tbody.parentElement.querySelector('thead tr')?.children?.length || Math.max(COL_DESC, COL_SKU) + 1;
+  for (let i = 0; i < colCount; i++) tr.appendChild(document.createElement('td'));
+
+  _setCell(tr, COL_DESC, hit.desc);
+  _setCell(tr, COL_SKU,  hit.sku);
+
+  // If you have a QTY column, set to 1 (optional)
+  if (typeof window.COL_QTY !== 'undefined') _setCell(tr, _colSafe(window.COL_QTY, 1), '1');
+
+  tbody.appendChild(tr);
+}
+
+// Wire up the dropdown
+(function initSimToItems(){
+  const sel = document.getElementById('simCard');
+  if (!sel) return;
+
+  const apply = () => {
+    const raw = sel.value || sel.options[sel.selectedIndex]?.text || '';
+    const key = String(raw).trim();
+    const hit = SIM_MAP[key];
+
+    // Always remove old SIM line(s) first
+    _removeExistingSimRows();
+
+    // If user chose NO SIM CARD, we're done after removal
+    if (!hit || !hit.sku) return;
+
+    // Insert the new SIM line
+    _addSimRow(hit);
+  };
+
+  // initial sync (in case there is a pre-selected value)
+  apply();
+  sel.addEventListener('change', apply);
+})();
+
 
 /* ===== Rep Database (localStorage-backed) ===== */
 const LS_REPS_KEY = "CUC_REPS_V1";
