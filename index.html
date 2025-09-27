@@ -3290,7 +3290,47 @@ window.addEventListener('DOMContentLoaded', () => {
   });
 })();
 
- 
+ /* === Main tabs (Sales Reps ↔ Intake) ============================== */
+(function initMainTabs(){
+  const tabs   = document.querySelectorAll('.mtab');                  // the two buttons
+  const panels = document.querySelectorAll('[data-mainpanel]');       // <section data-mainpanel="...">
+
+  if (!tabs.length || !panels.length) return;
+
+  const activate = (key) => {
+    // toggle buttons
+    tabs.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-main') === key));
+    // toggle panels
+    panels.forEach(p => p.classList.toggle('active', p.getAttribute('data-mainpanel') === key));
+
+    // optional: show stepper + subtabs header only on Intake
+    const isIntake = key === 'intake';
+    const stepper  = document.getElementById('stepper');
+    const intakeTabs = document.getElementById('intakeTabs');
+    if (stepper)    stepper.style.display = isIntake ? 'flex' : 'none';
+    if (intakeTabs) intakeTabs.style.display = isIntake ? 'flex' : 'none';
+  };
+
+  // click handlers
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => activate(btn.getAttribute('data-main')));
+  });
+
+  // ensure initial state matches the button that has .active in HTML
+  const initKey = document.querySelector('.mtab.active')?.getAttribute('data-main') || 'reps';
+  activate(initKey);
+})();
+
+/* === Safe init for dropdowns / listeners so a failure elsewhere
+       doesn't prevent the main tabs from working ================== */
+document.addEventListener('DOMContentLoaded', () => {
+  try { populateSimDropdowns?.(); } catch (e) { console.warn('populateSimDropdowns failed:', e); }
+  try {
+    const pairing = document.getElementById('pairingOption');
+    if (pairing) pairing.addEventListener('change', addOrUpdatePairingLineFromSelect);
+  } catch (e) { console.warn('pairing hook failed:', e); }
+});
+
 </script>
 </body>
 </html>
