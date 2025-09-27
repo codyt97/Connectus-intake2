@@ -1266,6 +1266,9 @@ function setCurrentRow(tr){
     activateSubtab('newdevice');
     loadNdPanelFromRow(tr);
   }
+  // keep Insurance subtab fields in sync with the selected row
+if (typeof syncSubtabFromRow === 'function') syncSubtabFromRow(tr);
+
 }
 
 // ND panel fields we persist per-row
@@ -1470,6 +1473,308 @@ if (itemsBody){
 // 3) One-time sweep in case SKUs already exist (e.g., after paste/clone/load)
 (function initialSweep(){
   document.querySelectorAll('#itemsBody tr').forEach(applyCondForRow);
+})();
+
+/* ================== ROW-SCOPED INSURANCE (Deductible + Sell) ================== */
+/* Features:
+   - Adds 2 UI fields to each item row (Ins Deductible, Ins Sell $/device) without shifting your existing column indexes.
+   - Keeps Insurance subtab (#insPlan, #insDed, #insSell) in 2-way sync with the current row.
+   - If Plan = "None" -> add/update ONE linked decline line (SKU: CUSTOMER DECLINE OF PROTECTION).
+   - If Plan = a catalog SKU -> add/update ONE linked insurance line using that SKU/Description.
+   - Real-time totals: whenever row Ins Sell changes, we call refreshTotals() if present.
+*/
+
+/* ---------- Config ---------- */
+const INS_DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
+const INS_DECLINE_DESC = 'Customer has declined device protection/insurance';
+const INS_DED_OPTS     = ['None', '$0', '$50', '$100']; // customize as needed
+const INS_PLAN_NONE_VAL = '__NONE__';                   // value used in #insPlan
+
+/* ---------- Utilities ---------- */
+function callRefreshTotals() {
+  if (typeof window.refreshTotals === 'function') {
+    try { window.refreshTotals(); } catch {}
+  }
+}
+function q$(sel, root=document) { return root.querySelector(sel); }
+function qAll(sel, root=document) { return [...root.querySelectorAll(sel)]; }
+function ensureEl(tag, attrs={}, text='') {
+  const el = document.createElement(tag);
+  for (const [k,v] of Object.entries(attrs)) el.setAttribute(k, v);
+  if (text) el.textContent = text;
+  return el;
+}
+
+/* ---------- Add header columns at runtime (non-breaking) ---------- */
+(function ensureInsuranceHeaderCols(){
+  const headRow = q$('#itemsHead tr');
+  if (!headRow) return;
+  const hasInsCols = q$('#itemsHead th[data-ins-col="ded"]') || q$('#itemsHead th[data-ins-col="sell"]');
+  if (hasInsCols) return;
+  headRow.appendChild(ensureEl('th', {'data-ins-col':'ded'}, 'Ins Deductible'));
+  headRow.appendChild(ensureEl('th', {'data-ins-col':'sell'}, 'Ins Sell $/device'));
+})();
+
+/* ---------- Ensure every row has Ins Deductible + Ins Sell cells ---------- */
+function ensureInsuranceCellsForRow(tr){
+  if (!tr || tr.dataset.insAugmented === '1') return;
+
+  // Create cells
+  const tdDed  = ensureEl('td');
+  const tdSell = ensureEl('td');
+
+  // Ins Deductible (select)
+  const sel = ensureEl('select', {'data-role':'insDed'});
+  INS_DED_OPTS.forEach(opt => sel.appendChild(ensureEl('option', {value:opt}, opt)));
+  if (tr.dataset.insDed && INS_DED_OPTS.includes(tr.dataset.insDed)) sel.value = tr.dataset.insDed;
+
+  // Ins Sell $/device (number)
+  const inp = ensureEl('input', {'data-role':'insSell', 'type':'number', 'min':'0', 'step':'0.01', 'inputmode':'decimal', 'placeholder':'0.00'});
+  if (tr.dataset.insSell) inp.value = tr.dataset.insSell;
+
+  tdDed.appendChild(sel);
+  tdSell.appendChild(inp);
+  tr.appendChild(tdDed);
+  tr.appendChild(tdSell);
+
+  sel.addEventListener('change', ()=>{
+    tr.dataset.insDed = sel.value;
+    if (__currentRow === tr) {
+      const tabDed = q$('#insDed'); if (tabDed) tabDed.value = sel.value;
+    }
+  });
+
+  inp.addEventListener('input', ()=>{
+    const v = (inp.value || '').trim();
+    tr.dataset.insSell = v;
+    if (__currentRow === tr) {
+      const tabSell = q$('#insSell'); if (tabSell) { tabSell.value = v; tabSell.dispatchEvent(new Event('input', {bubbles:true})); }
+    }
+    callRefreshTotals();
+  });
+
+  tr.dataset.insAugmented = '1';
+}
+
+/* ---------- MutationObserver to auto-augment rows as they’re added ---------- */
+(function watchItemRowsForInsuranceCols(){
+  const body = q$('#itemsBody'); if (!body) return;
+  qAll('tr', body).forEach(ensureInsuranceCellsForRow);
+  const mo = new MutationObserver((muts)=>{
+    muts.forEach(m=>{
+      m.addedNodes.forEach(n=>{
+        if (n.nodeType === 1 && n.tagName === 'TR') ensureInsuranceCellsForRow(n);
+      });
+      m.removedNodes.forEach(n=>{
+        if (n.nodeType === 1 && n.tagName === 'TR') handleRowRemovalCleanup(n);
+      });
+    });
+  });
+  mo.observe(body, {childList:true});
+})();
+
+/* ---------- Link management: one linked line per base row (decline OR plan) ---------- */
+function getRowSku(tr){
+  const tds = tr.querySelectorAll('td');
+  const el = tds[window.COL_SKU]?.querySelector('input,textarea,select');
+  return (el?.value || '').trim();
+}
+function setRowSkuAndDesc(tr, sku, desc){
+  const tds = tr.querySelectorAll('td');
+  const skuEl  = tds[window.COL_SKU ]?.querySelector('input,textarea,select');
+  const descEl = tds[window.COL_DESC]?.querySelector('input,textarea,select');
+  if (skuEl)  { skuEl.value  = sku ?? '';  skuEl.dispatchEvent(new Event('input', {bubbles:true})); }
+  if (descEl) { descEl.value = desc ?? ''; descEl.dispatchEvent(new Event('input', {bubbles:true})); }
+}
+
+function nextUid(){ return String(Date.now()) + Math.random().toString(16).slice(2); }
+
+function ensureLinkedLineAfter(baseTr){
+  const uid = baseTr.dataset.rowUid || (baseTr.dataset.rowUid = nextUid());
+  let link = q$(`#itemsBody tr[data-linked-for-uid="${uid}"]`);
+  if (link) return link;
+
+  let newTr = null;
+  if (typeof window.addRow === 'function') {
+    const before = qAll('#itemsBody tr').length;
+    try { window.addRow(); } catch {}
+    const afterRows = qAll('#itemsBody tr');
+    newTr = afterRows[afterRows.length - 1] || null;
+  }
+  if (!newTr) {
+    const last = qAll('#itemsBody tr').at(-1);
+    newTr = last ? last.cloneNode(true) : ensureEl('tr');
+    if (!last) {
+      const cols = (window.COL_COND || 11) + 2;
+      for (let i=0;i<cols;i++) newTr.appendChild(ensureEl('td'));
+    }
+    qAll('input,textarea,select', newTr).forEach(el=>{
+      if (el.tagName === 'SELECT') el.selectedIndex = 0; else el.value = '';
+    });
+    baseTr.after(newTr);
+  }
+
+  newTr.dataset.linkedForUid = uid;
+  newTr.dataset.isInsuranceLinked = '1';
+
+  ensureInsuranceCellsForRow(newTr);
+  return newTr;
+}
+
+function removeLinkedLine(baseTr){
+  const uid = baseTr?.dataset?.rowUid;
+  if (!uid) return;
+  const link = q$(`#itemsBody tr[data-linked-for-uid="${uid}"]`);
+  if (link && link.parentElement) link.parentElement.removeChild(link);
+}
+
+function handleRowRemovalCleanup(removedTr){
+  if (removedTr.dataset && removedTr.dataset.rowUid) {
+    const link = q$(`#itemsBody tr[data-linked-for-uid="${removedTr.dataset.rowUid}"]`);
+    if (link && link.parentElement) link.parentElement.removeChild(link);
+  }
+  if (removedTr.dataset && removedTr.dataset.linkedForUid) {
+    const base = q$(`#itemsBody tr[data-row-uid="${removedTr.dataset.linkedForUid}"]`);
+    if (base) delete base.dataset.insLinkedRowUid;
+  }
+}
+
+/* ---------- Catalog loader (CSV) + Plan dropdown population ---------- */
+let INS_CATALOG = []; // [{sku, desc}]
+async function loadInsuranceCatalogFromCSV(url){
+  try {
+    const res = await fetch(url, {cache:'no-cache'});
+    const text = await res.text();
+    const lines = text.split(/\r?\n/).filter(Boolean);
+    INS_CATALOG = [];
+    for (let i=0;i<lines.length;i++){
+      const raw = lines[i].split(',');
+      const sku = (raw[0] || '').trim();
+      const desc = (raw[1] || '').trim();
+      if (!sku || !desc) continue;
+      INS_CATALOG.push({sku, desc});
+    }
+  } catch (e) {
+    console.warn('Insurance CSV load failed, falling back to minimal options.', e);
+    INS_CATALOG = [];
+  }
+}
+
+function populateInsurancePlanDropdown(){
+  const sel = q$('#insPlan'); if (!sel) return;
+  const keep = sel.value;
+  sel.innerHTML = '';
+  sel.appendChild(ensureEl('option', {value:INS_PLAN_NONE_VAL}, 'None'));
+  // sel.appendChild(ensureEl('option', {value:'__OTHER__'}, 'Other (manual)'));
+  INS_CATALOG.forEach(it=>{
+    const label = `${it.desc} (${it.sku})`;
+    sel.appendChild(ensureEl('option', {value:it.sku, 'data-sku':it.sku, 'data-desc':it.desc}, label));
+  });
+  if (keep) sel.value = keep;
+}
+
+(async function initInsuranceCatalog(){
+  // ⛳ Update this path to where you host the CSV publicly in your app:
+  await loadInsuranceCatalogFromCSV('/data/ItemAll_20250927193107.csv');
+  populateInsurancePlanDropdown();
+})();
+
+/* ---------- Per-row <-> Insurance subtab 2-way sync ---------- */
+function syncSubtabFromRow(tr){
+  const planSel = q$('#insPlan');
+  const tabDed  = q$('#insDed');
+  const tabSell = q$('#insSell');
+  if (!tr) return;
+
+  const rowDed  = tr.dataset.insDed || 'None';
+  const rowSell = tr.dataset.insSell || '';
+  if (tabDed)  tabDed.value = rowDed;
+  if (tabSell) { tabSell.value = rowSell; tabSell.dispatchEvent(new Event('input', {bubbles:true})); }
+
+  const planSku = tr.dataset.insPlanSku || INS_PLAN_NONE_VAL;
+  if (planSel) planSel.value = planSku;
+}
+function syncRowFromSubtab(tr){
+  const planSel = q$('#insPlan');
+  const tabDed  = q$('#insDed');
+  const tabSell = q$('#insSell');
+  if (!tr) return;
+
+  const ded = tabDed ? tabDed.value : 'None';
+  const sell = tabSell ? (tabSell.value || '').trim() : '';
+  tr.dataset.insDed = ded;
+  tr.dataset.insSell = sell;
+
+  const rowDedSel  = tr.querySelector('select[data-role="insDed"]');  if (rowDedSel)  rowDedSel.value = ded;
+  const rowSellInp = tr.querySelector('input[data-role="insSell"]');  if (rowSellInp) { rowSellInp.value = sell; rowSellInp.dispatchEvent(new Event('input', {bubbles:true})); }
+
+  const sku = planSel ? (planSel.value || '') : INS_PLAN_NONE_VAL;
+  tr.dataset.insPlanSku = sku;
+
+  callRefreshTotals();
+}
+
+/* Hook into row selection: click row -> sync Insurance subtab */
+(function hookRowSelectionForInsurance(){
+  const body = q$('#itemsBody'); if (!body) return;
+  body.addEventListener('click', (e)=>{
+    const tr = e.target.closest('tr'); if (!tr) return;
+    ensureInsuranceCellsForRow(tr);
+    if (typeof setCurrentRow === 'function') {
+      queueMicrotask(()=>{ syncSubtabFromRow(tr); });
+    } else {
+      __currentRow = tr;
+      syncSubtabFromRow(tr);
+    }
+  });
+})();
+
+/* ---------- Plan change -> manage linked line (decline vs catalog) ---------- */
+function ensureInsuranceLineForRow(baseTr){
+  const planSel = q$('#insPlan');
+  if (!baseTr || !planSel) return;
+
+  const planVal = planSel.value || INS_PLAN_NONE_VAL;
+
+  let sku = '', desc = '';
+  if (planVal === INS_PLAN_NONE_VAL) {
+    sku = INS_DECLINE_SKU;
+    desc = INS_DECLINE_DESC;
+  } else {
+    const found = INS_CATALOG.find(x => x.sku === planVal);
+    if (found) { sku = found.sku; desc = found.desc; }
+    else { sku = planVal; desc = 'Insurance Plan'; }
+  }
+
+  const link = ensureLinkedLineAfter(baseTr);
+  setRowSkuAndDesc(link, sku, desc);
+
+  // (Optional) Zero out price on the linked line if you have a Sell Price column constant.
+
+  baseTr.dataset.insLinkedRowUid = link.dataset.linkedForUid;
+}
+
+/* ---------- Subtab event hooks ---------- */
+(function wireInsuranceSubtabEvents(){
+  const elPlan = q$('#insPlan');
+  const elDed  = q$('#insDed');
+  const elSell = q$('#insSell');
+
+  if (elPlan) elPlan.addEventListener('change', ()=>{
+    if (!__currentRow) return;
+    __currentRow.dataset.insPlanSku = elPlan.value || INS_PLAN_NONE_VAL;
+    ensureInsuranceLineForRow(__currentRow);
+  });
+
+  if (elDed) elDed.addEventListener('change', ()=>{
+    if (!__currentRow) return;
+    syncRowFromSubtab(__currentRow);
+  });
+
+  if (elSell) elSell.addEventListener('input', ()=>{
+    if (!__currentRow) return;
+    syncRowFromSubtab(__currentRow);
+  });
 })();
 
 // === Helper: add/update a line from Pairing selection ===
