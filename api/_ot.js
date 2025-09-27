@@ -56,17 +56,13 @@ async function listPage({ type, filters=[], sortProp='Id', dir='Asc', page=1, si
 }
 
 // recursive “does any string field include needle?”
-function rowContainsAllTokens(value, tokens) {
+function rowContainsAnyString(value, needle) {
   if (!value) return false;
-  if (typeof value === 'string') {
-    const s = value.toLowerCase();
-    return tokens.every(t => s.includes(t));
-  }
-  if (Array.isArray(value)) return value.some(v => rowContainsAllTokens(v, tokens));
-  if (typeof value === 'object') return Object.values(value).some(v => rowContainsAllTokens(v, tokens));
+  if (typeof value === 'string') return value.toLowerCase().includes(needle);
+  if (Array.isArray(value)) return value.some(v => rowContainsAnyString(v, needle));
+  if (typeof value === 'object') return Object.values(value).some(v => rowContainsAnyString(v, needle));
   return false;
 }
-
 
 async function listSearch({
   type, q, columns,
@@ -74,7 +70,6 @@ async function listSearch({
   pageSize = 100, maxPages = 8
 }) {
   const needle = String(q || '').toLowerCase().trim();
-  const tokens = needle.split(/\s+/).filter(Boolean);
   const filterable = (columns || []).filter(c => c && !c.includes('.')); // only simple fields
 
   const seen = new Set();
@@ -97,17 +92,14 @@ async function listSearch({
   // Post-filter whatever we collected using the provided columns (incl. nested)
   const usesColumns = (columns && columns.length > 0);
   const postMatch = (row) => {
-  if (usesColumns) {
-    return columns.some(c => {
-      const v = c.split('.').reduce((a,k) => (a ? a[k] : undefined), row);
-      if (typeof v !== 'string') return false;
-      const s = v.toLowerCase();
-      return tokens.every(t => s.includes(t));
-    });
-  }
-  return rowContainsAllTokens(row, tokens);
-};
-
+    if (usesColumns) {
+      return columns.some(c => {
+        const v = c.split('.').reduce((a,k) => (a ? a[k] : undefined), row);
+        return typeof v === 'string' && v.toLowerCase().includes(needle);
+      });
+    }
+    return rowContainsAnyString(row, needle);
+  };
 
   const filtered = merged.filter(postMatch);
   if (filtered.length) return filtered;
@@ -117,7 +109,7 @@ async function listSearch({
   for (let p = 1; p <= maxPages; p++) {
     const rows = await listPage({ type, filters: [], sortProp, dir, page: p, size: pageSize });
     if (!rows.length) break;
-    for (const r of rows) if (rowContainsAllTokens(r, tokens)) out.push(r);
+    for (const r of rows) if (rowContainsAnyString(r, needle)) out.push(r);
     if (out.length >= 50) break;
   }
   return out;
