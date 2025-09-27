@@ -1193,27 +1193,46 @@ if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
 function addOrUpdatePairingLineFromSelect() {
   const sel = document.getElementById('pairingOption');
   if (!sel) return;
-  const chosen = sel.value?.trim();
+  const chosen = (sel.value || '').trim();
   const map = PAIRING_SKU_MAP[chosen];
-  if (!map) return; // nothing to add
+  if (!map) return;
 
-  // If line with this SKU already exists, do nothing (prevents dupes)
   const body = document.getElementById('itemsBody');
   if (!body) return;
-  for (const tr of body.querySelectorAll('tr')) {
+
+  const desiredSkuL = String(map.sku || '').toLowerCase();
+  const rows = [...body.querySelectorAll('tr')];
+
+  // Find all existing "pairing" lines (any whose SKU is in PAIRING_SKUS)
+  let pairingRows = [];
+  let hasDesiredOnly = false;
+
+  rows.forEach(tr => {
     const tds = tr.querySelectorAll('td');
-    const skuEl = tds[window.COL_SKU]?.querySelector('input,textarea');
-    const skuVal = (skuEl?.value || '').trim();
-    if (skuVal && skuVal.toLowerCase() === map.sku.toLowerCase()) {
-      return; // already present
+    const skuEl = tds[window.COL_SKU]?.querySelector('input,textarea,select');
+    const skuValL = String(skuEl?.value || '').trim().toLowerCase();
+    if (PAIRING_SKUS.has(skuValL)) {
+      pairingRows.push(tr);
+    }
+  });
+
+  // If exactly one pairing row exists and it's already the desired SKU, do nothing
+  if (pairingRows.length === 1) {
+    const tds = pairingRows[0].querySelectorAll('td');
+    const skuEl = tds[window.COL_SKU]?.querySelector('input,textarea,select');
+    const existingSkuL = String(skuEl?.value || '').trim().toLowerCase();
+    if (existingSkuL === desiredSkuL) {
+      return; // already the correct single line
     }
   }
 
-  // Otherwise, add a row and populate Description + SKU + Qty=1
+  // Remove all existing pairing lines (enforce "only one" rule)
+  pairingRows.forEach(tr => tr.remove());
+
+  // Add a fresh line for the newly selected pairing option
   if (typeof addRow === 'function') {
     addRow();
   } else {
-    // Minimal fallback: create a blank row compatible with your table
     const tr = document.createElement('tr');
     tr.innerHTML = `
       <td><input class="autosize" /></td>
@@ -1237,23 +1256,20 @@ function addOrUpdatePairingLineFromSelect() {
       <td><input class="autosize" /></td>
       <td><button class="bad" onclick="this.closest('tr').remove()">Remove</button></td>
     `;
-    document.getElementById('itemsBody').appendChild(tr);
+    body.appendChild(tr);
   }
 
-  // Fill latest row
-  const rows = document.querySelectorAll('#itemsBody tr');
-  const tr = rows[rows.length - 1];
-  const tds = tr.querySelectorAll('td');
-
+  // Populate the newest row
+  const last = body.querySelectorAll('tr')[body.querySelectorAll('tr').length - 1];
+  const tds = last.querySelectorAll('td');
   const descEl = tds[window.COL_DESC]?.querySelector('input,textarea');
-  const skuEl  = tds[window.COL_SKU]?.querySelector('input,textarea');
-  const qtyEl  = tds[4]?.querySelector('input'); // Qty column index is 4 per header
+  const skuEl  = tds[window.COL_SKU ]?.querySelector('input,textarea');
+  const qtyEl  = tds[4]?.querySelector('input'); // Qty col index = 4
 
   if (descEl) descEl.value = map.desc;
   if (skuEl)  skuEl.value  = map.sku;
   if (qtyEl && !qtyEl.value) qtyEl.value = 1;
 
-  // Optional: trigger any autosize/input listeners your app uses
   [descEl, skuEl, qtyEl].forEach(el => el && el.dispatchEvent(new Event('input', { bubbles: true })));
 }
   
