@@ -1151,6 +1151,109 @@ const PAIRING_OPTIONS = [
   'iNTERNAL cuc sIM pAIR & ACTIVATION',
 ];
 
+  // === Pairing → SKU/Description mapping ===
+const PAIRING_SKU_MAP = {
+  // Map each pairing option text to an OrderTime SKU + Description.
+  // Use the exact visible text options in your dropdown.
+  'SIM PAIR ONLY': {
+    sku: 'SIM PAIRING',
+    desc: 'SIM PAIRING'
+  },
+  'SIM PAIR & CARRIER ACTIVATION': {
+    sku: 'DEVICE ACTIVATION & SIM PAIR',
+    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE'
+  },
+  'VERIZON eSIM PAIRING': {
+    sku: 'VERIZON eSIM PAIRING',
+    desc: 'VERIZON eSIM PAIRING — Please send IMEI listing to Verizon Rep to activate eSIM'
+  },
+  'SIM PAIR, BENCH TEST / ACTIVE TO ENSURE OPTIMAL PERFORMANCE': {
+    sku: 'CUSTCONFIG, DEV ACTIV&SIMPAIR',
+    desc: 'SIM PAIRING, DEVICE ACTIVATION, & CUSTOM CONFIGURATION SERVICES, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE/SOW REQUIRED'
+  },
+  'SIM PAIR w/ STATIC IP & DEVICE ACTIVATIO< BENCH TEST TO ENSURE OPTIOMAL PERFORMANCE': {
+    sku: 'STATIC IP SIMPAIR+DEVICE ACTIV',
+    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE W/ STATIC IP'
+  },
+  'iNTERNAL cuc sIM pAIR & ACTIVATION': {
+    sku: 'INT DEVICE ACTIVATE/SIM PAIR',
+    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION'
+  }
+  // Add more mappings here as you add more pairing options/SKUs.
+};
+
+// === Column safeguards (align with your table header) ===
+if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
+if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
+
+// === Helper: add/update a line from Pairing selection ===
+function addOrUpdatePairingLineFromSelect() {
+  const sel = document.getElementById('pairingOption');
+  if (!sel) return;
+  const chosen = sel.value?.trim();
+  const map = PAIRING_SKU_MAP[chosen];
+  if (!map) return; // nothing to add
+
+  // If line with this SKU already exists, do nothing (prevents dupes)
+  const body = document.getElementById('itemsBody');
+  if (!body) return;
+  for (const tr of body.querySelectorAll('tr')) {
+    const tds = tr.querySelectorAll('td');
+    const skuEl = tds[window.COL_SKU]?.querySelector('input,textarea');
+    const skuVal = (skuEl?.value || '').trim();
+    if (skuVal && skuVal.toLowerCase() === map.sku.toLowerCase()) {
+      return; // already present
+    }
+  }
+
+  // Otherwise, add a row and populate Description + SKU + Qty=1
+  if (typeof addRow === 'function') {
+    addRow();
+  } else {
+    // Minimal fallback: create a blank row compatible with your table
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input type="number" min="1" value="1" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><input class="autosize" /></td>
+      <td><button class="bad" onclick="this.closest('tr').remove()">Remove</button></td>
+    `;
+    document.getElementById('itemsBody').appendChild(tr);
+  }
+
+  // Fill latest row
+  const rows = document.querySelectorAll('#itemsBody tr');
+  const tr = rows[rows.length - 1];
+  const tds = tr.querySelectorAll('td');
+
+  const descEl = tds[window.COL_DESC]?.querySelector('input,textarea');
+  const skuEl  = tds[window.COL_SKU]?.querySelector('input,textarea');
+  const qtyEl  = tds[4]?.querySelector('input'); // Qty column index is 4 per header
+
+  if (descEl) descEl.value = map.desc;
+  if (skuEl)  skuEl.value  = map.sku;
+  if (qtyEl && !qtyEl.value) qtyEl.value = 1;
+
+  // Optional: trigger any autosize/input listeners your app uses
+  [descEl, skuEl, qtyEl].forEach(el => el && el.dispatchEvent(new Event('input', { bubbles: true })));
+}
+  
 /* Build the three selects and keep prior values (if any) */
 function populateSimDropdowns(){
   const map = [
@@ -1380,6 +1483,11 @@ window.addEventListener('DOMContentLoaded', () => {
   if(methodSel) methodSel.addEventListener('change', updateThirdPartyAccountUI);
   // init
   updateThirdPartyAccountUI();
+
+  const pairingSel = document.getElementById('pairingOption');
+  if (pairingSel) {
+    pairingSel.addEventListener('change', addOrUpdatePairingLineFromSelect);
+  }
 });
 
   
