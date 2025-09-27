@@ -422,7 +422,6 @@
   <option>No</option>
   <option>Yes (Backorder OK)</option>
 </select>
-</section>
 
 
         <section class="full">
@@ -1120,21 +1119,19 @@ async function api(path, { method='GET', headers={}, body } = {}){
 
 /* ===== SIM / Pairing option catalogs ===== */
 // Seeded from your template screenshot. Add/adjust as needed.
-const SIM_MAP = {
-  'VZ-SIM3IN1':              { sku: 'VZ-SIM3IN1',     desc: '3 IN 1 VERIZON SIM CARD' },
-  'AT-SIM3IN1':              { sku: 'AT-SIM3IN1',     desc: '3 IN 1 AT&T SIM CARD' },
-  'AT-FIRSTSIMA00':          { sku: 'AT-FIRSTSIMA00', desc: '3 IN 1 FIRST NET AT&T LOCKED 5G SIM CARD BLACK' },
-  'TM-SIM3IN14G':            { sku: 'TM-SIM3IN14G',   desc: '3IN1 T-MOBILE LOCKED 4G SIM CARD' },
-  'HE-HELIXTRIAA00':         { sku: 'HE-HELIXTRIAA00',desc: 'HELIX WIRELESS TRIA SIM CARD' },
-  'Helix eSIM(TriA)':        { sku: 'HE-HELXTRIAA00', desc: 'HELIX WIRELESS TRI-A eSIM' }, // adjust if needed
-  'HE TRI-B Static IP Helix':{ sku: 'HE-00075FB00',   desc: 'HELIX WIRELESS SIM CARD TRI-B FOR STATIC IP' },
-  'MW-SIMVZTMATT-E':         { sku: 'MW-SIMVZTMATT-E',desc: 'ConnectUS Dynamic IP Multi Carrier Access 3in1 SIM Card - VZ/ATT/TMO' },
-  'US-SIM3IN15G':            { sku: 'US-SIM3IN15G',   desc: '3IN1 US CELLULAR LOCKED 5G SIM CARD' },
-  'eSim Embended in the phone': { sku: 'ESIM-EMBEDDED', desc: 'Embedded eSIM (device-integrated)' },
-  'NO SIM CARD':             { sku: '',               desc: '' }
-};
-const _SIM_SKU_SET = new Set(Object.values(SIM_MAP).map(v => (v.sku || '').toUpperCase()).filter(Boolean));
-
+const SIM_CARD_OPTIONS = [
+  'VZ-SIM3IN1',
+  'AT-SIM3IN1',
+  'AT-FIRSTSIMA00',
+  'TM-SIM3IN14G',
+  'HE-HELIXTRIAA00',
+  'Helix eSIM(TriA) ',
+  'HE TRI-B Static IP Helix',
+  'MW-SIMVZTMATT-E',
+  'US-SIM3IN15G',
+  'eSim Embendded in the phone',
+  'NO SIM CARD',
+];
 
 // If your Word template has the full lists, add them here later.
 const SIM_HANDLING_OPTIONS = [
@@ -1189,7 +1186,6 @@ const PAIRING_SKU_MAP = {
   // A lowercase set of all pairing SKUs so we can identify & remove them
 const PAIRING_SKUS = new Set(Object.values(PAIRING_SKU_MAP).map(x => String(x.sku || '').toLowerCase()));
 // === Column safeguards (align with your table header) ===
-if (typeof window.COL_QTY  === 'undefined') window.COL_QTY  = 4; // Qty
 if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
 if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
 
@@ -1276,23 +1272,7 @@ function addOrUpdatePairingLineFromSelect() {
 
   [descEl, skuEl, qtyEl].forEach(el => el && el.dispatchEvent(new Event('input', { bubbles: true })));
 }
-
-
-// Options for <select id="simCard"> — must match visible option text
-const SIM_CARD_OPTIONS = [
-  'VZ-SIM3IN1',
-  'AT-SIM3IN1',
-  'AT-FIRSTSIMA00',
-  'TM-SIM3IN14G',
-  'HE-HELIXTRIAA00',
-  'Helix eSIM(TriA)',
-  'HE TRI-B Static IP Helix',
-  'MW-SIMVZTMATT-E',
-  'US-SIM3IN15G',
-  'eSim Embended in the phone',
-  'NO SIM CARD'
-];
-
+  
 /* Build the three selects and keep prior values (if any) */
 function populateSimDropdowns(){
   const map = [
@@ -1328,120 +1308,6 @@ function populateSimDropdowns(){
     }
   });
 }
-  /* === SIM Card → Items table (single-line upsert) ===========================
- * Uses existing elements only:
- *   - <select id="simCard">  (your SIM dropdown)
- *   - <table id="tblItems">  (we write SKU + DESCRIPTION columns only)
- * Requirements:
- *   - window.COL_SKU and window.COL_DESC should point to the correct columns.
- *     If you don't have them yet, set:  window.COL_DESC = 2; window.COL_SKU = 3;  // example
- * Behavior:
- *   - Only one SIM row is kept at any time.
- *   - Choosing "NO SIM CARD" removes any existing SIM row and adds nothing.
- */
-
-// Map the EXACT option texts you showed in your dropdown to {sku, desc}
-const SIM_MAP = {
-  'VZ-SIM3IN1':          { sku: 'VZ-SIM3IN1',     desc: '3 IN 1 VERIZON SIM CARD' },
-  'AT-SIM3IN1':          { sku: 'AT-SIM3IN1',     desc: '3 IN 1 AT&T SIM CARD' },
-  'AT-FIRSTSIMA00':      { sku: 'AT-FIRSTSIMA00', desc: '3 IN 1 FIRST NET AT&T LOCKED 5G SIM CARD BLACK' },
-  'TM-SIM3IN14G':        { sku: 'TM-SIM3IN14G',   desc: '3IN1 T-MOBILE LOCKED 4G SIM CARD' },
-  'HE-HELIXTRIAA00':     { sku: 'HE-HELIXTRIAA00',desc: 'HELIX WIRELESS TRIA SIM CARD' },
-  'Helix eSIM(TriA)':    { sku: 'HE-HELXTRIAA00', desc: 'HELIX WIRELESS TRI-A eSIM' }, // adjust if your eSIM SKU differs
-  'HE TRI-B Static IP Helix': { sku: 'HE-00075FB00', desc: 'HELIX WIRELESS SIM CARD TRI-B FOR STATIC IP' }, // from your list
-  'MW-SIMVZTMATT-E':     { sku: 'MW-SIMVZTMATT-E',desc: 'ConnectUS Dynamic IP Multi Carrier Access 3in1 SIM Card - VZ/ATT/TMO' },
-  'US-SIM3IN15G':        { sku: 'US-SIM3IN15G',   desc: '3IN1 US CELLULAR LOCKED 5G SIM CARD' },
-  'eSim Embended in the phone': { sku: 'ESIM-EMBEDDED', desc: 'Embedded eSIM (device-integrated)' }, // placeholder SKU if you track it
-  'NO SIM CARD':         { sku: '',               desc: '' },
-};
-
-// Build a fast set of known SIM SKUs to identify rows to remove
-const _SIM_SKU_SET = new Set(
-  Object.values(SIM_MAP).map(v => (v.sku || '').toUpperCase()).filter(Boolean)
-);
-
-// Helper: get tbody and safe COL indices
-function _getItemsTbody() {
-  // Your table is <table id="itemsTbl"><tbody id="itemsBody">
-  return document.getElementById('itemsBody');
-}
-
-function _colSafe(idx, fallback) {
-  const n = Number(idx);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-// Helper: write plain text into a cell (supports either text cell or <input>)
-function _setCell(tr, colIdx, text) {
-  const td = tr.cells[colIdx];
-  if (!td) return;
-  const inp = td.querySelector('input,textarea');
-  if (inp) { inp.value = text; inp.dispatchEvent(new Event('input', { bubbles: true })); }
-  else { td.textContent = text; }
-}
-
-// Remove any existing SIM rows (by SKU match)
-function _removeExistingSimRows() {
-  const tbody = _getItemsTbody();
-  if (!tbody) return;
-  [...tbody.querySelectorAll('tr')].forEach(tr => {
-    const skuCell = tr.cells[_colSafe(window.COL_SKU, 3)];
-    const skuTxt = (skuCell?.innerText || skuCell?.textContent || skuCell?.querySelector('input')?.value || '').toUpperCase().trim();
-    if (_SIM_SKU_SET.has(skuTxt)) tr.remove();
-  });
-}
-
-// Add a new SIM line with {sku, desc}
-function _addSimRow(hit) {
-  const tbody = _getItemsTbody();
-  if (!tbody || !hit || !hit.sku) return;
-
-  const tr = document.createElement('tr');
-
-  // Build minimal row—only DESCRIPTION and SKU guaranteed; qty defaults to 1 if you have that column.
-  const COL_DESC = _colSafe(window.COL_DESC, 2);
-  const COL_SKU  = _colSafe(window.COL_SKU, 3);
-
-  // Create the right number of cells to avoid layout issues
-  const headRow = document.querySelector('#itemsTbl thead tr');
-  const colCount = headRow ? headRow.children.length : Math.max(window.COL_DESC, window.COL_SKU) + 1;
-
-  for (let i = 0; i < colCount; i++) tr.appendChild(document.createElement('td'));
-
-  _setCell(tr, COL_DESC, hit.desc);
-  _setCell(tr, COL_SKU,  hit.sku);
-
-  // If you have a QTY column, set to 1 (optional)
-  if (typeof window.COL_QTY !== 'undefined') _setCell(tr, _colSafe(window.COL_QTY, 1), '1');
-
-  tbody.appendChild(tr);
-}
-
-// Wire up the dropdown
-(function initSimToItems(){
-  const sel = document.getElementById('simCard');
-  if (!sel) return;
-
-  const apply = () => {
-    const raw = sel.value || sel.options[sel.selectedIndex]?.text || '';
-    const key = String(raw).trim();
-    const hit = SIM_MAP[key];
-
-    // Always remove old SIM line(s) first
-    _removeExistingSimRows();
-
-    // If user chose NO SIM CARD, we're done after removal
-    if (!hit || !hit.sku) return;
-
-    // Insert the new SIM line
-    _addSimRow(hit);
-  };
-
-  // initial sync (in case there is a pre-selected value)
-  apply();
-  sel.addEventListener('change', apply);
-})();
-
 
 /* ===== Rep Database (localStorage-backed) ===== */
 const LS_REPS_KEY = "CUC_REPS_V1";
@@ -3270,67 +3136,7 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
-
-// === Main tabs (Sales Reps ↔ Intake) ===
-(function initMainTabs(){
-  const tabs = document.querySelectorAll('.mtab');
-  const panels = document.querySelectorAll('[data-mainpanel]');
-  if (!tabs.length || !panels.length) return;
-
-  const activate = (key) => {
-    tabs.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-main') === key));
-    panels.forEach(p => p.classList.toggle('active', p.getAttribute('data-mainpanel') === key));
-  };
-
-  tabs.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const key = btn.getAttribute('data-main');
-      activate(key);
-    });
-  });
-})();
-
- /* === Main tabs (Sales Reps ↔ Intake) ============================== */
-(function initMainTabs(){
-  const tabs   = document.querySelectorAll('.mtab');                  // the two buttons
-  const panels = document.querySelectorAll('[data-mainpanel]');       // <section data-mainpanel="...">
-
-  if (!tabs.length || !panels.length) return;
-
-  const activate = (key) => {
-    // toggle buttons
-    tabs.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-main') === key));
-    // toggle panels
-    panels.forEach(p => p.classList.toggle('active', p.getAttribute('data-mainpanel') === key));
-
-    // optional: show stepper + subtabs header only on Intake
-    const isIntake = key === 'intake';
-    const stepper  = document.getElementById('stepper');
-    const intakeTabs = document.getElementById('intakeTabs');
-    if (stepper)    stepper.style.display = isIntake ? 'flex' : 'none';
-    if (intakeTabs) intakeTabs.style.display = isIntake ? 'flex' : 'none';
-  };
-
-  // click handlers
-  tabs.forEach(btn => {
-    btn.addEventListener('click', () => activate(btn.getAttribute('data-main')));
-  });
-
-  // ensure initial state matches the button that has .active in HTML
-  const initKey = document.querySelector('.mtab.active')?.getAttribute('data-main') || 'reps';
-  activate(initKey);
-})();
-
-/* === Safe init for dropdowns / listeners so a failure elsewhere
-       doesn't prevent the main tabs from working ================== */
-document.addEventListener('DOMContentLoaded', () => {
-  try { populateSimDropdowns?.(); } catch (e) { console.warn('populateSimDropdowns failed:', e); }
-  try {
-    const pairing = document.getElementById('pairingOption');
-    if (pairing) pairing.addEventListener('change', addOrUpdatePairingLineFromSelect);
-  } catch (e) { console.warn('pairing hook failed:', e); }
-});
-
+ 
 </script>
 </body>
 </html>
