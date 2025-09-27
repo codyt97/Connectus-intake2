@@ -422,6 +422,7 @@
   <option>No</option>
   <option>Yes (Backorder OK)</option>
 </select>
+</section>
 
 
         <section class="full">
@@ -3269,6 +3270,26 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// === Main tabs (Sales Reps ↔ Intake) ===
+(function initMainTabs(){
+  const tabs = document.querySelectorAll('.mtab');
+  const panels = document.querySelectorAll('[data-mainpanel]');
+  if (!tabs.length || !panels.length) return;
+
+  const activate = (key) => {
+    tabs.forEach(btn => btn.classList.toggle('active', btn.getAttribute('data-main') === key));
+    panels.forEach(p => p.classList.toggle('active', p.getAttribute('data-mainpanel') === key));
+  };
+
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.getAttribute('data-main');
+      activate(key);
+    });
+  });
+})();
+
  
 </script>
 </body>
