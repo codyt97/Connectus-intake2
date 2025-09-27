@@ -999,14 +999,26 @@ if (typeof getNdData !== 'function') {
     try { return JSON.parse(tr?.dataset?.nd || '{}'); } catch { return {}; }
   }
 }
-if (typeof rowQualifiesNewDevice !== 'function') {
-  // qualifies only if SKU ends with "00" and description does NOT include "license"
-  function rowQualifiesNewDevice(tr){
-    const sku  = getRowSku(tr).toLowerCase();
-    const desc = (tr?.querySelectorAll('td')[window.COL_DESC]?.querySelector('input,textarea,select')?.value || '').toLowerCase();
-    return sku.endsWith('00') && !/license/.test(desc);
-  }
+function rowQualifiesNewDevice(tr){
+  if (!tr) return false;
+  const tds = tr.querySelectorAll('td');
+  const get = (colIdx) => (tds[colIdx]?.querySelector('input,textarea,select')?.value || '').trim();
+
+  const sku = get(window.COL_SKU);
+  const desc = get(window.COL_DESC);
+  const dL = desc.toLowerCase();
+
+  // Your existing SKU→condition inference
+  const cond = inferCondFromSku(sku); // "New" | "CPO" | ""
+  const looksNewBySku = (cond === 'New');
+
+  // Exclusions
+  const isLicense = dL.includes('license');     // keep: license lines should flip to Licenses tab
+  const isSimOrCard = /\b(sim|sim card|card)\b/i.test(desc); // NEW: hide New-Device for SIM/CARD descriptors
+
+  return looksNewBySku && !isLicense && !isSimOrCard;
 }
+
 
 function buildNewDeviceCSV(){
   const body = document.getElementById('itemsBody');
