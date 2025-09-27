@@ -1293,6 +1293,33 @@ function saveNdPanelToRow(){
   setNdData(__currentRow, data);
 }
 
+// ---- Licenses tab visibility: only show when row Description contains "license"
+function toggleLicensesTabForRow(tr){
+  const isLic = isLicenseDesc(getRowDesc(tr));
+  const licTab   = document.querySelector('#subtabsArea .subtab[data-sub="licenses"]');
+  const licPanel = document.querySelector('#subtabPanels [data-subpanel="licenses"]');
+
+  if (licTab)   licTab.style.display   = isLic ? '' : 'none';
+  if (licPanel) licPanel.style.display = (isLic && licTab.classList.contains('active')) ? '' : 'none';
+
+  if (isLic) {
+    // Show Licenses subtab for this row
+    activateSubtab('licenses');
+  } else {
+    // If Licenses was active and no longer applicable, fall back to New Device (if qualifies) else Accessory
+    if (licTab && licTab.classList.contains('active')) {
+      if (rowQualifiesNewDevice(tr)) activateSubtab('newdevice');
+      else activateSubtab('accessory');
+    }
+  }
+}
+
+// Hide Licenses tab by default on load
+(function initLicensesHidden(){
+  const licTab = document.querySelector('#subtabsArea .subtab[data-sub="licenses"]');
+  if (licTab) licTab.style.display = 'none';
+})();
+
 // Show the "New Device Details" tab only if ANY row qualifies (license rows do NOT qualify)
 function anyRowQualifiesNewDevice(){
   const body = document.getElementById('itemsBody');
@@ -1319,6 +1346,7 @@ function ensureNewDeviceTabVisibility(){
   body.addEventListener('click', (e)=>{
     const tr = e.target.closest('tr');
     if (tr) setCurrentRow(tr);
+    toggleLicensesTabForRow(tr);
   });
 
   // When SKU or Description changes, recompute visibility; for current row, sync panel/subtab
@@ -1337,6 +1365,7 @@ function ensureNewDeviceTabVisibility(){
         }
       }
     }
+    toggleLicensesTabForRow(tr)
   });
 
   // Watch for newly added rows (addRow / clone)
