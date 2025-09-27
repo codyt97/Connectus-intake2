@@ -1276,10 +1276,23 @@ function isLicenseDesc(desc){ return /license/i.test(String(desc || '')); }
 // Qualifier for this row:
 // - SKU ends with "00"
 // - AND description does NOT include "license"
+// Qualifier for this row:
+// - SKU ends with "00"
+// - AND description does NOT include "license"
+// - AND description does NOT include "sim" or "card"
 function rowQualifiesNewDevice(tr){
-  const sku = getRowSku(tr);
-  const desc = getRowDesc(tr);
-  return sku.toLowerCase().endsWith('00') && !isLicenseDesc(desc);
+  if (!tr) return false;
+
+  const sku  = String(getRowSku(tr)  || '').toLowerCase();
+  const desc = String(getRowDesc(tr) || '');
+
+  // existing license check keeps Licenses tab behavior
+  const isLic = isLicenseDesc(desc);
+
+  // new exclusion: hide New-Device for SIM/CARD descriptors
+  const isSimOrCard = /\b(sim|sim card|card)\b/i.test(desc);
+
+  return sku.endsWith('00') && !isLic && !isSimOrCard;
 }
 
 // Per-row data storage for ND panel, persisted on the <tr>
