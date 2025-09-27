@@ -1188,6 +1188,7 @@ const PAIRING_SKU_MAP = {
   // A lowercase set of all pairing SKUs so we can identify & remove them
 const PAIRING_SKUS = new Set(Object.values(PAIRING_SKU_MAP).map(x => String(x.sku || '').toLowerCase()));
 // === Column safeguards (align with your table header) ===
+if (typeof window.COL_QTY  === 'undefined') window.COL_QTY  = 4; // Qty
 if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
 if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
 
@@ -1274,7 +1275,23 @@ function addOrUpdatePairingLineFromSelect() {
 
   [descEl, skuEl, qtyEl].forEach(el => el && el.dispatchEvent(new Event('input', { bubbles: true })));
 }
-  
+
+
+// Options for <select id="simCard"> — must match visible option text
+const SIM_CARD_OPTIONS = [
+  'VZ-SIM3IN1',
+  'AT-SIM3IN1',
+  'AT-FIRSTSIMA00',
+  'TM-SIM3IN14G',
+  'HE-HELIXTRIAA00',
+  'Helix eSIM(TriA)',
+  'HE TRI-B Static IP Helix',
+  'MW-SIMVZTMATT-E',
+  'US-SIM3IN15G',
+  'eSim Embended in the phone',
+  'NO SIM CARD'
+];
+
 /* Build the three selects and keep prior values (if any) */
 function populateSimDropdowns(){
   const map = [
