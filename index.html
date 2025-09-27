@@ -961,81 +961,66 @@ function csvEscape(v) {
   return s;
 }
 
-/* ==== New-Device CSV (only when any OrderTime SKU ends with "00") ==== */
+/* ==== New-Device CSV (row-scoped, line-per-line) ==== */
 
+// Produce a CSV row for each line that qualifies (SKU ends with 00 AND NOT a license line)
+const ND_CSV_HEADERS = [
+  'Line#',
+  'OrderTime SKU',
+  'Vendor*',
+  'SPA/Deal Reg #',
+  'Deal Reg Expiration',
+  'Vendor Hold/Reservation #',
+  'End of Life Date*',
+  'Stock Available for SO Qty*',
+  'Lead Time Date (if No)',
+  'Expected Ship By Date*',
+  'Quantity Required',
+  'Same Shipping Address',
+  'Alternate Shipping Address (if No)',
+  'Services Stay The Same',
+  'New/Additional Services SKU (if No)'
+];
 
-function anySkuEndsWith00(){
-  const body = document.getElementById('itemsBody');
-  if(!body) return false;
-  for(const tr of body.querySelectorAll('tr')){
-    const tds = [...tr.querySelectorAll('td')];
-    const skuEl = tds[COL_SKU]?.querySelector('input,textarea,select');
-    const sku = (skuEl?.value || '').trim().toLowerCase();
-    if (sku.endsWith('00')) return true;
-  }
-  return false;
-}
-
-function readVal(id){ return (document.getElementById(id)?.value || '').trim(); }
-
-/**
- * Returns a CSV string (headers + one row) OR empty string if not applicable.
- * Fields drawn from the "New Device Details" panel (ids: ndVendor, ndDealReg, ndDealExp, ndHoldNo,
- * ndEOL, ndStockOK, ndLeadDate, ndExpShipBy, ndQtyRequired, ndSameShip, ndAltShip, ndSvcSame, ndSvcSKU)
- */
 function buildNewDeviceCSV(){
-  if (!anySkuEndsWith00()) return '';
+  const body = document.getElementById('itemsBody');
+  if (!body) return '';
 
-  const vendor     = readVal('ndVendor');
-  const dealReg    = readVal('ndDealReg');
-  const dealExp    = readVal('ndDealExp');
-  const holdNo     = readVal('ndHoldNo');
-  const eol        = readVal('ndEOL');
-  const stockOK    = readVal('ndStockOK');
-  const leadDate   = readVal('ndLeadDate');
-  const expShipBy  = readVal('ndExpShipBy');
-  const qtyReq     = readVal('ndQtyRequired');
-  const sameShip   = readVal('ndSameShip');
-  const altShip    = readVal('ndAltShip');
-  const svcSame    = readVal('ndSvcSame');
-  const svcSKU     = readVal('ndSvcSKU');
+  // Gather qualifying rows (license rows do NOT qualify)
+  const rows = [...body.querySelectorAll('tr')].filter(tr => rowQualifiesNewDevice(tr));
+  if (!rows.length) return '';
 
-  const headers = [
-    'Vendor*',
-    'SPA/Deal Reg #',
-    'Deal Reg Expiration',
-    'Vendor Hold/Reservation #',
-    'End of Life Date*',
-    'Stock Available for SO Qty*',
-    'Lead Time Date (if No)',
-    'Expected Ship By Date*',
-    'Quantity Required',
-    'Same Shipping Address',
-    'Alternate Shipping Address (if No)',
-    'Services Stay The Same',
-    'New/Additional Services SKU (if No)'
-  ];
+  // Read current panel values (they reflect the "current" row), but we persist per-row in dataset
+  let csv = ND_CSV_HEADERS.join(',') + '\n';
+  rows.forEach((tr, i)=>{
+    const data = getNdData(tr);
+    const sku  = getRowSku(tr);
+    const lineNo = i + 1;
 
-  const row = [
-    vendor,
-    dealReg,
-    dealExp,
-    holdNo,
-    eol,
-    stockOK,
-    stockOK === 'No' ? leadDate : '',
-    expShipBy,
-    qtyReq,
-    sameShip,
-    sameShip === 'No' ? altShip : '',
-    svcSame,
-    svcSame === 'No' ? svcSKU : ''
-  ];
+    const row = [
+      lineNo,
+      sku,
+      data.ndVendor || '',
+      data.ndDealReg || '',
+      data.ndDealExp || '',
+      data.ndHoldNo || '',
+      data.ndEOL || '',
+      data.ndStockOK || '',
+      (data.ndStockOK === 'No' ? (data.ndLeadDate || '') : ''),
+      data.ndExpShipBy || '',
+      data.ndQtyRequired || '',
+      data.ndSameShip || '',
+      (data.ndSameShip === 'No' ? (data.ndAltShip || '') : ''),
+      data.ndSvcSame || '',
+      (data.ndSvcSame === 'No' ? (data.ndSvcSKU || '') : '')
+    ];
 
-  let csv = headers.join(',') + '\n';
-  csv += row.map(csvEscape).join(',');
-  return csv;
+    csv += row.map(csvEscape).join(',') + '\n';
+  });
+
+  return csv.trimEnd();
 }
+
 
 /* ==== Combined CSV for preview + Gmail body ==== */
 function buildCSV(){
@@ -1240,6 +1225,158 @@ const PAIRING_SKUS = new Set(Object.values(PAIRING_SKU_MAP).map(x => String(x.sk
 // === Column safeguards (align with your table header) ===
 if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
 if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
+// ===== Row-scoped "New Device Details" with License override =====
+
+// Read inputs from a row
+function getTdInput(tr, colIdx){
+  return tr?.querySelectorAll('td')[colIdx]?.querySelector('input,textarea,select') || null;
+}
+function getRowSku(tr){ return (getTdInput(tr, window.COL_SKU)?.value || '').trim(); }
+function getRowDesc(tr){ return (getTdInput(tr, window.COL_DESC)?.value || '').trim(); }
+function isLicenseDesc(desc){ return /license/i.test(String(desc || '')); }
+
+// Qualifier for this row:
+// - SKU ends with "00"
+// - AND description does NOT include "license"
+function rowQualifiesNewDevice(tr){
+  const sku = getRowSku(tr);
+  const desc = getRowDesc(tr);
+  return sku.toLowerCase().endsWith('00') && !isLicenseDesc(desc);
+}
+
+// Per-row data storage for ND panel, persisted on the <tr>
+function getNdData(tr){ try { return JSON.parse(tr.dataset.nd || '{}'); } catch { return {}; } }
+function setNdData(tr, obj){ tr.dataset.nd = JSON.stringify(obj || {}); }
+
+// Track the "current" row that the ND panel is editing
+let __currentRow = null;
+function setCurrentRow(tr){
+  __currentRow = tr;
+
+  // Optional highlight
+  document.querySelectorAll('#itemsBody tr').forEach(r => r.classList.remove('nd-current'));
+  tr?.classList.add('nd-current');
+
+  // Decide which subtab to activate for this row
+  const desc = getRowDesc(tr);
+  if (isLicenseDesc(desc)) {
+    activateSubtab('licenses'); // license rows go to Licenses subtab
+  } else if (rowQualifiesNewDevice(tr)) {
+    ensureNewDeviceTabVisibility();
+    activateSubtab('newdevice');
+    loadNdPanelFromRow(tr);
+  }
+}
+
+// ND panel fields we persist per-row
+const ND_IDS = [
+  'ndVendor','ndDealReg','ndDealExp','ndHoldNo','ndEOL','ndStockOK',
+  'ndLeadDate','ndExpShipBy','ndQtyRequired','ndSameShip','ndAltShip',
+  'ndSvcSame','ndSvcSKU'
+];
+
+function readVal(id){ return (document.getElementById(id)?.value || '').trim(); }
+function setVal(id, v){
+  const el = document.getElementById(id);
+  if (el) { el.value = v ?? ''; el.dispatchEvent(new Event('input', {bubbles:true})); }
+}
+
+function loadNdPanelFromRow(tr){
+  const data = getNdData(tr);
+  ND_IDS.forEach(k => setVal(k, data[k] ?? ''));
+  toggleNdDependents();
+}
+function saveNdPanelToRow(){
+  if (!__currentRow) return;
+  const data = {};
+  ND_IDS.forEach(k => data[k] = readVal(k));
+  setNdData(__currentRow, data);
+}
+
+// Show the "New Device Details" tab only if ANY row qualifies (license rows do NOT qualify)
+function anyRowQualifiesNewDevice(){
+  const body = document.getElementById('itemsBody');
+  if (!body) return false;
+  for (const tr of body.querySelectorAll('tr')) {
+    if (rowQualifiesNewDevice(tr)) return true;
+  }
+  return false;
+}
+function ensureNewDeviceTabVisibility(){
+  const show = anyRowQualifiesNewDevice();
+  const tab  = document.getElementById('tabNewDevice');
+  const pane = document.getElementById('panelNewDevice');
+  if (tab)  tab.style.display  = show ? '' : 'none';
+  if (pane) pane.style.display = show ? '' : 'none';
+}
+
+// Hook row selection and SKU/Description edits
+(function hookRowScope(){
+  const body = document.getElementById('itemsBody');
+  if (!body) return;
+
+  // Click any row to make it "current" for the ND panel
+  body.addEventListener('click', (e)=>{
+    const tr = e.target.closest('tr');
+    if (tr) setCurrentRow(tr);
+  });
+
+  // When SKU or Description changes, recompute visibility; for current row, sync panel/subtab
+  body.addEventListener('input', (e)=>{
+    const tr = e.target.closest('tr'); if (!tr) return;
+    const td = e.target.closest('td'); if (!td) return;
+    const idx = [...tr.children].indexOf(td);
+    if (idx === window.COL_SKU || idx === window.COL_DESC) {
+      ensureNewDeviceTabVisibility();
+      if (__currentRow === tr) {
+        if (isLicenseDesc(getRowDesc(tr))) {
+          activateSubtab('licenses');
+        } else if (rowQualifiesNewDevice(tr)) {
+          activateSubtab('newdevice');
+          loadNdPanelFromRow(tr);
+        }
+      }
+    }
+  });
+
+  // Watch for newly added rows (addRow / clone)
+  const mo = new MutationObserver(()=> ensureNewDeviceTabVisibility());
+  mo.observe(body, { childList:true });
+})();
+
+// Persist ND panel edits back into the current row’s dataset
+ND_IDS.forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', saveNdPanelToRow);
+});
+
+// Dependent ND UI (lead time, alt ship, services)
+function toggleNdDependents(){
+  const stockOK = readVal('ndStockOK');
+  const sameShip = readVal('ndSameShip');
+  const svcSame  = readVal('ndSvcSame');
+
+  const leadWrap = document.getElementById('ndLeadWrap');
+  if (leadWrap) leadWrap.style.display = (stockOK === 'No') ? '' : 'none';
+
+  const altWrap = document.getElementById('ndAltShipWrap');
+  if (altWrap) altWrap.style.display = (sameShip === 'No') ? '' : 'none';
+
+  const svcWrap = document.getElementById('ndSvcWrap');
+  if (svcWrap) svcWrap.style.display = (svcSame === 'No') ? '' : 'none';
+}
+['ndStockOK','ndSameShip','ndSvcSame'].forEach(id=>{
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('change', ()=>{ toggleNdDependents(); saveNdPanelToRow(); });
+});
+
+// Generic subtab activator (uses your existing subtabs DOM)
+function activateSubtab(key){
+  const tabs = document.querySelectorAll('#subtabsArea .subtab');
+  const panels = document.querySelectorAll('#subtabPanels [data-subpanel]');
+  tabs.forEach(t => t.classList.toggle('active', t.getAttribute('data-sub') === key));
+  panels.forEach(p => p.style.display = (p.getAttribute('data-subpanel') === key) ? '' : 'none');
+}
 
   // Column index for "New / CPO" (0-based from your header)
 if (typeof window.COL_COND === 'undefined') window.COL_COND = 11;
@@ -1273,13 +1410,10 @@ function applyCondForRow(tr){
   }
 
   // Optional: keep the New Device Details tab in sync if you have UI toggling elsewhere
-  if (typeof anySkuEndsWith00 === 'function') {
-    const show = anySkuEndsWith00();
-    const tab  = document.getElementById('tabNewDevice');
-    const pane = document.getElementById('panelNewDevice');
-    if (tab)  tab.style.display  = show ? '' : 'none';
-    if (pane) pane.style.display = show ? '' : 'none';
-  }
+  if (typeof ensureNewDeviceTabVisibility === 'function') {
+  ensureNewDeviceTabVisibility();
+}
+
 }
 
 // 1) React when the SKU cell is edited
