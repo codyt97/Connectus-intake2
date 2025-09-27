@@ -384,13 +384,45 @@
 
         <section class="three">
           <h3>Shipping Options</h3>
-          <label>Shipping Payment Method</label>
-          <select id="shipPay"><option value="">Select Shipping Pmt Method</option><option>Prepaid</option><option>Collect</option><option>3rd Party</option></select>
-          <label style="margin-top:10px">Shipping Speed</label>
-          <select id="shipSpeed"><option value="">Select Shipping Speed</option><option>Ground</option><option>2-Day</option><option>Overnight</option></select>
-          <label style="margin-top:10px">Short Ship?</label>
-          <select id="shortShip"><option value="">Select</option><option>No</option><option>Yes (Backorder OK)</option></select>
-        </section>
+
+<!-- NEW: Carrier method -->
+<label>Shipping Method</label>
+<select id="shipMethod">
+  <option value="">Select Carrier</option>
+  <option value="FedEx">FedEx</option>
+  <option value="UPS">UPS</option>
+</select>
+
+<label style="margin-top:10px">Shipping Payment Method</label>
+<select id="shipPay">
+  <option value="">Select Shipping Pmt Method</option>
+  <option value="Prepaid">Prepaid</option>
+  <option value="Collect">Collect</option>
+  <option value="3rd Party">3rd Party</option>
+</select>
+
+<!-- NEW: Only visible when 3rd Party is chosen -->
+<div id="thirdPartyBlock" style="display:none; margin-top:8px">
+  <label id="thirdPartyLabel">Account #</label>
+  <input id="thirdPartyAcct" placeholder="Enter account number" />
+  <div class="tiny">Shown only for 3rd Party billing; label adapts to chosen carrier.</div>
+</div>
+
+<label style="margin-top:10px">Shipping Speed</label>
+<select id="shipSpeed">
+  <option value="">Select Shipping Speed</option>
+  <option>Ground</option>
+  <option>2-Day</option>
+  <option>Overnight</option>
+</select>
+
+<label style="margin-top:10px">Short Ship?</label>
+<select id="shortShip">
+  <option value="">Select</option>
+  <option>No</option>
+  <option>Yes (Backorder OK)</option>
+</select>
+
 
         <section class="full">
           <h3>Internal Notes</h3>
@@ -441,7 +473,10 @@
             <button class="subtab" data-sub="insurance">Insurance</button>
             <button class="subtab" data-sub="sim">SIM / Pairing</button>
             <button class="subtab" data-sub="licenses">Licenses</button>
+            <!-- NEW: visible only when needed -->
+            <button class="subtab" data-sub="newdevice" id="tabNewDevice" style="display:none">New Device Details</button>
           </div>
+
 
           <!-- Subtab panels -->
           <div id="subtabPanels" style="margin-top:8px;display:none">
@@ -510,6 +545,78 @@
             </div>
           </div>
 
+          <!-- NEW: New Device Details (shown when any SKU ends with 00) -->
+<div data-subpanel="newdevice" id="panelNewDevice" style="display:none">
+  <div class="grid">
+    <section class="three">
+      <label>Vendor* (Must enter Vendor for New Devices)</label>
+      <input id="ndVendor" placeholder="e.g., Ingram" />
+
+      <label style="margin-top:8px">SPA PRICE / DEAL REGISTRATION #</label>
+      <input id="ndDealReg" placeholder="e.g., DR-12345 or SPA $310" />
+
+      <label style="margin-top:8px">Deal registration expiration date</label>
+      <input id="ndDealExp" type="date" />
+      
+      <label style="margin-top:8px">Vendor Hold # / Reservation #</label>
+      <input id="ndHoldNo" placeholder="e.g., RES-9981" />
+
+      <label style="margin-top:8px">End of life date*</label>
+      <input id="ndEOL" type="date" />
+
+      <label style="margin-top:8px">Confirm availability of stock for the SO qty*</label>
+      <select id="ndStockOK">
+        <option value="">Select</option>
+        <option>Yes</option>
+        <option>No</option>
+      </select>
+
+      <div id="ndLeadWrap" style="display:none; margin-top:8px">
+        <label>If No — enter lead time date</label>
+        <input id="ndLeadDate" type="date" />
+      </div>
+
+      <label style="margin-top:8px">Expected Ship By Date*</label>
+      <input id="ndExpShipBy" type="date" />
+    </section>
+
+    <section class="three">
+      <label>Quantity Required</label>
+      <input id="ndQtyRequired" type="number" min="0" />
+
+      <label style="margin-top:8px">Same Shipping Address</label>
+      <select id="ndSameShip">
+        <option value="">Select</option>
+        <option>Yes</option>
+        <option>No</option>
+      </select>
+
+      <div id="ndAltShipWrap" style="display:none; margin-top:8px">
+        <label>Alternate Shipping Address</label>
+        <textarea id="ndAltShip" rows="6" placeholder="Company / Contact / Phone / Email
+Street / Suite
+City, State ZIP"></textarea>
+      </div>
+
+      <label style="margin-top:8px">Services Stay The Same</label>
+      <select id="ndSvcSame">
+        <option value="">Select</option>
+        <option>Yes</option>
+        <option>No</option>
+      </select>
+
+      <div id="ndSvcWrap" style="display:none; margin-top:8px">
+        <label>If No — enter new / additional services SKU</label>
+        <input id="ndSvcSKU" placeholder="e.g., Proservices_Tier2" />
+      </div>
+    </section>
+  </div>
+  <div class="tiny" style="margin-top:8px">
+    This panel appears when any line’s OrderTime SKU ends with <strong>00</strong> (new-device workflow).
+  </div>
+</div>
+
+          
           <!-- Totals -->
           <div class="totals" id="totalsBox" style="display:none">
             <h4>Totals (current document)</h4>
@@ -1156,6 +1263,36 @@ Orlando
  `
 };
 
+/* ===== Shipping: 3rd party toggle ===== */
+function updateThirdPartyAccountUI(){
+  const pay = document.getElementById('shipPay')?.value || '';
+  const method = document.getElementById('shipMethod')?.value || '';
+  const block = document.getElementById('thirdPartyBlock');
+  const label = document.getElementById('thirdPartyLabel');
+  if(!block || !label) return;
+
+  const isThird = String(pay).toLowerCase() === '3rd party';
+  block.style.display = isThird ? '' : 'none';
+
+  if(isThird){
+    // Label adapts to chosen carrier
+    if(method === 'FedEx') label.textContent = 'FedEx Account #';
+    else if(method === 'UPS') label.textContent = 'UPS Account #';
+    else label.textContent = 'Carrier Account #';
+  }
+}
+
+// Bind events once DOM is ready
+window.addEventListener('DOMContentLoaded', () => {
+  const paySel = document.getElementById('shipPay');
+  const methodSel = document.getElementById('shipMethod');
+  if(paySel)   paySel.addEventListener('change', updateThirdPartyAccountUI);
+  if(methodSel) methodSel.addEventListener('change', updateThirdPartyAccountUI);
+  // init
+  updateThirdPartyAccountUI();
+});
+
+  
 function loadReps(){
   let reps = [];
   try{ reps = JSON.parse(localStorage.getItem(LS_REPS_KEY)||"[]"); }catch(_){}
@@ -2665,6 +2802,124 @@ document.getElementById('btnSubmitIntake')?.addEventListener('click', async ()=>
   // Ensure CSV preview is primed
   refreshCSVPreview();
 })();
+
+ /* ===== Items: SKU suffix rules ===== */
+
+// Column indexes (0-based) based on your header order
+const COL_SKU = 3;       // "OrderTime SKU"
+const COL_NEWCPO = 11;   // "New / CPO"
+
+// Evaluate one row for suffix rules
+function evalRowSuffixRules(tr){
+  const tds = [...tr.querySelectorAll('td')];
+  if(!tds.length) return;
+
+  // Get SKU text
+  const skuEl = tds[COL_SKU]?.querySelector('input,textarea,select');
+  const sku = (skuEl?.value || '').trim();
+
+  // 1) If SKU ends with 10, 20, 29, 99, or 999 → set New/CPO = CPO
+  const cpoSuffixes = ['10','20','29','99','999'];
+  const endsWithAny = (s, suffixes) => suffixes.some(suf => s.toLowerCase().endsWith(String(suf).toLowerCase()));
+  if(sku && endsWithAny(sku, cpoSuffixes)){
+    const ncEl = tds[COL_NEWCPO]?.querySelector('input,textarea,select');
+    if(ncEl){
+      ncEl.value = 'CPO';
+      ncEl.dispatchEvent(new Event('input', { bubbles: true }));
+      ncEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+  }
+
+  // Return whether SKU ends with '00' (used to toggle new panel)
+  return sku && sku.toLowerCase().endsWith('00');
+}
+
+// Recompute whether we show the New Device tab/panel
+function recomputeNewDeviceTabVisibility(){
+  const body = document.getElementById('itemsBody');
+  const rows = body ? [...body.querySelectorAll('tr')] : [];
+  let needsTab = false;
+  rows.forEach(tr => {
+    const isNewDevice = evalRowSuffixRules(tr);
+    if(isNewDevice) needsTab = true;
+  });
+
+  const tab = document.getElementById('tabNewDevice');
+  const panel = document.getElementById('panelNewDevice');
+  if(tab){
+    tab.style.display = needsTab ? '' : 'none';
+  }
+  if(panel){
+    // If hiding and it was the active subpanel, optionally revert to "Accessory"
+    panel.style.display = needsTab ? '' : 'none';
+    if(!needsTab){
+      const active = document.querySelector('.subtab.active[data-sub="newdevice"]');
+      if(active){
+        active.classList.remove('active');
+        const acc = document.querySelector('.subtab[data-sub="accessory"]');
+        const accPanel = document.querySelector('[data-subpanel="accessory"]');
+        if(acc){ acc.classList.add('active'); }
+        if(accPanel){ accPanel.style.display = ''; }
+      }
+    }
+    // ensure subtabs container is visible if any tab exists
+    const subtabs = document.getElementById('subtabsArea');
+    const panels = document.getElementById('subtabPanels');
+    if(subtabs && panels){
+      const anyTabVisible = [...subtabs.querySelectorAll('.subtab')].some(b => b.style.display !== 'none');
+      if(anyTabVisible){ subtabs.style.display = ''; panels.style.display = ''; }
+    }
+  }
+}
+
+// Delegate keyup/change events on the Items table to catch SKU edits and newly added rows
+window.addEventListener('DOMContentLoaded', () => {
+  const body = document.getElementById('itemsBody');
+  if(!body) return;
+
+  body.addEventListener('input', (e) => {
+    const tr = e.target.closest('tr');
+    if(!tr) return;
+    // Only react when the change is in the SKU column
+    const cell = e.target.closest('td');
+    if(!cell) return;
+    const idx = [...tr.children].indexOf(cell);
+    if(idx === COL_SKU){
+      // Re-run rules for this row and refresh panel visibility
+      evalRowSuffixRules(tr);
+      recomputeNewDeviceTabVisibility();
+    }
+  });
+
+  // Also run once after page load (in case of prefilled example)
+  recomputeNewDeviceTabVisibility();
+});
+
+// New Device panel: dependent field visibility
+window.addEventListener('DOMContentLoaded', () => {
+  const stockSel = document.getElementById('ndStockOK');
+  const leadWrap = document.getElementById('ndLeadWrap');
+  if(stockSel && leadWrap){
+    stockSel.addEventListener('change', () => {
+      leadWrap.style.display = (stockSel.value === 'No') ? '' : 'none';
+    });
+  }
+  const sameShip = document.getElementById('ndSameShip');
+  const altShipWrap = document.getElementById('ndAltShipWrap');
+  if(sameShip && altShipWrap){
+    sameShip.addEventListener('change', () => {
+      altShipWrap.style.display = (sameShip.value === 'No') ? '' : 'none';
+    });
+  }
+  const svcSame = document.getElementById('ndSvcSame');
+  const svcWrap = document.getElementById('ndSvcWrap');
+  if(svcSame && svcWrap){
+    svcSame.addEventListener('change', () => {
+      svcWrap.style.display = (svcSame.value === 'No') ? '' : 'none';
+    });
+  }
+});
+ 
 </script>
 </body>
 </html>
