@@ -1,3 +1,4 @@
+// /api/ordertime/items/search.js
 const { listSearch } = require('../../_ot');
 
 module.exports = async function handler(req, res) {
@@ -5,23 +6,30 @@ module.exports = async function handler(req, res) {
     const q = String(req.query.q || '').trim();
     if (!q) return res.status(200).json([]);
 
-    const rows = await listSearch({
-      type: 'Customer',
-      q,
-      columns: ['Name','CompanyName','Email','Phone','BillingCity','BillingState'],
-      sortProp: 'Name',
-      dir: 'Asc'
-    });
+    const columns = [
+      'Name','ItemName','Number','ItemNumber','SKU',
+      'ManufacturerPartNo','ManufacturerPartNumber','MfgPartNo',
+      'UPC','UPCCode','Description'
+    ];
 
-    res.status(200).json(rows.map(x => ({
-      id: x.Id,
-      company: x.CompanyName || x.Name || '',
-      email: x.Email || x.BillingEmail || '',
-      phone: x.Phone || x.BillingPhone || '',
-      city: x.BillingCity || x.City || '',
-      state: x.BillingState || x.State || '',
-    })));
+    const rows = await listSearch({ type: 'PartItem', q, columns, sortProp: 'Id', dir: 'Asc' });
+
+    const pick = (o, keys) => { for (const k of keys) if (o && o[k]) return o[k]; return ''; };
+    const seen = new Set();
+    const out = rows
+      .filter(r => (seen.has(r.Id) ? false : (seen.add(r.Id), true)))
+      .map(x => ({
+        id: x.Id,
+        name: pick(x, ['Name','ItemName','Description','Number','ItemNumber','SKU']) || '',
+        description: pick(x, ['Description']) || '',
+        mfgPart: pick(x, ['ManufacturerPartNo','ManufacturerPartNumber','MfgPartNo']) || '',
+        upc: pick(x, ['UPC','UPCCode']) || '',
+        price: (x.SalesPrice ?? x.Price ?? x.UnitPrice ?? 0) || 0,
+        sku: pick(x, ['Number','ItemNumber','SKU']) || ''
+      }));
+
+    res.status(200).json(out);
   } catch (err) {
-    res.status(500).json({ error: `API GET /ordertime/customers/search failed: ${err.message || err}` });
+    res.status(500).json({ error: `API GET /ordertime/items/search failed: ${err.message || err}` });
   }
 };
