@@ -1,27 +1,27 @@
-const { listSearch } = require('../../_ot');
+import { listCustomersByName } from '../../_ot';
 
-module.exports = async function handler(req, res) {
+export default async function handler(req, res) {
   try {
-    const q = String(req.query.q || '').trim();
-    if (!q) return res.status(200).json([]);
+    if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
+    const { q = '', page = '1', take = '25' } = req.query;
+    if (!q.trim()) return res.status(400).json({ error: 'Missing query ?q=' });
 
-    const rows = await listSearch({
-      type: 'Customer',
-      q,
-      columns: ['Name','CompanyName','Email','Phone','BillingCity','BillingState'],
-      sortProp: 'Name',
-      dir: 'Asc'
-    });
+    const rows = await listCustomersByName(q.trim(), Number(page)||1, Number(take)||25);
 
-    res.status(200).json(rows.map(x => ({
-      id: x.Id,
-      company: x.CompanyName || x.Name || '',
-      email: x.Email || x.BillingEmail || '',
-      phone: x.Phone || x.BillingPhone || '',
-      city: x.BillingCity || x.City || '',
-      state: x.BillingState || x.State || '',
-    })));
+    const items = rows.map(r => ({
+      id: r.Id ?? r.ID ?? r.id,
+      company: r.Name || r.CompanyName || r.Company || '',
+      city: r.City || r.BillingCity || '',
+      state: r.State || r.BillingState || '',
+      zip: r.Zip || r.BillingZip || '',
+      billingContact: r.BillingContact || '',
+      billingPhone:   r.BillingPhone || '',
+      billingEmail:   r.BillingEmail || ''
+    }));
+
+    res.status(200).json(items);
   } catch (err) {
-    res.status(500).json({ error: `API GET /ordertime/customers/search failed: ${err.message || err}` });
+    console.error('customers/search error:', err);
+    res.status(500).json({ error: String(err.message || err) });
   }
-};
+}
