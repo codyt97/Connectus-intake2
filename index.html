@@ -961,6 +961,97 @@ function csvEscape(v) {
   return s;
 }
 
+/* ==== New-Device CSV (only when any OrderTime SKU ends with "00") ==== */
+
+// Reuse the same indexes you used earlier
+const COL_SKU = 3;  // 4th column in Items table
+
+function anySkuEndsWith00(){
+  const body = document.getElementById('itemsBody');
+  if(!body) return false;
+  for(const tr of body.querySelectorAll('tr')){
+    const tds = [...tr.querySelectorAll('td')];
+    const skuEl = tds[COL_SKU]?.querySelector('input,textarea,select');
+    const sku = (skuEl?.value || '').trim().toLowerCase();
+    if (sku.endsWith('00')) return true;
+  }
+  return false;
+}
+
+function readVal(id){ return (document.getElementById(id)?.value || '').trim(); }
+
+/**
+ * Returns a CSV string (headers + one row) OR empty string if not applicable.
+ * Fields drawn from the "New Device Details" panel (ids: ndVendor, ndDealReg, ndDealExp, ndHoldNo,
+ * ndEOL, ndStockOK, ndLeadDate, ndExpShipBy, ndQtyRequired, ndSameShip, ndAltShip, ndSvcSame, ndSvcSKU)
+ */
+function buildNewDeviceCSV(){
+  if (!anySkuEndsWith00()) return '';
+
+  const vendor     = readVal('ndVendor');
+  const dealReg    = readVal('ndDealReg');
+  const dealExp    = readVal('ndDealExp');
+  const holdNo     = readVal('ndHoldNo');
+  const eol        = readVal('ndEOL');
+  const stockOK    = readVal('ndStockOK');
+  const leadDate   = readVal('ndLeadDate');
+  const expShipBy  = readVal('ndExpShipBy');
+  const qtyReq     = readVal('ndQtyRequired');
+  const sameShip   = readVal('ndSameShip');
+  const altShip    = readVal('ndAltShip');
+  const svcSame    = readVal('ndSvcSame');
+  const svcSKU     = readVal('ndSvcSKU');
+
+  const headers = [
+    'Vendor*',
+    'SPA/Deal Reg #',
+    'Deal Reg Expiration',
+    'Vendor Hold/Reservation #',
+    'End of Life Date*',
+    'Stock Available for SO Qty*',
+    'Lead Time Date (if No)',
+    'Expected Ship By Date*',
+    'Quantity Required',
+    'Same Shipping Address',
+    'Alternate Shipping Address (if No)',
+    'Services Stay The Same',
+    'New/Additional Services SKU (if No)'
+  ];
+
+  const row = [
+    vendor,
+    dealReg,
+    dealExp,
+    holdNo,
+    eol,
+    stockOK,
+    stockOK === 'No' ? leadDate : '',
+    expShipBy,
+    qtyReq,
+    sameShip,
+    sameShip === 'No' ? altShip : '',
+    svcSame,
+    svcSame === 'No' ? svcSKU : ''
+  ];
+
+  let csv = headers.join(',') + '\n';
+  csv += row.map(csvEscape).join(',');
+  return csv;
+}
+
+/* ==== Combined CSV for preview + Gmail body ==== */
+function buildCSV(){
+  const parts = [];
+  // Header CSV
+  parts.push('=== Sales Order Header ===\n' + buildHeaderCSV());
+  // Lines CSV
+  parts.push('=== Sales Order Lines ===\n' + buildLineCSV());
+  // New Device CSV (conditional)
+  const ndCsv = buildNewDeviceCSV();
+  if (ndCsv) parts.push('=== New Device Details ===\n' + ndCsv);
+  return parts.join('\n\n');
+}
+ 
 // ---- Download helpers
 function downloadBlobCSV(filename, csvText) {
   const blob = new Blob([csvText], { type: 'text/csv;charset=utf-8;' });
@@ -972,6 +1063,7 @@ function downloadBlobCSV(filename, csvText) {
   a.click();
   setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 0);
 }
+
 
 // Replaces old "downloadCSVFile"
 function downloadHeaderCSVFile() {
