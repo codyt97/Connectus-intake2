@@ -1276,24 +1276,28 @@ function isLicenseDesc(desc){ return /license/i.test(String(desc || '')); }
 // Qualifier for this row:
 // - SKU ends with "00"
 // - AND description does NOT include "license"
-// Qualifier for this row:
-// - SKU ends with "00"
-// - AND description does NOT include "license"
 // - AND description does NOT include "sim" or "card"
+// - AND description does NOT include "AKKO"
+// - AND SKU does NOT start with "AO" (e.g., AO-… insurance SKUs)
 function rowQualifiesNewDevice(tr){
   if (!tr) return false;
 
-  const sku  = String(getRowSku(tr)  || '').toLowerCase();
-  const desc = String(getRowDesc(tr) || '');
+  const skuRaw = String(getRowSku(tr) || '');
+  const sku    = skuRaw.trim().toLowerCase();
+  const desc   = String(getRowDesc(tr) || '');
 
-  // existing license check keeps Licenses tab behavior
-  const isLic = isLicenseDesc(desc);
+  // keep: license rows route to Licenses subtab elsewhere
+  const isLic        = isLicenseDesc(desc);
 
-  // new exclusion: hide New-Device for SIM/CARD descriptors
-  const isSimOrCard = /\b(sim|sim card|card)\b/i.test(desc);
+  // ND-specific exclusions
+  const isSimOrCard  = /\b(sim|sim card|card)\b/i.test(desc);
+  const isAkkoText   = /akko/i.test(desc);
+  const isAoSku      = sku.startsWith('ao'); // e.g., "AO-PMA4YFF900"
 
-  return sku.endsWith('00') && !isLic && !isSimOrCard;
+  return sku.endsWith('00') && !isLic && !isSimOrCard && !isAkkoText && !isAoSku;
 }
+
+
 
 // Per-row data storage for ND panel, persisted on the <tr>
 function getNdData(tr){ try { return JSON.parse(tr.dataset.nd || '{}'); } catch { return {}; } }
