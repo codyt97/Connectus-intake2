@@ -1119,19 +1119,21 @@ async function api(path, { method='GET', headers={}, body } = {}){
 
 /* ===== SIM / Pairing option catalogs ===== */
 // Seeded from your template screenshot. Add/adjust as needed.
-const SIM_CARD_OPTIONS = [
-  'VZ-SIM3IN1',
-  'AT-SIM3IN1',
-  'AT-FIRSTSIMA00',
-  'TM-SIM3IN14G',
-  'HE-HELIXTRIAA00',
-  'Helix eSIM(TriA) ',
-  'HE TRI-B Static IP Helix',
-  'MW-SIMVZTMATT-E',
-  'US-SIM3IN15G',
-  'eSim Embendded in the phone',
-  'NO SIM CARD',
-];
+const SIM_MAP = {
+  'VZ-SIM3IN1':              { sku: 'VZ-SIM3IN1',     desc: '3 IN 1 VERIZON SIM CARD' },
+  'AT-SIM3IN1':              { sku: 'AT-SIM3IN1',     desc: '3 IN 1 AT&T SIM CARD' },
+  'AT-FIRSTSIMA00':          { sku: 'AT-FIRSTSIMA00', desc: '3 IN 1 FIRST NET AT&T LOCKED 5G SIM CARD BLACK' },
+  'TM-SIM3IN14G':            { sku: 'TM-SIM3IN14G',   desc: '3IN1 T-MOBILE LOCKED 4G SIM CARD' },
+  'HE-HELIXTRIAA00':         { sku: 'HE-HELIXTRIAA00',desc: 'HELIX WIRELESS TRIA SIM CARD' },
+  'Helix eSIM(TriA)':        { sku: 'HE-HELXTRIAA00', desc: 'HELIX WIRELESS TRI-A eSIM' }, // adjust if needed
+  'HE TRI-B Static IP Helix':{ sku: 'HE-00075FB00',   desc: 'HELIX WIRELESS SIM CARD TRI-B FOR STATIC IP' },
+  'MW-SIMVZTMATT-E':         { sku: 'MW-SIMVZTMATT-E',desc: 'ConnectUS Dynamic IP Multi Carrier Access 3in1 SIM Card - VZ/ATT/TMO' },
+  'US-SIM3IN15G':            { sku: 'US-SIM3IN15G',   desc: '3IN1 US CELLULAR LOCKED 5G SIM CARD' },
+  'eSim Embended in the phone': { sku: 'ESIM-EMBEDDED', desc: 'Embedded eSIM (device-integrated)' },
+  'NO SIM CARD':             { sku: '',               desc: '' }
+};
+const _SIM_SKU_SET = new Set(Object.values(SIM_MAP).map(v => (v.sku || '').toUpperCase()).filter(Boolean));
+
 
 // If your Word template has the full lists, add them here later.
 const SIM_HANDLING_OPTIONS = [
@@ -1342,8 +1344,10 @@ const _SIM_SKU_SET = new Set(
 
 // Helper: get tbody and safe COL indices
 function _getItemsTbody() {
-  return document.querySelector('#tblItems tbody');
+  // Your table is <table id="itemsTbl"><tbody id="itemsBody">
+  return document.getElementById('itemsBody');
 }
+
 function _colSafe(idx, fallback) {
   const n = Number(idx);
   return Number.isFinite(n) ? n : fallback;
@@ -1381,7 +1385,9 @@ function _addSimRow(hit) {
   const COL_SKU  = _colSafe(window.COL_SKU, 3);
 
   // Create the right number of cells to avoid layout issues
-  const colCount = tbody.parentElement.querySelector('thead tr')?.children?.length || Math.max(COL_DESC, COL_SKU) + 1;
+  const headRow = document.querySelector('#itemsTbl thead tr');
+  const colCount = headRow ? headRow.children.length : Math.max(window.COL_DESC, window.COL_SKU) + 1;
+
   for (let i = 0; i < colCount; i++) tr.appendChild(document.createElement('td'));
 
   _setCell(tr, COL_DESC, hit.desc);
