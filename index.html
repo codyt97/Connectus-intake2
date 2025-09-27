@@ -845,20 +845,6 @@ function openGmailCompose({to, subject, body}) {
 }
 
 function openGmailWithCSV() {
-  // ===== HARD GATE: if any license mini-tab exists, all its fields must be valid =====
-  const miniTabs = [...document.querySelectorAll('tr.license-mini')];
-  if (miniTabs.length > 0) {
-    const firstInvalid = miniTabs.map(m => m.querySelector(':invalid')).find(Boolean);
-    if (firstInvalid) {
-      const row = firstInvalid.closest('tr') || firstInvalid;
-      row.scrollIntoView({ block: 'center', behavior: 'smooth' });
-      firstInvalid.focus({ preventScroll: false });
-      firstInvalid.reportValidity?.();
-      return; // BLOCK send
-    }
-  }
-
-  // === existing body below ===
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
   const csv     = document.getElementById('csvPreview')?.value || buildCSV();
@@ -869,7 +855,6 @@ function openGmailWithCSV() {
 
   openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
-
 // ---- Helper: map current wizard doc type to ERP TranType code
 function getDocTypeCode() {
   // radios in Step 3 (Document Type): QUOTE / SALES ORDER / CLONE (clone still resolves to a base type)
@@ -880,7 +865,6 @@ function getDocTypeCode() {
   // For CLONE, infer base from currently selected chip—fallback to Sales Order
   return 7;
 }
-
 
 // ---- Helper: get current DocNo (optional UX field; safe if absent)
 function getDocNo() {
@@ -1131,118 +1115,6 @@ async function api(path, { method='GET', headers={}, body } = {}){
 }
 
 
-// Ensure each item row has a stable id to link the mini-tab row
-function ensureRowId(tr) {
-  if (!tr.dataset.rowid) {
-    tr.dataset.rowid = String(Date.now()) + '-' + Math.random().toString(36).slice(2,7);
-  }
-  return tr.dataset.rowid;
-}
-
-// Create/update/remove the license mini-tab below a row when description contains "license"
-function handleLicenseMiniTabForRow(tr) {
-  const descInput = tr.cells?.[window.COL_DESC]?.querySelector('input,textarea,select');
-  const desc = (descInput?.value || '').trim();
-  const hasLicense = /license/i.test(desc);
-  const rowId = ensureRowId(tr);
-
-  const next = tr.nextElementSibling;
-  const existing = (next?.classList?.contains('license-mini') && next?.dataset?.forRow === rowId) ? next : null;
-
-  if (hasLicense && !existing) {
-    insertLicenseMiniTabAfter(tr, rowId);
-  } else if (!hasLicense && existing) {
-    existing.remove();
-  }
-
-  // If present, enforce 'required' on all fields
-  if (hasLicense) {
-    const mini = tr.nextElementSibling?.classList?.contains('license-mini') ? tr.nextElementSibling : null;
-    if (mini) enforceRequiredInside(mini);
-  }
-}
-
-// Render a single-row mini-tab directly under the item row
-function insertLicenseMiniTabAfter(tr, rowId) {
-  const colCount = tr.querySelectorAll('td').length || 6;
-  const mini = document.createElement('tr');
-  mini.className = 'license-mini';
-  mini.dataset.forRow = rowId;
-
-  // Unique ids per row
-  const uid = rowId.replace(/[^a-z0-9]+/gi, '');
-  const idType  = `licType_${uid}`;
-  const idSeats = `licSeats_${uid}`;
-  const idStart = `licStart_${uid}`;
-  const idEnd   = `licEnd_${uid}`;
-  const idAssn  = `licAssignees_${uid}`;
-  const idNotes = `licNotes_${uid}`;
-
-  mini.innerHTML = `
-    <td colspan="${colCount}" style="background:#fafafa; padding:12px; border-top:1px solid #ddd;">
-      <div class="license-mini-wrap">
-        <div style="display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end">
-          <div style="min-width:220px">
-            <label for="${idType}">License Type</label>
-            <select id="${idType}">
-              <option value="">— Select —</option>
-              <option value="named-user">Named User</option>
-              <option value="device">Device</option>
-              <option value="site">Site</option>
-              <option value="subscription">Subscription</option>
-            </select>
-          </div>
-          <div>
-            <label for="${idSeats}">Seats / Qty</label>
-            <input id="${idSeats}" type="number" min="1" placeholder="e.g., 10" />
-          </div>
-          <div>
-            <label for="${idStart}">Start Date</label>
-            <input id="${idStart}" type="date" />
-          </div>
-          <div>
-            <label for="${idEnd}">End Date</label>
-            <input id="${idEnd}" type="date" />
-          </div>
-        </div>
-
-        <div style="display:flex; gap:12px; margin-top:10px; flex-wrap:wrap">
-          <div style="flex:1; min-width:280px">
-            <label for="${idAssn}">Assigned To / Emails</label>
-            <textarea id="${idAssn}" rows="2" placeholder="Comma-separated emails or names"></textarea>
-          </div>
-          <div style="flex:1; min-width:280px">
-            <label for="${idNotes}">License Notes</label>
-            <textarea id="${idNotes}" rows="2" placeholder="Any constraints, SKUs, or portals"></textarea>
-          </div>
-        </div>
-      </div>
-    </td>
-  `;
-  tr.after(mini);
-  enforceRequiredInside(mini);
-}
-
-// Mark EVERY field inside a root required (and make selects force a deliberate choice)
-function enforceRequiredInside(root) {
-  root.querySelectorAll('input, select, textarea').forEach(el => {
-    const type = (el.getAttribute('type') || '').toLowerCase();
-    if (['button','reset','submit'].includes(type)) return;
-    el.required = true;
-
-    if (el.tagName === 'SELECT') {
-      const hasEmpty = [...el.options].some(o => o.value === '');
-      if (!hasEmpty) {
-        const ph = document.createElement('option');
-        ph.value = '';
-        ph.textContent = '— Select —';
-        ph.disabled = true;
-        ph.selected = !el.value;
-        el.insertBefore(ph, el.firstChild);
-      }
-    }
-  });
-}
 
 
 /* ===== SIM / Pairing option catalogs ===== */
@@ -1682,31 +1554,6 @@ window.addEventListener('DOMContentLoaded', () => {
   if(methodSel) methodSel.addEventListener('change', updateThirdPartyAccountUI);
   // init
   updateThirdPartyAccountUI();
-  body.addEventListener('input', (e) => {
-    const tr = e.target.closest('tr');
-    if(!tr) return;
-
-    // (A) Always keep a stable id for this item row (used to tie the mini-tab)
-    ensureRowId(tr);
-
-    // (B) If the Description cell changed, add/remove/enforce the per-row License mini-tab
-    const cell = e.target.closest('td');
-    if (cell) {
-      const idx = [...tr.children].indexOf(cell);
-      if (idx === window.COL_DESC) {
-        handleLicenseMiniTabForRow(tr);
-      }
-    }
-
-    // (C) Existing logic for New Device tab — keep as-is for SKU changes
-    const cell2 = e.target.closest('td');
-    if(!cell2) return;
-    const idx2 = [...tr.children].indexOf(cell2);
-    if(idx2 === COL_SKU){
-      evalRowSuffixRules(tr);
-      recomputeNewDeviceTabVisibility();
-    }
-  });
 
   const pairingSel = document.getElementById('pairingOption');
   if (pairingSel) {
