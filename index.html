@@ -2516,11 +2516,9 @@ async function openOTSearch(){
 
 
 async function applyCustomerFromApi(r){
-  // helper: safe getter with multiple aliases and nested paths
   const get = (obj, ...keys) => {
     for (const k of keys) {
       if (!obj) continue;
-      // nested path support: "Billing.Address1"
       if (k.includes('.')) {
         const v = k.split('.').reduce((o, part) => (o ? o[part] : undefined), obj);
         if (v !== undefined && v !== null && String(v).trim() !== '') return v;
@@ -2532,97 +2530,81 @@ async function applyCustomerFromApi(r){
     return '';
   };
 
-  // 1) Figure out an ID from the search row
+  // ID from search row
   const id =
-    get(r, 'id','Id','ID','CustomerId','CustomerID','CustomerIdRef') ||
-    get(r, 'CustomerRef.id','CustomerRef.Id','CustomerRef.ID');
-  if (!id) { alert('This search result has no ID; cannot load details.'); return; }
+    get(r,'id','Id','ID','CustomerId','CustomerID','CustomerIdRef') ||
+    get(r,'CustomerRef.id','CustomerRef.Id','CustomerRef.ID');
+  if (!id) { alert('No customer ID on this row.'); return; }
 
-  // 2) Load detail from backend (may be sparse for your tenant)
+  // Load detail
   let detail = {};
-  try {
-    detail = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
-  } catch (e) {
-    console.warn('Customer detail failed, falling back to search row only', e);
-    detail = {};
-  }
+  try { detail = await api(`/ordertime/customers/${encodeURIComponent(id)}`); }
+  catch(e){ console.warn('detail fetch failed, using search row only', e); }
 
-  // 3) Merge search row and detail so we have the widest coverage
-  const merged = { ...r, ...detail, Billing: { ...(r.Billing||{}), ...(detail.Billing||{}) }, BillTo: { ...(r.BillTo||{}), ...(detail.BillTo||{}) }, ShipTo: { ...(r.ShipTo||{}), ...(detail.ShipTo||{}) }, Shipping: { ...(r.Shipping||{}), ...(detail.Shipping||{}) }, Payment: { ...(r.Payment||{}), ...(detail.Payment||{}) }, CarrierRep: { ...(r.CarrierRep||{}), ...(detail.CarrierRep||{}) } };
+  // Merge search row + detail (and nested)
+  const merged = {
+    ...r, ...detail,
+    Billing: { ...(r.Billing||{}), ...(detail.Billing||{}) },
+    BillTo:  { ...(r.BillTo||{}),  ...(detail.BillTo||{})  },
+    ShipTo:  { ...(r.ShipTo||{}),  ...(detail.ShipTo||{})  },
+    Shipping:{ ...(r.Shipping||{}),...(detail.Shipping||{})},
+    Payment: { ...(r.Payment||{}), ...(detail.Payment||{}) },
+    CarrierRep:{...(r.CarrierRep||{}),...(detail.CarrierRep||{})}
+  };
 
-  // 4) Build the normalized data the applier expects — using wide aliases
+  // Normalize for applier
   const data = {
-    company:
-      get(merged, 'company','Company','CompanyName','Name','CustomerName','CustName'),
-
+    company: get(merged,'company','Company','CompanyName','Name','CustomerName','CustName'),
     billing: {
-      contact: get(merged,
-        'BillingContact','BillToContact','Contact',
-        'Billing.Contact','BillTo.Contact','PrimaryContact','ContactName'),
-      phone:   get(merged,
-        'BillingPhone','BillToPhone','Phone',
-        'Billing.Phone','BillTo.Phone','PrimaryPhone','ContactPhone'),
-      email:   get(merged,
-        'BillingEmail','BillToEmail','Email',
-        'Billing.Email','BillTo.Email','ContactEmail'),
-      street:  get(merged,
-        'BillingAddress1','BillingAddress','BillToAddress1','BillToAddress',
-        'Billing.Address1','Billing.Street','BillTo.Address1','Address1','Street'),
-      suite:   get(merged,
-        'BillingAddress2','BillToAddress2','Billing.Address2','BillTo.Address2','Address2','Suite'),
+      contact: get(merged,'BillingContact','BillToContact','Contact','Billing.Contact','BillTo.Contact','PrimaryContact','ContactName'),
+      phone:   get(merged,'BillingPhone','BillToPhone','Phone','Billing.Phone','BillTo.Phone','PrimaryPhone','ContactPhone'),
+      email:   get(merged,'BillingEmail','BillToEmail','Email','Billing.Email','BillTo.Email','ContactEmail'),
+      street:  get(merged,'BillingAddress1','BillingAddress','BillToAddress1','BillToAddress','Billing.Address1','Billing.Street','BillTo.Address1','Address1','Street'),
+      suite:   get(merged,'BillingAddress2','BillToAddress2','Billing.Address2','BillTo.Address2','Address2','Suite'),
       city:    get(merged,'BillingCity','BillToCity','Billing.City','BillTo.City','City'),
       state:   get(merged,'BillingState','BillToState','Billing.State','BillTo.State','State'),
       zip:     get(merged,'BillingZip','BillToZip','Billing.Zip','BillTo.Zip','Zip','PostalCode'),
     },
-
     shipping: {
-      company: get(merged,'ShipToCompany','ShippingCompany','ShipTo.Company','Shipping.Company','Company') || 
+      company: get(merged,'ShipToCompany','ShippingCompany','ShipTo.Company','Shipping.Company','Company') ||
                get(merged,'company','Company','CompanyName','Name'),
       contact: get(merged,'ShipToContact','ShippingContact','ShipTo.Contact','Shipping.Contact','ShipToContactName'),
       phone:   get(merged,'ShipToPhone','ShippingPhone','ShipTo.Phone','Shipping.Phone'),
       email:   get(merged,'ShipToEmail','ShippingEmail','ShipTo.Email','Shipping.Email'),
-      street:  get(merged,'ShipToAddress1','ShippingAddress1','ShipToAddress','ShippingAddress',
-                        'ShipTo.Address1','Shipping.Address1','ShipTo.Street','Shipping.Street'),
+      street:  get(merged,'ShipToAddress1','ShippingAddress1','ShipToAddress','ShippingAddress','ShipTo.Address1','Shipping.Address1','ShipTo.Street','Shipping.Street'),
       suite:   get(merged,'ShipToAddress2','ShippingAddress2','ShipTo.Address2','Shipping.Address2'),
       city:    get(merged,'ShipToCity','ShippingCity','ShipTo.City','Shipping.City'),
       state:   get(merged,'ShipToState','ShippingState','ShipTo.State','Shipping.State'),
       zip:     get(merged,'ShipToZip','ShippingZip','ShipTo.Zip','Shipping.Zip','PostalCode'),
       residence: !!get(merged,'ShipToIsResidential','ShippingIsResidential','ShipTo.IsResidential','Shipping.IsResidential'),
     },
-
     payment: {
       method: get(merged,'DefaultPaymentMethod','PaymentMethod','Payment.Method'),
       terms:  get(merged,'PaymentTerms','Payment.Terms'),
       taxExempt: !!get(merged,'TaxExempt','IsTaxExempt','Payment.TaxExempt'),
       agreement: !!get(merged,'HasAgreement','PurchaseAgreement','Payment.Agreement'),
     },
-
     shippingOptions: {
       pay:       get(merged,'ShippingPaymentMethod','ShipPaymentMethod','Shipping.Pay'),
       speed:     get(merged,'ShippingSpeed','Shipping.Speed'),
       shortShip: get(merged,'ShortShip','Shipping.ShortShip'),
     },
-
     rep: {
       primary:   get(merged,'PrimarySalesRep','Rep','Rep1'),
       secondary: get(merged,'SecondarySalesRep','Rep2'),
     },
-
     carrierRep: {
       name:  get(merged,'CarrierRepName','CarrierRep.Name'),
       email: get(merged,'CarrierRepEmail','CarrierRep.Email'),
     },
   };
 
-  // Debug once: see what we’re actually applying
-  try { console.debug('applyCustomerFromApi merged→data', { merged, data }); } catch {}
-
-  // 5) Push to the existing applier
+  // Push into existing applier
   const ta = document.getElementById('wcpPaste');
   if (ta) ta.value = JSON.stringify(data, null, 2);
   applyPastedCustomer('wcpPaste');
 
-  // Optional: jump user to Shipping tab so they see both populated
+  // Optional: show Shipping tab so user sees both sides filled
   if (typeof openTab === 'function') openTab('shipping');
 }
 
