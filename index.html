@@ -2626,7 +2626,7 @@ async function openSOSearch(){
   if(!q){ target.innerHTML = 'Enter a query first.'; return; }
   target.innerHTML = 'Searching…';
   try{
-    const results = await api(`/ordertime/sales-orders/search?q=${encodeURIComponent(q)}`);
+    const results = await api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
     if(!Array.isArray(results) || results.length === 0){
       target.innerHTML = 'No matches.'; return;
     }
@@ -2737,7 +2737,7 @@ async function applySalesOrderFromApi(row){
 // Pull 1 SO and show JSON in the Clone drawer textarea
 async function loadSO(id){
   try{
-    const so = await api(`/ordertime/sales-orders/${encodeURIComponent(id)}`);
+    const so = await api(`/ordertime/salesorders/${encodeURIComponent(id)}`);
     document.getElementById('clonePaste').value = JSON.stringify(so, null, 2);
   }catch(err){
     alert(`Load SO failed: ${err.message}`);
@@ -2857,7 +2857,7 @@ async function openSOSearch(){
   target.innerHTML = 'Searching…';
   try{
     // hit your proxy: GET /api/ordertime/sales-orders/search?q=...
-    const results = await api(`/ordertime/sales-orders/search?q=${encodeURIComponent(q)}`);
+    const results = await api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
     if(!Array.isArray(results) || results.length === 0){
       target.innerHTML = 'No matches.'; return;
     }
@@ -2880,7 +2880,7 @@ async function openSOSearch(){
 async function loadSO(id){
   try{
     // GET /api/ordertime/sales-orders/:id
-    const so = await api(`/ordertime/sales-orders/${encodeURIComponent(id)}`);
+    const so = await api(`/ordertime/salesorders/${encodeURIComponent(id)}`);
     // show JSON in the drawer textarea so the user can review/edit
     document.getElementById('clonePaste').value = JSON.stringify(so, null, 2);
   }catch(err){
