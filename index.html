@@ -2598,15 +2598,17 @@ function applyPastedCustomer(textareaId){
   setVal('shipEmail',   pick(data.shipping?.email,   data.billing?.email));
   setVal('shipStreet',  pick(data.shipping?.street,  data.billing?.street));
   setVal('shipSuite',   pick(data.shipping?.suite,   data.billing?.suite));
-  {
+  // --- shipping: fix flipped street/suite if Street == Company and Suite looks like an address
+// --- shipping: fix flipped street/suite if Street == Company and Suite looks like an address
+{
   const st = (getVal?.('shipStreet') ?? document.getElementById('shipStreet')?.value ?? '').trim();
   const su = (getVal?.('shipSuite')  ?? document.getElementById('shipSuite')?.value  ?? '').trim();
   const co = (getVal?.('shipCompany')?? document.getElementById('shipCompany')?.value?? '').trim();
   if (st && co && st.toLowerCase() === co.toLowerCase() && /\d/.test(su)) {
     (setVal?.('shipStreet', su) ?? (document.getElementById('shipStreet').value = su));
     (setVal?.('shipSuite',  st) ?? (document.getElementById('shipSuite').value  = st));
-   }
   }
+}
   setVal('shipCity',    pick(data.shipping?.city,    data.billing?.city));
   setVal('shipState',   pick(data.shipping?.state,   data.billing?.state));
   setVal('shipZip',     pick(data.shipping?.zip,     data.billing?.zip));
@@ -3454,6 +3456,26 @@ document.getElementById('btnDemoFlow').addEventListener('click', ()=>{
   document.querySelector('.tab[data-tab="shipping"]').click();
   buildSummary();
   openDrawer('drawerEmail');
+  // --- auto-complete wizard so the intake tabs are unlocked
+try {
+  // Step 1: Sales Rep (use currently selected Primary Rep if present)
+  const repSel = document.getElementById('rep1');
+  const repName = repSel && repSel.options[repSel.selectedIndex]?.text ? repSel.options[repSel.selectedIndex].text : '';
+  if (repName) onWizardStepRep(repName);
+
+  // Step 2: Customer Type = existing
+  const wct = document.querySelector('input[name="wizCustomerType"][value="existing"]');
+  if (wct) { wct.checked = true; onWizardStep1('existing'); }
+
+  // Step 3: Document Type = QUOTE  (change to 'SALES ORDER' if you prefer)
+  const wdt = document.querySelector('input[name="wizDocType"][value="QUOTE"]');
+  if (wdt) { wdt.checked = true; onWizardStep2('QUOTE'); }
+
+  // Step 4: Scope = hardware
+  const ws = document.querySelector('input[name="wizScope"][value="hardware"]');
+  if (ws) { ws.checked = true; onWizardComplete('hardware'); }
+} catch {}
+
 });
 
 /* ===== Utilities ===== */
