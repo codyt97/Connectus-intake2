@@ -2567,6 +2567,7 @@ async function applyCustomerFromApi(r){
       city:    get(merged,'BillingCity','BillToCity','Billing.City','BillTo.City','City','city'),
       state:   get(merged,'BillingState','BillToState','Billing.State','BillTo.State','State','state'),
       zip:     get(merged,'BillingZip','BillToZip','Billing.Zip','BillTo.Zip','Zip','PostalCode','zip'),
+
     },
 
     shipping: {
@@ -2581,6 +2582,7 @@ async function applyCustomerFromApi(r){
       city:    get(merged,'ShipToCity','ShippingCity','ShipTo.City','Shipping.City','City','city'),
       state:   get(merged,'ShipToState','ShippingState','ShipTo.State','Shipping.State','State','state'),
       zip:     get(merged,'ShipToZip','ShippingZip','ShipTo.Zip','Shipping.Zip','Zip','PostalCode','zip'),
+
       residence: !!get(merged,'ShipToIsResidential','ShippingIsResidential','ShipTo.IsResidential','Shipping.IsResidential'),
     },
 
@@ -2611,6 +2613,11 @@ async function applyCustomerFromApi(r){
   // 5) Feed the existing applier
   const ta = document.getElementById('wcpPaste');
   if (ta) ta.value = JSON.stringify(data, null, 2);
+  try { console.table({
+  billCity:data.billing.city, billState:data.billing.state, billZip:data.billing.zip,
+  shipCity:data.shipping.city, shipState:data.shipping.state, shipZip:data.shipping.zip
+}); } catch {}
+
   applyPastedCustomer('wcpPaste');
   if (typeof openTab === 'function') openTab('shipping');
 }
