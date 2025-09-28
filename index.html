@@ -2577,16 +2577,6 @@ function applyPastedCustomer(textareaId){
   setVal('billEmail',   pick(data.billing?.email));
   setVal('billStreet',  pick(data.billing?.street));
   setVal('billSuite',   pick(data.billing?.suite));
-  // --- billing: fix flipped street/suite if Street == Company and Suite looks like an address
-{
-  const st = (getVal?.('billStreet') ?? document.getElementById('billStreet')?.value ?? '').trim();
-  const su = (getVal?.('billSuite')  ?? document.getElementById('billSuite')?.value  ?? '').trim();
-  const co = (getVal?.('billCompany')?? document.getElementById('billCompany')?.value?? '').trim();
-  if (st && co && st.toLowerCase() === co.toLowerCase() && /\d/.test(su)) {
-    (setVal?.('billStreet', su) ?? (document.getElementById('billStreet').value = su));
-    (setVal?.('billSuite',  st) ?? (document.getElementById('billSuite').value  = st));
-  }
-}
   setVal('billCity',    pick(data.billing?.city));
   setVal('billState',   pick(data.billing?.state));
   setVal('billZip',     pick(data.billing?.zip));
@@ -2598,17 +2588,6 @@ function applyPastedCustomer(textareaId){
   setVal('shipEmail',   pick(data.shipping?.email,   data.billing?.email));
   setVal('shipStreet',  pick(data.shipping?.street,  data.billing?.street));
   setVal('shipSuite',   pick(data.shipping?.suite,   data.billing?.suite));
-  // --- shipping: fix flipped street/suite if Street == Company and Suite looks like an address
-{
-  const st = (getVal?.('shipStreet') ?? document.getElementById('shipStreet')?.value ?? '').trim();
-  const su = (getVal?.('shipSuite')  ?? document.getElementById('shipSuite')?.value  ?? '').trim();
-  const co = (getVal?.('shipCompany')?? document.getElementById('shipCompany')?.value?? '').trim();
-  if (st && co && st.toLowerCase() === co.toLowerCase() && /\d/.test(su)) {
-    (setVal?.('shipStreet', su) ?? (document.getElementById('shipStreet').value = su));
-    (setVal?.('shipSuite',  st) ?? (document.getElementById('shipSuite').value  = st));
-  }
-}
-
   setVal('shipCity',    pick(data.shipping?.city,    data.billing?.city));
   setVal('shipState',   pick(data.shipping?.state,   data.billing?.state));
   setVal('shipZip',     pick(data.shipping?.zip,     data.billing?.zip));
