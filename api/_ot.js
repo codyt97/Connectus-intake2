@@ -330,6 +330,9 @@ return {
     name:  '',
     email: ''
   }
+// ESM-friendly re-exports (so `import * as ot from '../../_ot.js'` works)
+export default typeof module !== 'undefined' && module.exports ? module.exports : {};
+  
 };
 
 
