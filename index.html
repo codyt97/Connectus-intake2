@@ -2516,111 +2516,39 @@ async function openOTSearch(){
 
 
 async function applyCustomerFromApi(r){
-  // helper: safe getter with multiple aliases and nested paths
-  const get = (obj, ...keys) => {
-    for (const k of keys) {
-      if (!obj) continue;
-      if (k.includes('.')) {
-        const v = k.split('.').reduce((o, part) => (o ? o[part] : undefined), obj);
-        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
-      } else {
-        const v = obj[k];
-        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
-      }
-    }
-    return '';
-  };
-
-  // 1) ID from the search row
+  // pick an ID from the row
   const id =
-    get(r, 'id','Id','ID','CustomerId','CustomerID','CustomerIdRef') ||
-    get(r, 'CustomerRef.id','CustomerRef.Id','CustomerRef.ID');
+    r?.Id ?? r?.ID ?? r?.id ??
+    r?.CustomerId ?? r?.CustomerID ??
+    r?.CustomerRef?.Id ?? r?.CustomerRef?.ID ?? r?.CustomerRef?.id;
   if (!id) { alert('No customer ID on this row.'); return; }
 
-  // 2) Load detail (may be sparse; search row will be our fallback)
-  let detail = {};
-  try { detail = await api(`/ordertime/customers/${encodeURIComponent(id)}`); }
-  catch(e){ console.warn('detail fetch failed, using search row only', e); }
+  // fetch normalized detail from our backend (already shaped to UI fields)
+  let data;
+  try {
+    data = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
+  } catch (e) {
+    console.error('Customer detail fetch failed', e);
+    alert('Failed to load customer details.');
+    return;
+  }
 
-  // 3) Merge search row + detail (and nested)
-  const merged = {
-    ...r, ...detail,
-    Billing:  { ...(r.Billing||{}),  ...(detail.Billing||{}) },
-    BillTo:   { ...(r.BillTo||{}),   ...(detail.BillTo||{})  },
-    ShipTo:   { ...(r.ShipTo||{}),   ...(detail.ShipTo||{})  },
-    Shipping: { ...(r.Shipping||{}), ...(detail.Shipping||{})},
-    Payment:  { ...(r.Payment||{}),  ...(detail.Payment||{}) },
-    CarrierRep:{...(r.CarrierRep||{}),...(detail.CarrierRep||{})}
-  };
+  // sanity (temporary): see what we got
+  try { console.table({
+    company: data.company,
+    billStreet: data.billing?.street, billCity: data.billing?.city, billState: data.billing?.state, billZip: data.billing?.zip,
+    shipStreet: data.shipping?.street, shipCity: data.shipping?.city, shipState: data.shipping?.state, shipZip: data.shipping?.zip
+  }); } catch {}
 
-  // 4) Normalize for the applier — NOW INCLUDING top-level city/state/zip fallbacks
-  const data = {
-    company: get(merged,'company','Company','CompanyName','Name','CustomerName','CustName'),
-
-    billing: {
-      contact: get(merged,'BillingContact','BillToContact','Contact','Billing.Contact','BillTo.Contact','PrimaryContact','ContactName'),
-      phone:   get(merged,'BillingPhone','BillToPhone','Phone','Billing.Phone','BillTo.Phone','PrimaryPhone','ContactPhone'),
-      email:   get(merged,'BillingEmail','BillToEmail','Email','Billing.Email','BillTo.Email','ContactEmail'),
-      street:  get(merged,'BillingAddress1','BillingAddress','BillToAddress1','BillToAddress','Billing.Address1','Billing.Street','BillTo.Address1','Address1','Street'),
-      suite:   get(merged,'BillingAddress2','BillToAddress2','Billing.Address2','BillTo.Address2','Address2','Suite'),
-      // <— these three lines are new: use top-level search row values as LAST-RESORT fallbacks
-      city:    get(merged,'BillingCity','BillToCity','Billing.City','BillTo.City','City','city'),
-      state:   get(merged,'BillingState','BillToState','Billing.State','BillTo.State','State','state'),
-      zip:     get(merged,'BillingZip','BillToZip','Billing.Zip','BillTo.Zip','Zip','PostalCode','zip'),
-
-    },
-
-    shipping: {
-      company: get(merged,'ShipToCompany','ShippingCompany','ShipTo.Company','Shipping.Company','Company') ||
-               get(merged,'company','Company','CompanyName','Name'),
-      contact: get(merged,'ShipToContact','ShippingContact','ShipTo.Contact','Shipping.Contact','ShipToContactName'),
-      phone:   get(merged,'ShipToPhone','ShippingPhone','ShipTo.Phone','Shipping.Phone'),
-      email:   get(merged,'ShipToEmail','ShippingEmail','ShipTo.Email','Shipping.Email'),
-      street:  get(merged,'ShipToAddress1','ShippingAddress1','ShipToAddress','ShippingAddress','ShipTo.Address1','Shipping.Address1','ShipTo.Street','Shipping.Street'),
-      suite:   get(merged,'ShipToAddress2','ShippingAddress2','ShipTo.Address2','Shipping.Address2'),
-      // <— same idea here: accept top-level city/state/zip from search row
-      city:    get(merged,'ShipToCity','ShippingCity','ShipTo.City','Shipping.City','City','city'),
-      state:   get(merged,'ShipToState','ShippingState','ShipTo.State','Shipping.State','State','state'),
-      zip:     get(merged,'ShipToZip','ShippingZip','ShipTo.Zip','Shipping.Zip','Zip','PostalCode','zip'),
-
-      residence: !!get(merged,'ShipToIsResidential','ShippingIsResidential','ShipTo.IsResidential','Shipping.IsResidential'),
-    },
-
-    payment: {
-      method: get(merged,'DefaultPaymentMethod','PaymentMethod','Payment.Method'),
-      terms:  get(merged,'PaymentTerms','Payment.Terms'),
-      taxExempt: !!get(merged,'TaxExempt','IsTaxExempt','Payment.TaxExempt'),
-      agreement: !!get(merged,'HasAgreement','PurchaseAgreement','Payment.Agreement'),
-    },
-
-    shippingOptions: {
-      pay:       get(merged,'ShippingPaymentMethod','ShipPaymentMethod','Shipping.Pay'),
-      speed:     get(merged,'ShippingSpeed','Shipping.Speed'),
-      shortShip: get(merged,'ShortShip','Shipping.ShortShip'),
-    },
-
-    rep: {
-      primary:   get(merged,'PrimarySalesRep','Rep','Rep1'),
-      secondary: get(merged,'SecondarySalesRep','Rep2'),
-    },
-
-    carrierRep: {
-      name:  get(merged,'CarrierRepName','CarrierRep.Name'),
-      email: get(merged,'CarrierRepEmail','CarrierRep.Email'),
-    },
-  };
-
-  // 5) Feed the existing applier
+  // hand off to the existing applier (expects {company, billing{...}, shipping{...}, ...})
   const ta = document.getElementById('wcpPaste');
   if (ta) ta.value = JSON.stringify(data, null, 2);
-  try { console.table({
-  billCity:data.billing.city, billState:data.billing.state, billZip:data.billing.zip,
-  shipCity:data.shipping.city, shipState:data.shipping.state, shipZip:data.shipping.zip
-}); } catch {}
-
   applyPastedCustomer('wcpPaste');
+
+  // optional: show the Shipping tab so reps see both sides filled
   if (typeof openTab === 'function') openTab('shipping');
 }
+
 
 
 
