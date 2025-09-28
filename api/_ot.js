@@ -252,98 +252,65 @@ export async function getCustomerById(id) {
   if (!res.ok) throw new Error(`/customer ${res.status}: ${txt.slice(0,300)}`);
   const x = safeJSON(txt) || {};
 
-   // Normalize to the structure your UI expects (wider aliases)
-  return {
-    company:
-      x.Company || x.CompanyName || x.Name ||
-      x.CustomerName || x.CustName || '',
+  // Normalize to the structure your UI expects (per OT Customer docs)
+return {
+  company:
+    x.CompanyName || x.Name || '',
 
-    billing: {
-      contact: x.BillingContact || x.BillToContact || x.Contact ||
-               (x.Billing && (x.Billing.Contact || x.Billing.ContactName)) ||
-               (x.BillTo && x.BillTo.Contact) || '',
-      phone:   x.BillingPhone || x.BillToPhone || x.Phone ||
-               (x.Billing && x.Billing.Phone) ||
-               (x.BillTo && x.BillTo.Phone) || '',
-      email:   x.BillingEmail || x.BillToEmail || x.Email ||
-               (x.Billing && x.Billing.Email) ||
-               (x.BillTo && x.BillTo.Email) || '',
-      street:  x.BillingAddress1 || x.BillingAddress || x.BillToAddress1 || x.BillToAddress ||
-               (x.Billing && (x.Billing.Address1 || x.Billing.Street)) ||
-               (x.BillTo && x.BillTo.Address1) || x.Address1 || x.Street || '',
-      suite:   x.BillingAddress2 || x.BillToAddress2 ||
-               (x.Billing && x.Billing.Address2) ||
-               (x.BillTo && x.BillTo.Address2) || '',
-      city:    x.BillingCity || x.BillToCity ||
-               (x.Billing && x.Billing.City) ||
-               (x.BillTo && x.BillTo.City) || x.City || '',
-      state:   x.BillingState || x.BillToState ||
-               (x.Billing && x.Billing.State) ||
-               (x.BillTo && x.BillTo.State) || x.State || '',
-      zip:     x.BillingZip || x.BillToZip ||
-               (x.Billing && (x.Billing.Zip || x.Billing.PostalCode)) ||
-               (x.BillTo && (x.BillTo.Zip || x.BillTo.PostalCode)) ||
-               x.Zip || x.PostalCode || '',
-    },
+  // OT: Primary contact is nested; build a readable string
+  billing: {
+    contact: [
+      x.PrimaryContact?.Salutation,
+      x.PrimaryContact?.FirstName,
+      x.PrimaryContact?.MiddleName,
+      x.PrimaryContact?.LastName
+    ].filter(Boolean).join(' ').trim(),
+    phone:   x.PrimaryContact?.Phone || '',       // if your tenant exposes it
+    email:   x.BillAddress?.Email || '',          // OT puts email on the address block
+    street:  x.BillAddress?.Addr1 || '',
+    suite:   x.BillAddress?.Addr2 || x.BillAddress?.Addr3 || '',
+    city:    x.BillAddress?.City || '',
+    state:   x.BillAddress?.State || '',
+    zip:     x.BillAddress?.Zip || ''
+  },
 
-    shipping: {
-      company:   x.ShipToCompany || x.ShippingCompany ||
-                 (x.ShipTo && x.ShipTo.Company) ||
-                 (x.Shipping && x.Shipping.Company) ||
-                 x.Company || '',
-      contact:   x.ShipToContact || x.ShippingContact ||
-                 (x.ShipTo && x.ShipTo.Contact) ||
-                 (x.Shipping && x.Shipping.Contact) || '',
-      phone:     x.ShipToPhone || x.ShippingPhone ||
-                 (x.ShipTo && x.ShipTo.Phone) ||
-                 (x.Shipping && x.Shipping.Phone) || '',
-      email:     x.ShipToEmail || x.ShippingEmail ||
-                 (x.ShipTo && x.ShipTo.Email) ||
-                 (x.Shipping && x.Shipping.Email) || '',
-      street:    x.ShipToAddress1 || x.ShippingAddress1 || x.ShipToAddress || x.ShippingAddress ||
-                 (x.ShipTo && (x.ShipTo.Address1 || x.ShipTo.Street)) ||
-                 (x.Shipping && (x.Shipping.Address1 || x.Shipping.Street)) || '',
-      suite:     x.ShipToAddress2 || x.ShippingAddress2 ||
-                 (x.ShipTo && x.ShipTo.Address2) ||
-                 (x.Shipping && x.Shipping.Address2) || '',
-      city:      x.ShipToCity || x.ShippingCity ||
-                 (x.ShipTo && x.ShipTo.City) ||
-                 (x.Shipping && x.Shipping.City) || x.City || '',
-      state:     x.ShipToState || x.ShippingState ||
-                 (x.ShipTo && x.ShipTo.State) ||
-                 (x.Shipping && x.Shipping.State) || x.State || '',
-      zip:       x.ShipToZip || x.ShippingZip ||
-                 (x.ShipTo && (x.ShipTo.Zip || x.ShipTo.PostalCode)) ||
-                 (x.Shipping && (x.Shipping.Zip || x.Shipping.PostalCode)) ||
-                 x.Zip || x.PostalCode || '',
-      residence: !!(x.ShipToIsResidential ?? x.ShippingIsResidential ??
-                    (x.ShipTo && x.ShipTo.IsResidential) ??
-                    (x.Shipping && x.Shipping.IsResidential)),
-    },
+  shipping: {
+    company: x.CompanyName || x.Name || '',       // same company unless you track per-ship-to
+    contact: '',                                   // fill if your tenant has ship-to contact fields
+    phone:   '',                                   // fill if present
+    email:   x.PrimaryShipAddress?.Email || '',
+    street:  x.PrimaryShipAddress?.Addr1 || '',
+    suite:   x.PrimaryShipAddress?.Addr2 || x.PrimaryShipAddress?.Addr3 || '',
+    city:    x.PrimaryShipAddress?.City || '',
+    state:   x.PrimaryShipAddress?.State || '',
+    zip:     x.PrimaryShipAddress?.Zip || '',
+    residence: false                               // set if your tenant flags residential on ship-to
+  },
 
-    payment: {
-      method:    x.DefaultPaymentMethod || x.PaymentMethod ||
-                 (x.Payment && x.Payment.Method) || '',
-      terms:     x.PaymentTerms || (x.Payment && x.Payment.Terms) || '',
-      taxExempt: !!(x.TaxExempt ?? x.IsTaxExempt ?? (x.Payment && x.Payment.TaxExempt)),
-      agreement: !!(x.HasAgreement ?? x.HasPurchaseAgreement ??
-                    (x.Payment && x.Payment.Agreement)),
-    },
+  payment: {
+    method:  x.PaymentMethodRef?.Name || '',
+    terms:   x.TermRef?.Name || '',
+    taxExempt: !!(x.SalesTaxCodeRef?.Name && x.SalesTaxCodeRef.Name.toLowerCase().includes('non')),
+    agreement: false
+  },
 
-    shippingOptions: {
-      pay:       x.DefaultShipPaymentMethod || x.ShippingPaymentMethod || x.ShipPaymentMethod ||
-                 (x.Shipping && x.Shipping.Pay) || '',
-      speed:     x.DefaultShipSpeed || x.ShippingSpeed ||
-                 (x.Shipping && x.Shipping.Speed) || '',
-      shortShip: x.ShortShipPolicy || (x.Shipping && x.Shipping.ShortShip) || '',
-    },
+  shippingOptions: {
+    pay:   x.ShipMethodRef?.Name || '',
+    speed: '',
+    shortShip: ''
+  },
 
-    carrierRep: { name: x.CarrierRepName || (x.CarrierRep && x.CarrierRep.Name) || '',
-                  email: x.CarrierRepEmail || (x.CarrierRep && x.CarrierRep.Email) || '' },
+  rep: {
+    primary:   x.SalesRepRef?.Name || '',
+    secondary: ''
+  },
 
-    rep:        { primary: x.PrimaryRepName || x.PrimarySalesRep || x.Rep || x.Rep1 || '',
-                  secondary: x.SecondaryRepName || x.SecondarySalesRep || x.Rep2 || '' },
-  };
+  carrierRep: {
+    name:  '',
+    email: ''
+  }
+};
+
 
 
 }
