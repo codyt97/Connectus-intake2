@@ -2693,7 +2693,7 @@ async function applySalesOrderFromApi(row){
   setVal('shipState',   so.shipping?.state   || '');
   setVal('shipZip',     so.shipping?.zip     || '');
   setChk('resShip',     so.shipping?.residence || false);
-  setSelectValue('shipCarrier', so.header?.shipMethod || '');
+  setSelectValue('shipMethod', so.header?.shipMethod || '');
 
   // ---- Items ----
   // If you already have "add line" helpers, use them. Otherwise, this will clear and rebuild rows.
