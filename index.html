@@ -999,25 +999,6 @@ if (typeof getNdData !== 'function') {
     try { return JSON.parse(tr?.dataset?.nd || '{}'); } catch { return {}; }
   }
 }
-function rowQualifiesNewDevice(tr){
-  if (!tr) return false;
-  const tds = tr.querySelectorAll('td');
-  const get = (colIdx) => (tds[colIdx]?.querySelector('input,textarea,select')?.value || '').trim();
-
-  const sku = get(window.COL_SKU);
-  const desc = get(window.COL_DESC);
-  const dL = desc.toLowerCase();
-
-  // Your existing SKU→condition inference
-  const cond = inferCondFromSku(sku); // "New" | "CPO" | ""
-  const looksNewBySku = (cond === 'New');
-
-  // Exclusions
-  const isLicense = dL.includes('license');     // keep: license lines should flip to Licenses tab
-  const isSimOrCard = /\b(sim|sim card|card)\b/i.test(desc); // NEW: hide New-Device for SIM/CARD descriptors
-
-  return looksNewBySku && !isLicense && !isSimOrCard;
-}
 
 
 function buildNewDeviceCSV(){
@@ -1274,11 +1255,11 @@ function getRowDesc(tr){ return (getTdInput(tr, window.COL_DESC)?.value || '').t
 function isLicenseDesc(desc){ return /license/i.test(String(desc || '')); }
 
 // Qualifier for this row:
-// - SKU ends with "00"
-// - AND description does NOT include "license"
-// - AND description does NOT include "sim" or "card"
-// - AND description does NOT include "AKKO"
-// - AND SKU does NOT start with "AO" (e.g., AO-… insurance SKUs)
+// - SKU ends with "00"  → candidate “New”
+// - EXCLUDE if Description contains "license"
+// - EXCLUDE if Description contains "sim" or "card"
+// - EXCLUDE if Description contains "AKKO"
+// - EXCLUDE if SKU starts with "AO" (insurance SKUs)
 function rowQualifiesNewDevice(tr){
   if (!tr) return false;
 
@@ -1286,16 +1267,17 @@ function rowQualifiesNewDevice(tr){
   const sku    = skuRaw.trim().toLowerCase();
   const desc   = String(getRowDesc(tr) || '');
 
-  // keep: license rows route to Licenses subtab elsewhere
-  const isLic        = isLicenseDesc(desc);
+  // License rows go to the Licenses subtab (handled elsewhere)
+  const isLic       = isLicenseDesc(desc);
 
   // ND-specific exclusions
-  const isSimOrCard  = /\b(sim|sim card|card)\b/i.test(desc);
-  const isAkkoText   = /akko/i.test(desc);
-  const isAoSku      = sku.startsWith('AO'); // e.g., "AO-PMA4YFF900"
+  const isSimOrCard = /\b(sim|sim card|card)\b/i.test(desc);
+  const isAkkoText  = /akko/i.test(desc);
+  const isAoSku     = /^ao\b/.test(sku); // case-safe "AO", with or without hyphen
 
   return sku.endsWith('00') && !isLic && !isSimOrCard && !isAkkoText && !isAoSku;
 }
+
 
 
 
