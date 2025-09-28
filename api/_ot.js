@@ -252,43 +252,91 @@ export async function getCustomerById(id) {
   if (!res.ok) throw new Error(`/customer ${res.status}: ${txt.slice(0,300)}`);
   const x = safeJSON(txt) || {};
 
-  // Normalize to the structure your UI expects
+  // Normalize to the structure your UI expects (be liberal with aliases)
   return {
-    company: x.Company || x.CompanyName || x.Name || '',
+    company:
+      x.Company || x.CompanyName || x.Name ||
+      x.CustomerName || x.CustName || '',
+
     billing: {
-      contact: x.BillingContact || '',
-      phone:   x.BillingPhone   || '',
-      email:   x.BillingEmail   || '',
-      street:  x.BillingAddress1 || x.BillingAddress || '',
-      suite:   x.BillingAddress2 || '',
-      city:    x.BillingCity     || '',
-      state:   x.BillingState    || '',
-      zip:     x.BillingZip      || '',
+      contact:
+        x.BillingContact || x.BillToContact || x.Contact ||
+        x.Billing?.Contact || '',
+      phone:
+        x.BillingPhone || x.BillToPhone || x.Phone ||
+        x.Billing?.Phone || '',
+      email:
+        x.BillingEmail || x.BillToEmail || x.Email ||
+        x.Billing?.Email || '',
+      street:
+        x.BillingAddress1 || x.BillingAddress || x.BillToAddress1 ||
+        x.BillToAddress || x.Billing?.Address1 || x.Billing?.Street ||
+        x.BillTo?.Address1 || '',
+      suite:
+        x.BillingAddress2 || x.BillToAddress2 ||
+        x.Billing?.Address2 || x.BillTo?.Address2 || '',
+      city:
+        x.BillingCity || x.BillToCity || x.Billing?.City || x.BillTo?.City || '',
+      state:
+        x.BillingState || x.BillToState || x.Billing?.State || x.BillTo?.State || '',
+      zip:
+        x.BillingZip || x.BillToZip || x.Billing?.Zip || x.BillTo?.Zip || '',
     },
+
     shipping: {
-      company:   x.ShipToCompany || x.Company || '',
-      contact:   x.ShipToContact || '',
-      phone:     x.ShipToPhone   || '',
-      email:     x.ShipToEmail   || '',
-      street:    x.ShipToAddress1 || '',
-      suite:     x.ShipToAddress2 || '',
-      city:      x.ShipToCity     || '',
-      state:     x.ShipToState    || '',
-      zip:       x.ShipToZip      || '',
-      residence: !!x.ShipToIsResidential,
+      company:
+        x.ShipToCompany || x.ShippingCompany || x.Company ||
+        x.ShipTo?.Company || '',
+      contact:
+        x.ShipToContact || x.ShippingContact || x.ShipTo?.Contact || '',
+      phone:
+        x.ShipToPhone || x.ShippingPhone || x.ShipTo?.Phone || '',
+      email:
+        x.ShipToEmail || x.ShippingEmail || x.ShipTo?.Email || '',
+      street:
+        x.ShipToAddress1 || x.ShippingAddress1 || x.ShipTo?.Address1 ||
+        x.ShipToAddress || x.ShippingAddress || x.ShipTo?.Street || '',
+      suite:
+        x.ShipToAddress2 || x.ShippingAddress2 || x.ShipTo?.Address2 || '',
+      city:
+        x.ShipToCity || x.ShippingCity || x.ShipTo?.City || '',
+      state:
+        x.ShipToState || x.ShippingState || x.ShipTo?.State || '',
+      zip:
+        x.ShipToZip || x.ShippingZip || x.ShipTo?.Zip || '',
+      residence:
+        !!(x.ShipToIsResidential ?? x.ShippingIsResidential ?? x.ShipTo?.IsResidential),
     },
+
     payment: {
-      method:    x.DefaultPaymentMethod || '',
-      terms:     x.PaymentTerms         || '',
-      taxExempt: !!x.IsTaxExempt,
-      agreement: !!x.HasPurchaseAgreement,
+      method:
+        x.DefaultPaymentMethod || x.PaymentMethod || x.Payment?.Method || '',
+      terms:
+        x.PaymentTerms || x.Payment?.Terms || '',
+      taxExempt:
+        !!(x.TaxExempt ?? x.IsTaxExempt ?? x.Payment?.TaxExempt),
+      agreement:
+        !!(x.HasAgreement ?? x.PurchaseAgreement ?? x.Payment?.Agreement),
     },
+
     shippingOptions: {
-      pay:      x.DefaultShipPaymentMethod || '',
-      speed:    x.DefaultShipSpeed         || '',
-      shortShip: x.ShortShipPolicy || '',
+      pay:
+        x.ShippingPaymentMethod || x.ShipPaymentMethod || x.Shipping?.Pay || '',
+      speed:
+        x.ShippingSpeed || x.Shipping?.Speed || '',
+      shortShip:
+        x.ShortShip || x.Shipping?.ShortShip || '',
     },
-    carrierRep: { name: x.CarrierRepName || '', email: x.CarrierRepEmail || '' },
-    rep:        { primary: x.PrimaryRepName || '', secondary: x.SecondaryRepName || '' },
+
+    rep: {
+      primary:   x.PrimarySalesRep    || x.Rep || x.Rep1 || '',
+      secondary: x.SecondarySalesRep  || x.Rep2 || '',
+    },
+
+    carrierRep: {
+      name:  x.CarrierRepName  || x.CarrierRep?.Name  || '',
+      email: x.CarrierRepEmail || x.CarrierRep?.Email || '',
+    },
   };
+
 }
