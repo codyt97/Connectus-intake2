@@ -1,5 +1,5 @@
 // api/ordertime/salesorders/search.js
-import { tryPost } from '../../_ot';
+import { tryPost } from '../../_ot.js';
 
 export default async function handler(req, res) {
   try {
@@ -20,7 +20,7 @@ export default async function handler(req, res) {
       ],
     };
 
-    const out = await tryPost('/list', body);
+    const out = await ot.tryPost('/list', body);
     if (!out.ok) throw new Error(out.text);
 
     const rows = (out.json && (out.json.Items || out.json.List)) || normalizeListResult(out.json);
