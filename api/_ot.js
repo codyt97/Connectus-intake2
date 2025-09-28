@@ -19,27 +19,6 @@ function authHeaders() {
   return h;
 }
 
-export async function tryPost(path, body = {}) {
-  const BASE   = process.env.OT_BASE_URL || 'https://services.ordertime.com/api';
-  const APIKEY = process.env.OT_API_KEY;
-  const EMAIL  = process.env.OT_EMAIL || '';
-  const PASS   = process.env.OT_PASSWORD || '';
-  const DEVKEY = process.env.OT_DEV_KEY || '';
-
-  const url = `${BASE.replace(/\/$/, '')}${path.startsWith('/') ? '' : '/'}${path}`;
-  const headers = { 'Content-Type': 'application/json', ApiKey: APIKEY };
-  if (EMAIL)  headers.Email = EMAIL;
-  if (DEVKEY) headers.DevKey = DEVKEY;
-  else if (PASS) headers.Password = PASS;
-
-  const r = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-  if (!r.ok) {
-    const text = await r.text();
-    throw new Error(`OT POST ${path} failed: ${r.status} ${text}`);
-  }
-  return r.json();
-}
-
 
 async function tryPost(path, body) {
   const url = `${BASE}${path}`;
@@ -330,9 +309,6 @@ return {
     name:  '',
     email: ''
   }
-// ESM-friendly re-exports (so `import * as ot from '../../_ot.js'` works)
-export default typeof module !== 'undefined' && module.exports ? module.exports : {};
-  
 };
 
 
