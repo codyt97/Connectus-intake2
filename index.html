@@ -2515,92 +2515,117 @@ async function openOTSearch(){
 }
 
 
-// hydrate -> log -> paste -> apply (hard fail if id/detail missing)
 async function applyCustomerFromApi(r){
-  // 0) must have an id from the search result
+  // helper: safe getter with multiple aliases and nested paths
+  const get = (obj, ...keys) => {
+    for (const k of keys) {
+      if (!obj) continue;
+      // nested path support: "Billing.Address1"
+      if (k.includes('.')) {
+        const v = k.split('.').reduce((o, part) => (o ? o[part] : undefined), obj);
+        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      } else {
+        const v = obj[k];
+        if (v !== undefined && v !== null && String(v).trim() !== '') return v;
+      }
+    }
+    return '';
+  };
+
+  // 1) Figure out an ID from the search row
   const id =
-    r?.id ??
-    r?.Id ?? r?.ID ??
-    r?.CustomerId ?? r?.CustomerID ??
-    r?.CustomerIdRef ??
-    r?.CustomerRef?.Id ?? r?.CustomerRef?.ID ?? r?.CustomerRef?.id ??
-    null;
+    get(r, 'id','Id','ID','CustomerId','CustomerID','CustomerIdRef') ||
+    get(r, 'CustomerRef.id','CustomerRef.Id','CustomerRef.ID');
+  if (!id) { alert('This search result has no ID; cannot load details.'); return; }
 
-  if (!id) {
-    console.warn('Apply blocked: search result had no id', r);
-    alert('This search result has no ID. Try another customer or fix /api/ordertime/customers/search mapping.');
-    return;
-  }
-
-  // 1) load detail from your API (this MUST return billing/shipping)
-  let detail = null;
+  // 2) Load detail from backend (may be sparse for your tenant)
+  let detail = {};
   try {
     detail = await api(`/ordertime/customers/${encodeURIComponent(id)}`);
   } catch (e) {
-    console.error('Detail fetch failed:', e);
-    alert('Customer detail failed. Check server logs and env vars.');
-    return;
+    console.warn('Customer detail failed, falling back to search row only', e);
+    detail = {};
   }
 
-  // 2) log the key fields so you can see what the backend actually returned
-  console.table({
-    company: detail.company,
-    billStreet: detail?.billing?.street,
-    billCity:   detail?.billing?.city,
-    billState:  detail?.billing?.state,
-    billZip:    detail?.billing?.zip,
-    shipStreet: detail?.shipping?.street,
-    shipCity:   detail?.shipping?.city,
-    shipState:  detail?.shipping?.state,
-    shipZip:    detail?.shipping?.zip,
-    payMethod:  detail?.payment?.method
-  });
+  // 3) Merge search row and detail so we have the widest coverage
+  const merged = { ...r, ...detail, Billing: { ...(r.Billing||{}), ...(detail.Billing||{}) }, BillTo: { ...(r.BillTo||{}), ...(detail.BillTo||{}) }, ShipTo: { ...(r.ShipTo||{}), ...(detail.ShipTo||{}) }, Shipping: { ...(r.Shipping||{}), ...(detail.Shipping||{}) }, Payment: { ...(r.Payment||{}), ...(detail.Payment||{}) }, CarrierRep: { ...(r.CarrierRep||{}), ...(detail.CarrierRep||{}) } };
 
-  // 3) build the paste object from detail only (no fallback to thin search row)
+  // 4) Build the normalized data the applier expects — using wide aliases
   const data = {
-    company: detail.company || '',
+    company:
+      get(merged, 'company','Company','CompanyName','Name','CustomerName','CustName'),
+
     billing: {
-      contact: detail.billing?.contact || '',
-      phone:   detail.billing?.phone   || '',
-      email:   detail.billing?.email   || '',
-      street:  detail.billing?.street  || '',
-      suite:   detail.billing?.suite   || '',
-      city:    detail.billing?.city    || '',
-      state:   detail.billing?.state   || '',
-      zip:     detail.billing?.zip     || '',
+      contact: get(merged,
+        'BillingContact','BillToContact','Contact',
+        'Billing.Contact','BillTo.Contact','PrimaryContact','ContactName'),
+      phone:   get(merged,
+        'BillingPhone','BillToPhone','Phone',
+        'Billing.Phone','BillTo.Phone','PrimaryPhone','ContactPhone'),
+      email:   get(merged,
+        'BillingEmail','BillToEmail','Email',
+        'Billing.Email','BillTo.Email','ContactEmail'),
+      street:  get(merged,
+        'BillingAddress1','BillingAddress','BillToAddress1','BillToAddress',
+        'Billing.Address1','Billing.Street','BillTo.Address1','Address1','Street'),
+      suite:   get(merged,
+        'BillingAddress2','BillToAddress2','Billing.Address2','BillTo.Address2','Address2','Suite'),
+      city:    get(merged,'BillingCity','BillToCity','Billing.City','BillTo.City','City'),
+      state:   get(merged,'BillingState','BillToState','Billing.State','BillTo.State','State'),
+      zip:     get(merged,'BillingZip','BillToZip','Billing.Zip','BillTo.Zip','Zip','PostalCode'),
     },
+
     shipping: {
-      company:   detail.shipping?.company || detail.company || '',
-      contact:   detail.shipping?.contact || '',
-      phone:     detail.shipping?.phone   || '',
-      email:     detail.shipping?.email   || '',
-      street:    detail.shipping?.street  || '',
-      suite:     detail.shipping?.suite   || '',
-      city:      detail.shipping?.city    || '',
-      state:     detail.shipping?.state   || '',
-      zip:       detail.shipping?.zip     || '',
-      residence: !!detail.shipping?.residence,
+      company: get(merged,'ShipToCompany','ShippingCompany','ShipTo.Company','Shipping.Company','Company') || 
+               get(merged,'company','Company','CompanyName','Name'),
+      contact: get(merged,'ShipToContact','ShippingContact','ShipTo.Contact','Shipping.Contact','ShipToContactName'),
+      phone:   get(merged,'ShipToPhone','ShippingPhone','ShipTo.Phone','Shipping.Phone'),
+      email:   get(merged,'ShipToEmail','ShippingEmail','ShipTo.Email','Shipping.Email'),
+      street:  get(merged,'ShipToAddress1','ShippingAddress1','ShipToAddress','ShippingAddress',
+                        'ShipTo.Address1','Shipping.Address1','ShipTo.Street','Shipping.Street'),
+      suite:   get(merged,'ShipToAddress2','ShippingAddress2','ShipTo.Address2','Shipping.Address2'),
+      city:    get(merged,'ShipToCity','ShippingCity','ShipTo.City','Shipping.City'),
+      state:   get(merged,'ShipToState','ShippingState','ShipTo.State','Shipping.State'),
+      zip:     get(merged,'ShipToZip','ShippingZip','ShipTo.Zip','Shipping.Zip','PostalCode'),
+      residence: !!get(merged,'ShipToIsResidential','ShippingIsResidential','ShipTo.IsResidential','Shipping.IsResidential'),
     },
+
     payment: {
-      method:    detail.payment?.method || '',
-      terms:     detail.payment?.terms  || '',
-      taxExempt: !!detail.payment?.taxExempt,
-      agreement: !!detail.payment?.agreement,
+      method: get(merged,'DefaultPaymentMethod','PaymentMethod','Payment.Method'),
+      terms:  get(merged,'PaymentTerms','Payment.Terms'),
+      taxExempt: !!get(merged,'TaxExempt','IsTaxExempt','Payment.TaxExempt'),
+      agreement: !!get(merged,'HasAgreement','PurchaseAgreement','Payment.Agreement'),
     },
+
     shippingOptions: {
-      pay:       detail.shippingOptions?.pay   || '',
-      speed:     detail.shippingOptions?.speed || '',
-      shortShip: detail.shippingOptions?.shortShip || '',
+      pay:       get(merged,'ShippingPaymentMethod','ShipPaymentMethod','Shipping.Pay'),
+      speed:     get(merged,'ShippingSpeed','Shipping.Speed'),
+      shortShip: get(merged,'ShortShip','Shipping.ShortShip'),
     },
-    rep:        detail.rep        || {},
-    carrierRep: detail.carrierRep || {},
+
+    rep: {
+      primary:   get(merged,'PrimarySalesRep','Rep','Rep1'),
+      secondary: get(merged,'SecondarySalesRep','Rep2'),
+    },
+
+    carrierRep: {
+      name:  get(merged,'CarrierRepName','CarrierRep.Name'),
+      email: get(merged,'CarrierRepEmail','CarrierRep.Email'),
+    },
   };
 
-  // 4) send through your single paste->applier path
+  // Debug once: see what we’re actually applying
+  try { console.debug('applyCustomerFromApi merged→data', { merged, data }); } catch {}
+
+  // 5) Push to the existing applier
   const ta = document.getElementById('wcpPaste');
   if (ta) ta.value = JSON.stringify(data, null, 2);
   applyPastedCustomer('wcpPaste');
+
+  // Optional: jump user to Shipping tab so they see both populated
+  if (typeof openTab === 'function') openTab('shipping');
 }
+
 
 
 // ---- apply customer from textarea paste (JSON or key: value lines)
