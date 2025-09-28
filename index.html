@@ -1292,7 +1292,7 @@ function rowQualifiesNewDevice(tr){
   // ND-specific exclusions
   const isSimOrCard  = /\b(sim|sim card|card)\b/i.test(desc);
   const isAkkoText   = /akko/i.test(desc);
-  const isAoSku      = sku.startsWith('ao'); // e.g., "AO-PMA4YFF900"
+  const isAoSku      = sku.startsWith('AO'); // e.g., "AO-PMA4YFF900"
 
   return sku.endsWith('00') && !isLic && !isSimOrCard && !isAkkoText && !isAoSku;
 }
