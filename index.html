@@ -2597,6 +2597,7 @@ function applyPastedCustomer(textareaId){
   setVal('shipPhone',   pick(data.shipping?.phone,   data.billing?.phone));
   setVal('shipEmail',   pick(data.shipping?.email,   data.billing?.email));
   setVal('shipStreet',  pick(data.shipping?.street,  data.billing?.street));
+  setVal('shipSuite',   pick(data.shipping?.suite,   data.billing?.suite));
   {
   const st = (getVal?.('shipStreet') ?? document.getElementById('shipStreet')?.value ?? '').trim();
   const su = (getVal?.('shipSuite')  ?? document.getElementById('shipSuite')?.value  ?? '').trim();
@@ -2606,8 +2607,6 @@ function applyPastedCustomer(textareaId){
     (setVal?.('shipSuite',  st) ?? (document.getElementById('shipSuite').value  = st));
    }
   }
-
-  setVal('shipSuite',   pick(data.shipping?.suite,   data.billing?.suite));
   setVal('shipCity',    pick(data.shipping?.city,    data.billing?.city));
   setVal('shipState',   pick(data.shipping?.state,   data.billing?.state));
   setVal('shipZip',     pick(data.shipping?.zip,     data.billing?.zip));
