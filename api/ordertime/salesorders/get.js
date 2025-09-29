@@ -16,9 +16,12 @@ const RAW_BASE =
   process.env.OT_BASE_URL ||
   process.env.ORDERTIME_BASE_URL ||
   process.env.ORDERTIME_BASE ||
-  'https://services.ordertime.com'; // no /api suffix here
+  'https://services.ordertime.com'; // tolerate either with/without /api
 
-const BASE_API = String(RAW_BASE).replace(/\/+$/,'') + '/api';
+// Strip trailing slashes *and* a trailing /api if present, then add one canonical /api
+const BASE_ROOT = String(RAW_BASE).replace(/\/+$/,'').replace(/\/api$/,'');
+const BASE_API  = `${BASE_ROOT}/api`;
+
 
 const API_KEY =
   process.env.OT_API_KEY ||
