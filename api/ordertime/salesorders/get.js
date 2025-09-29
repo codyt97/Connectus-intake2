@@ -1,14 +1,23 @@
 // /api/ordertime/salesorders/get.js
-const OT_BASE = process.env.OT_BASE_URL
-             || process.env.ORDERTIME_BASE_URL
-             || process.env.ORDERTIME_BASE
-             || process.env.ORDERTIME_BASE_URL_FALLBACK
-             || "https://services.ordertime.com";
+const RAW_BASE =
+  process.env.OT_BASE_URL ||
+  process.env.ORDERTIME_BASE_URL ||
+  process.env.ORDERTIME_BASE ||
+  process.env.ORDERTIME_BASE_URL_FALLBACK ||
+  'https://services.ordertime.com';
 
-const OT_KEY  = process.env.OT_API_KEY
-             || process.env.ORDERTIME_API_KEY;
+const OT_KEY =
+  process.env.OT_API_KEY ||
+  process.env.ORDERTIME_API_KEY;
 
+function cleanBase(u) {
+  // strip trailing slashes and a trailing /api if present
+  return String(u || '')
+    .replace(/\/+$/,'')
+    .replace(/\/api\/?$/,'');
+}
 
+const OT_BASE = cleanBase(RAW_BASE);
 
 function otHeaders() {
   if (!OT_KEY) throw new Error("Missing ORDERTIME_API_KEY");
@@ -22,12 +31,7 @@ function otHeaders() {
 
 // Normalize raw OT response into a shape the UI can drop into fields
 function normalizeSalesOrder(r) {
-  // Defensive getters (OT objects vary by tenant/version)
-  const get = (obj, path, d='') => {
-    try {
-      return path.split('.').reduce((o,k)=>o?.[k], obj) ?? d;
-    } catch { return d; }
-  };
+  const get = (obj, path, d='') => { try { return path.split('.').reduce((o,k)=>o?.[k], obj) ?? d; } catch { return d; } };
 
   const billing = {
     company: get(r, 'CustomerRef.Name') || get(r, 'CustomerName') || '',
@@ -98,17 +102,28 @@ export default async function handler(req, res) {
     const { docNo } = req.query;
     if (!docNo) return res.status(400).json({ error: 'Missing ?docNo=' });
 
-    // The actual OT endpoint may differ (DocNo vs docNo). Keep this fetch simple and let server map it.
-    const url = `${OT_BASE}/api/salesorder/get?docNo=${encodeURIComponent(docNo)}`;
-    const r = await fetch(url, { headers: otHeaders() });
-    if (!r.ok) {
+    // Try singular then plural paths (tenants vary)
+    const paths = [
+      `${OT_BASE}/api/salesorder/get?docNo=${encodeURIComponent(docNo)}`,
+      `${OT_BASE}/api/salesorders/get?docNo=${encodeURIComponent(docNo)}`
+    ];
+
+    let lastErr = null;
+    for (const url of paths) {
+      const r = await fetch(url, { headers: otHeaders() });
       const text = await r.text();
-      return res.status(r.status).json({ error: `OT get failed ${r.status}: ${text}` });
+      if (r.ok) {
+        const raw = JSON.parse(text);
+        const data = Array.isArray(raw) ? raw[0] : raw;
+        return res.status(200).json({ ok: true, order: normalizeSalesOrder(data) });
+      }
+      lastErr = new Error(`OT get failed ${r.status}: ${text}`);
+      // try next path on 404/400
+      if (r.status === 404 || r.status === 400) continue;
+      break; // other errors, bail
     }
 
-    const raw = await r.json();
-    const data = Array.isArray(raw) ? raw[0] : raw;
-    return res.status(200).json({ ok: true, order: normalizeSalesOrder(data) });
+    return res.status(404).json({ error: String(lastErr?.message || lastErr || 'Not found') });
   } catch (e) {
     return res.status(500).json({ error: e?.message || String(e) });
   }
