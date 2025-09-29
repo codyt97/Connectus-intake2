@@ -123,14 +123,34 @@ function normalizeSalesOrder(raw) {
 }
 
 // Candidate object names for Sales Order header on different tenants
+// Try a broad set of Sales Order header object names used across OT tenants
 const SO_OBJECT_TYPES = [
-  'SalesOrderHeader',   // most common
+  'SalesOrderHeader',
   'SalesOrder',
   'Sales Order',
-  'SalesOrders'
+  'SalesOrders',
+  'Sales Order Header',
+  'Sales_Order_Header',
+  'Sales Order Headers',
+  'SalesOrderHeaders',
+  'OrderHeader',
+  'Order Header',
+  'SOHeader',
+  'SO Header',
+  'SOHeaders',
+  'Sales Document Header',
+  'SalesDocumentHeader',
+  'Sales Documents',
+  'SalesDocument',
+  'Sales_Document_Header'
 ];
 
-const DOC_FIELDS = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
+
+const DOC_FIELDS = [
+  'DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay',
+  'OrderNo','SalesOrderNo','OrderNumber','SalesOrderNumber','DocumentNumber','DocNum','Doc_No'
+];
+;
 
 function buildCandidates(input) {
   const s = String(input || '').trim();
@@ -177,15 +197,20 @@ export default async function handler(req, res) {
     ensureEnv();
 
     // Probe object types in order until one returns a row
-    const attempts = [];
-    for (const objectType of SO_OBJECT_TYPES) {
-      const out = await listByObjectType(objectType, docNo);
-      attempts.push({ objectType, hit: !!out.row });
-      if (out.row) {
-        const order = normalizeSalesOrder(out.row);
-        return res.status(200).json({ ok: true, order, objectTypeUsed: objectType });
-      }
-    }
+    // Optional: allow ?objectType=SalesOrderHeader to force a specific name
+const { objectType: force } = req.query;
+const orderTypes = pickObjectTypes(force);
+
+const attempts = [];
+for (const objectType of orderTypes) {
+  const out = await listByObjectType(objectType, docNo);
+  attempts.push({ objectType, hit: !!out.row });
+  if (out.row) {
+    const order = normalizeSalesOrder(out.row);
+    return res.status(200).json({ ok: true, order, objectTypeUsed: objectType });
+  }
+}
+
 
     if (debug === '1') {
       return res.status(404).json({ error: `DocNo not found: ${docNo}`, attempts });
