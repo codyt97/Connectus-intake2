@@ -117,26 +117,16 @@ export async function listCustomersByName(q, page = 1, pageSize = 25) {
   return []; // fallback
 }
 
-/* ---------- Sales Orders helper (multi-strategy, tolerant) ---------- */
+/* ---------- Sales Orders helper: use ONLY /list; try scalar+array filters ---------- */
 export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) {
   assertEnv();
 
-  const {
-    q = '',
-    docNo = '',
-    customer = '',
-    status = '',
-    dateFrom = '',
-    dateTo = '',
-  } = criteria;
+  const { q = '', docNo = '', customer = '', status = '', dateFrom = '', dateTo = '' } = criteria;
 
-  // Try several list endpoints (tenants vary)
-  const PATHS = ['/list', '/document/list', '/salesorder/list'];
+  const PATH = '/list';                 // <- the only valid OT list endpoint
+  const TYPES = [130, 135, 131];        // your known-good SO header types
 
-  // Most common SO header types seen across tenants
-  const TYPES = [130, 135, 131, 140, 7]; // keep yours and add a couple more
-
-  // Field variants across tenants
+  // field variants
   const F = {
     DocNo:        ['DocNo', 'DocumentNo', 'DocNumber'],
     CustomerName: ['CustomerName', 'Customer', 'CustName'],
@@ -146,87 +136,70 @@ export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) 
     Id:           ['Id', 'ID', 'id'],
   };
 
-  const looksNumeric = (v) => /^[0-9\-]+$/.test(String(v || '').trim());
+  const looksDocNo = (v) => /^[A-Za-z\-]*\d[\w\-]*$/.test(String(v || '').trim());
 
-  // LIKE filters (string or array variant)
   const likeFilters = (props, val, asArray = false) => {
     const v = (val == null ? '' : String(val)).trim();
     if (!v) return [];
     const fv = asArray ? [v] : v;
-    return props.map(p => ({ PropertyName: p, Operator: 12, FilterValueArray: fv })); // 12: contains
+    return props.map(p => ({ PropertyName: p, Operator: 12, FilterValueArray: fv })); // contains
   };
-
-  // EQUALS filters (for exact DocNo match when numeric-looking)
   const eqFilters = (props, val, asArray = false) => {
     const v = (val == null ? '' : String(val)).trim();
     if (!v) return [];
     const fv = asArray ? [v] : v;
-    return props.map(p => ({ PropertyName: p, Operator: 0, FilterValueArray: fv }));  // 0: equals
+    return props.map(p => ({ PropertyName: p, Operator: 0, FilterValueArray: fv }));  // equals
   };
-
-  // Date range filters
-  const dateFiltersFor = (asArray) => {
-    const filters = [];
-    if (dateFrom && dateTo) {
-      filters.push({ PropertyName: F.DocDate[0], Operator: 7, FilterValueArray: [dateFrom, dateTo] }); // between
-    } else if (dateFrom) {
-      filters.push({ PropertyName: F.DocDate[0], Operator: 3, FilterValueArray: dateFrom }); // >=
-    } else if (dateTo) {
-      filters.push({ PropertyName: F.DocDate[0], Operator: 5, FilterValueArray: dateTo });   // <=
-    }
-    return filters;
+  const dateFilters = () => {
+    const out = [];
+    if (dateFrom && dateTo) out.push({ PropertyName: F.DocDate[0], Operator: 7, FilterValueArray: [dateFrom, dateTo] }); // between
+    else if (dateFrom)     out.push({ PropertyName: F.DocDate[0], Operator: 3, FilterValueArray: dateFrom });            // >=
+    else if (dateTo)       out.push({ PropertyName: F.DocDate[0], Operator: 5, FilterValueArray: dateTo });              // <=
+    return out;
   };
 
   const qDoc = (docNo || q || '').trim();
-  const tryAsArray = [false, true]; // scalar first, then array
+  const tryAsArray = [false, true]; // some tenants require arrays
   let lastErr = null;
 
-  for (const path of PATHS) {
-    for (const TYPE of TYPES) {
-      for (const arr of tryAsArray) {
-        // Build filters per variant
-        const base = [
-          ...likeFilters(F.CustomerName, customer, arr),
-          ...likeFilters(F.Status, status, arr),
-          ...(q && !docNo ? likeFilters(F.CustomerName, q, arr) : []),
-          ...dateFiltersFor(arr),
-        ];
+  for (const TYPE of TYPES) {
+    for (const arr of tryAsArray) {
+      const docPart = looksDocNo(qDoc)
+        ? [...eqFilters(F.DocNo, qDoc, arr), ...likeFilters(F.DocNo, qDoc, arr)]
+        : likeFilters(F.DocNo, qDoc, arr);
 
-        // Prefer DocNo match; if numeric-looking, try equals before like
-        const docFilters = looksNumeric(qDoc)
-          ? [...eqFilters(F.DocNo, qDoc, arr), ...likeFilters(F.DocNo, qDoc, arr)]
-          : likeFilters(F.DocNo, qDoc, arr);
+      const filters = [
+        ...docPart,
+        ...likeFilters(F.CustomerName, customer || (q && !docNo ? q : ''), arr),
+        ...likeFilters(F.Status, status, arr),
+        ...dateFilters(),
+      ];
 
-        const Filters = (docFilters.length || base.length) ? [...docFilters, ...base] : likeFilters(F.DocNo, qDoc, arr);
+      const body = {
+        Type: TYPE,
+        NumberOfRecords: Math.min(Math.max(Number(pageSize) || 50, 1), 100),
+        PageNumber: Number(page) || 1,
+        SortOrder: { PropertyName: F.DocNo[0], Direction: 1 },
+        Filters: filters.length ? filters : likeFilters(F.DocNo, qDoc, arr),
+      };
 
-        const body = {
-          Type: TYPE,
-          NumberOfRecords: Math.min(Math.max(Number(pageSize) || 50, 1), 100),
-          PageNumber: Number(page) || 1,
-          SortOrder: { PropertyName: F.DocNo[0], Direction: 1 },
-          Filters,
-        };
+      try {
+        const out = await tryPost(PATH, body);
+        if (!out.ok) { lastErr = new Error(`${PATH} ${out.status}: ${out.text?.slice?.(0,180)}`); continue; }
 
-        try {
-          const out = await tryPost(path, body);
-          if (!out.ok) { lastErr = new Error(`${path} ${out.status}: ${out.text.slice(0,180)}`); continue; }
-
-          const rows = normalizeListResult(out.json);
-          const mapped = rows.map(r => ({
-            id:        r[F.Id.find(k => k in r)] ?? null,
-            docNo:     r[F.DocNo.find(k => k in r)] ?? '',
-            customer:  r[F.CustomerName.find(k => k in r)] ?? '',
-            status:    r[F.Status.find(k => k in r)] ?? '',
-            date:      r[F.DocDate.find(k => k in r)] ?? '',
-            total:     r[F.Total.find(k => k in r)] ?? null,
-            raw:       r,
-          }));
-
-          return mapped; // accept first 200 (even if empty array)
-        } catch (e) {
-          lastErr = e;
-          continue;
-        }
+        const rows = normalizeListResult(out.json);
+        return rows.map(r => ({
+          id:       r[F.Id.find(k => k in r)] ?? null,
+          docNo:    r[F.DocNo.find(k => k in r)] ?? '',
+          customer: r[F.CustomerName.find(k => k in r)] ?? '',
+          status:   r[F.Status.find(k => k in r)] ?? '',
+          date:     r[F.DocDate.find(k => k in r)] ?? '',
+          total:    r[F.Total.find(k => k in r)] ?? null,
+          raw:      r,
+        }));
+      } catch (e) {
+        lastErr = e;
+        continue;
       }
     }
   }
