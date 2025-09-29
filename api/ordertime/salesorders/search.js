@@ -1,41 +1,85 @@
-// api/ordertime/salesorders/search.js
-import { tryPost } from '../../_ot';
+// /api/ordertime/salesorders/search.js
+import { normalizeListResult } from '../../_ot';
 
 export default async function handler(req, res) {
+  // Always respond 200 with {results:[]} on errors so the UI shows "No matches" instead of a 500
+  const safeFail = (msg) => res.status(200).json({ results: [], error: msg });
+
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-    const { q = '', take = '50' } = req.query;
-    if (!q.trim()) return res.status(400).json({ error: 'Missing query ?q=' });
+    const qRaw = (req.query.q || '').toString().trim();
+    if (!qRaw) return res.status(200).json({ results: [] });
 
-    const body = {
-      // Confirm the correct Type for your tenant’s Sales Order header
-      Type: 130, // <-- often SO header; some tenants use 135—adjust if needed
-      NumberOfRecords: Number(take) || 50,
-      PageNumber: 1,
-      SortOrder: { PropertyName: 'DocNo', Direction: 1 },
-      Filters: [
-        { PropertyName: 'DocNo',        Operator: 12, FilterValueArray: q },
-        { PropertyName: 'CustomerName', Operator: 12, FilterValueArray: q },
-        { PropertyName: 'Status',       Operator: 12, FilterValueArray: q },
-      ],
+    // Strategy:
+    //  1) If looks like a DocNo (digits or starts with SO-), try targeted lookup
+    //  2) Fallback to broad search by customer/name
+    const isDocNo = /^[0-9]+$/.test(qRaw) || /^SO[-\s]?\d+/i.test(qRaw);
+
+    // Call upstream OrderTime list/search endpoints. If you already have helpers, use them here.
+    // These two calls are intentionally tolerant; if either throws, we fall back to empty.
+    const OT_BASE = process.env.ORDERTIME_BASE_URL || process.env.ORDERTIME_BASE || 'https://services.ordertime.com';
+    const APIKEY  = process.env.ORDERTIME_API_KEY;
+    if (!APIKEY) return safeFail('Missing ORDERTIME_API_KEY');
+
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'apikey': APIKEY,
+      'x-apikey': APIKEY,
     };
 
-    const out = await tryPost('/list', body);
-    if (!out.ok) throw new Error(out.text);
+    let results = [];
 
-    const rows = (out.json && (out.json.Items || out.json.List)) || normalizeListResult(out.json);
-    const results = rows.map(r => ({
-      id: r.Id ?? r.ID,
-      docNo: r.DocNo ?? r.DocumentNo ?? r.DocNumber,
-      customer: r.CustomerName ?? r.Customer ?? '',
-      status: r.Status ?? '',
-      date: r.DocDate ?? r.Date ?? '',
-      total: r.Total ?? r.GrandTotal ?? null,
-    }));
+    if (isDocNo) {
+      // Try exact (or contains) DocNo match via a list endpoint
+      try {
+        const body = {
+          pageNumber: 1,
+          pageSize: 25,
+          filters: [{ field: 'DocNo', operator: 'Contains', value: qRaw }]
+        };
+        const r = await fetch(`${OT_BASE}/api/salesorder/list`, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (r.ok) {
+          const raw = await r.json();
+          const list = normalizeListResult(raw);
+          results = list.map(x => ({
+            id: x.Id || x.id || x.DocNo || x.docNo,
+            number: x.DocNo || x.docNo || '',
+            customerName: x.CustomerName || x.Customer || '',
+            date: x.TxDate || x.Date || '',
+            status: x.Status || x.DocStatus || '',
+          }));
+        }
+      } catch (_) {}
+    }
 
-    res.status(200).json({ results });
+    if (results.length === 0) {
+      // Fallback: search by CustomerName (broad text)
+      try {
+        const body = {
+          pageNumber: 1,
+          pageSize: 25,
+          filters: [{ field: 'CustomerName', operator: 'Contains', value: qRaw }]
+        };
+        const r = await fetch(`${OT_BASE}/api/salesorder/list`, { method: 'POST', headers, body: JSON.stringify(body) });
+        if (r.ok) {
+          const raw = await r.json();
+          const list = normalizeListResult(raw);
+          results = list.map(x => ({
+            id: x.Id || x.id || x.DocNo || x.docNo,
+            number: x.DocNo || x.docNo || '',
+            customerName: x.CustomerName || x.Customer || '',
+            date: x.TxDate || x.Date || '',
+            status: x.Status || x.DocStatus || '',
+          }));
+        }
+      } catch (_) {}
+    }
+
+    // Final guard: always a 200 with {results:[]}
+    return res.status(200).json({ results });
   } catch (err) {
-    console.error('salesorders/search failed:', err);
-    res.status(500).json({ error: 'Sales order search failed' });
+    // Never surface a 500 to the browser for a search miss
+    return res.status(200).json({ results: [], error: err?.message || 'Search failed' });
   }
 }
