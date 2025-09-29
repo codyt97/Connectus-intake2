@@ -35,7 +35,7 @@ async function tryPost(path, body) {
 function safeJSON(t) { try { return JSON.parse(t); } catch { return null; } }
 
 // Replace the whole function with this:
-function normalizeListResult(data) {
+export function normalizeListResult(data) {
   if (!data) return [];
 
   // Common direct array
