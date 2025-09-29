@@ -726,12 +726,22 @@ City, State ZIP"></textarea>
     <strong>Clone Existing Order — OrderTime</strong>
     <button class="ghost" onclick="closeDrawer('drawerClone')">Close</button>
   </header>
+  <!-- In-App Sales Order Search -->
+<div class="card" style="margin-bottom:12px">
+  <h3>Find Existing Sales Orders</h3>
+  <div class="row">
+    <input id="soSearchInput" placeholder="Search by SO #, customer, or status…" />
+    <button class="ghost" id="btnSoSearch">Search</button>
+  </div>
+  <div id="soSearchResults" class="tiny" style="margin-top:8px"></div>
+</div>
+
   <div class="content">
     <label class="tiny">Search Sales Orders in OrderTime (opens in a new tab)</label>
     <div class="row">
       <input id="cloneQuery" placeholder="Type customer name, SO number, etc." />
       <button class="ghost" onclick="openSOSearch()">Search</button>
-    </div>
+  </div>
     <div id="cloneResults" class="tiny" style="margin-top:8px"></div>
 
 
@@ -3917,5 +3927,198 @@ window.addEventListener('DOMContentLoaded', () => {
 
 
 </script>
+<script>
+// ===== Existing Sales Order: In-App Search + Apply =====
+
+// Wire the search button + Enter key
+document.getElementById('btnSoSearch')?.addEventListener('click', soRunSearch);
+document.getElementById('soSearchInput')?.addEventListener('keydown', (e)=>{
+  if (e.key === 'Enter') soRunSearch();
+});
+
+async function soRunSearch(){
+  const box = document.getElementById('soSearchResults');
+  const q   = (document.getElementById('soSearchInput')?.value || '').trim();
+  if (!q) { box.innerHTML = '<div class="muted">Enter a query.</div>'; return; }
+
+  box.innerHTML = 'Searching…';
+  try {
+    const url = `/api/ordertime/salesorders/search?q=${encodeURIComponent(q)}&take=25`;
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    const rows = await res.json();
+
+    if (!Array.isArray(rows) || !rows.length) {
+      box.innerHTML = '<div class="muted">No results.</div>';
+      return;
+    }
+
+    // Render results table with Apply per row
+    const html = [
+      '<table class="table"><thead><tr>',
+      '<th>DocNo</th><th>Customer</th><th>Status</th><th>Date</th><th>Total</th><th></th>',
+      '</tr></thead><tbody>',
+      ...rows.map(r => {
+        const doc = (r.docNo || '').toString().trim();
+        const cust = (r.customer || '').toString().trim();
+        const st = (r.status || '').toString().trim();
+        const dt = (r.date || '').toString().slice(0,10);
+        const tot = (r.total ?? '')?.toString();
+        const safeDoc = doc.replace(/"/g,'&quot;');
+        return `<tr>
+          <td>${doc}</td>
+          <td>${cust}</td>
+          <td>${st}</td>
+          <td>${dt}</td>
+          <td>${tot}</td>
+          <td><button class="ok tiny" data-apply-doc="${safeDoc}">Apply</button></td>
+        </tr>`;
+      }),
+      '</tbody></table>'
+    ].join('');
+
+    box.innerHTML = html;
+
+    // Attach Apply handlers
+    [...box.querySelectorAll('button[data-apply-doc]')].forEach(btn=>{
+      btn.addEventListener('click', async (e)=>{
+        const docNo = e.currentTarget.getAttribute('data-apply-doc') || '';
+        if (!docNo) return;
+        await soApplyByDocNo(docNo);
+      });
+    });
+
+  } catch (err) {
+    console.error('SO search failed', err);
+    box.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
+  }
+}
+
+// Fetch full order (normalized) and apply to Intake
+async function soApplyByDocNo(docNo){
+  try {
+    const res = await fetch(`/api/ordertime/salesorders/get?docNo=${encodeURIComponent(docNo)}`);
+    if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
+    const payload = await res.json();
+    const order   = payload?.order || payload; // normalized here
+
+    if (!order || !order.billing) throw new Error('No order data');
+
+    // Persist docNo if you include it in CSV header later
+    window.__cloneDocNo = order.docNo || docNo;
+
+    // Apply Customer/Billing
+    setVal('billCompany', order.billing.company);
+    setVal('billContact', order.billing.contact);
+    setVal('billPhone',   order.billing.phone);
+    setVal('billEmail',   order.billing.email);
+    setVal('billStreet',  order.billing.street);
+    setVal('billSuite',   order.billing.suite);
+    setVal('billCity',    order.billing.city);
+    setVal('billState',   order.billing.state);
+    setVal('billZip',     order.billing.zip);
+
+    // Apply Shipping
+    setVal('shipCompany', order.shipping.company || order.billing.company);
+    setVal('shipContact', order.shipping.contact);
+    setVal('shipPhone',   order.shipping.phone);
+    setVal('shipEmail',   order.shipping.email);
+    setVal('shipStreet',  order.shipping.street);
+    setVal('shipSuite',   order.shipping.suite);
+    setVal('shipCity',    order.shipping.city);
+    setVal('shipState',   order.shipping.state);
+    setVal('shipZip',     order.shipping.zip);
+    const resBox = document.getElementById('resShip');
+    if (resBox) resBox.checked = !!order.shipping.residence;
+
+    // Optional: customer PO / terms if you expose them
+    setVal('customerPO', order.customer?.po);
+    setVal('payTerms',   order.customer?.terms);
+
+    // Populate Items table
+    await replaceItemsWithOrderLines(order.lines || []);
+
+    // Surface intake tabs if your wizard gates them
+    openIntakeTabs();
+
+    // Close the drawer after applying
+    closeDrawer?.('drawerClone');
+
+  } catch (err) {
+    alert(`Failed to apply Sales Order: ${String(err.message || err)}`);
+    console.error(err);
+  }
+}
+
+function setVal(id, v) {
+  const el = document.getElementById(id);
+  if (el) el.value = (v ?? '').toString();
+}
+
+function openIntakeTabs(){
+  // Minimal: show Intake main panel + intake tabs
+  document.querySelector('[data-mainpanel="intake"]')?.classList.add('active');
+  document.querySelector('[data-mainpanel="reps"]')?.classList?.remove('active');
+  document.querySelector('#intakeTabs')?.removeAttribute('style');
+  document.getElementById('stepper')?.removeAttribute('style');
+}
+
+// Replace items table with order lines
+async function replaceItemsWithOrderLines(lines){
+  const body = document.getElementById('itemsBody');
+  if (!body) return;
+
+  // Clear
+  body.innerHTML = '';
+
+  // Add each line
+  for (const L of lines) {
+    // Use your existing helper that inserts a blank row with inputs/selects
+    if (typeof addRow === 'function') addRow();
+    const tr = body.querySelector('tr:last-child');
+    if (!tr) continue;
+
+    const tds = tr.querySelectorAll('td');
+
+    // Your columns (adjust if your table differs):
+    // 0:Desc, 1:Model, 2:Color, 3:OrderTime SKU, 4:Qty, 5:LTE/Wi-Fi/Both, 6:Carrier,
+    // 7:Act Payout, 8:MSRP, 9:Disc %, 10:Sell Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
+    // 14:Quoted Cost, 15:DLL/SPA/DealReg, 16:Hold/Res, 17:Delivery Lead, 18:EOL Confirm, 19:Remove
+
+    // Description
+    setCellInput(tds[0], L.description || L.item || '');
+    // SKU
+    setCellInput(tds[3], L.sku || '');
+    // Qty
+    setCellInput(tds[4], (L.qty ?? '').toString());
+    // LTE / Wi-Fi / Both
+    setCellInput(tds[5], L.attributes?.lteWifiBoth || '');
+    // Carrier
+    setCellInput(tds[6], L.attributes?.carrier || '');
+    // Sell Price
+    setCellInput(tds[10], (L.unitPrice ?? '').toString());
+    // New/CPO
+    setCellInput(tds[11], L.attributes?.condition || '');
+
+    // Optional: keep Line Item ID (hidden) if your CSV needs it
+    const hidden = document.createElement('input');
+    hidden.type  = 'hidden';
+    hidden.name  = 'lineItemId';
+    hidden.value = (L.lineId ?? '').toString();
+    tr.appendChild(hidden);
+  }
+
+  // Reveal subtabs area if you hide it when empty
+  document.getElementById('subtabsArea')?.removeAttribute('style');
+  document.getElementById('subtabPanels')?.removeAttribute('style');
+}
+
+function setCellInput(td, val) {
+  if (!td) return;
+  const el = td.querySelector('input,textarea,select');
+  if (el) el.value = (val ?? '').toString();
+}
+</script>
+
 </body>
 </html>
