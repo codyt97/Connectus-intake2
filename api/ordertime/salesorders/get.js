@@ -259,14 +259,20 @@ export default async function handler(req, res) {
     }
 
     if (!resolved) return res.status(404).json({ error: `DocNo not found: ${docNo}` });
-    const { id, TYPE } = resolved;
+    // If the resolver already returned the raw doc (Id fast-path), use it
+if (resolved._raw) {
+  return res.status(200).json({ ok: true, order: normalizeSalesOrder(resolved._raw) });
+}
 
-    // 2) Fetch by Id (canonical)
-    const getRes = await otPost('/document/get', { Type: TYPE, Id: id });
-    if (getRes.ok && getRes.json) {
-      const raw = Array.isArray(getRes.json) ? getRes.json[0] : getRes.json;
-      return res.status(200).json({ ok: true, order: normalizeSalesOrder(raw) });
-    }
+const { id, TYPE } = resolved;
+
+// Otherwise fetch by Id via /document/get
+const getRes = await otPost('/document/get', { Type: TYPE, Id: id });
+if (getRes.ok && getRes.json) {
+  const raw = Array.isArray(getRes.json) ? getRes.json[0] : getRes.json;
+  return res.status(200).json({ ok: true, order: normalizeSalesOrder(raw) });
+}
+
 
     // Surface upstream error for transparency
     return res.status(getRes.status || 502).json({
