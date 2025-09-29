@@ -2825,7 +2825,7 @@ function applyClonedOrder(){
 
 /* ===== Clone Existing Order helper ===== */
 // ---------- Clone Existing Sales Order (OrderTime) ----------
-function openSOSearch(){
+async function openSOSearch(){
   const q = (document.getElementById('cloneQuery').value || '').trim();
   const target = document.getElementById('cloneResults');
   if(!q){ target.innerHTML = 'Enter a query first.'; return; }
@@ -2852,7 +2852,7 @@ function openSOSearch(){
 }
 
 
-function loadSO(id){
+async function loadSO(id){
   try{
     // Use the docNo-based endpoint we control
     const raw = await api(`/ordertime/salesorders/get?docNo=${encodeURIComponent(id)}`);
