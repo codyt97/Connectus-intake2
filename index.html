@@ -3928,6 +3928,19 @@ document.getElementById('soSearchInput')?.addEventListener('keydown', (e)=>{
 async function soRunSearch(){
   const box = document.getElementById('soSearchResults');
   const q   = (document.getElementById('soSearchInput')?.value || '').trim();
+
+  const looksDocNo = /^[A-Za-z\-]*\d[\w\-]*$/.test(q);
+  if (looksDocNo) {
+    box.innerHTML = 'Loading order…';
+    try {
+      await soApplyByDocNo(q);           // uses /api/ordertime/salesorders/get?docNo=...
+      box.innerHTML = '<div class="muted">Applied by DocNo.</div>';
+    } catch (err) {
+      box.innerHTML = `<div class="muted">Failed: ${String(err.message || err)}</div>`;
+    }
+    return;
+  }
+
   if (!q) { box.innerHTML = '<div class="muted">Enter a query.</div>'; return; }
 
   box.innerHTML = 'Searching…';
@@ -3942,46 +3955,13 @@ async function soRunSearch(){
       return;
     }
 
-    // Render results table with Apply per row
-    const html = [
-      '<table class="table"><thead><tr>',
-      '<th>DocNo</th><th>Customer</th><th>Status</th><th>Date</th><th>Total</th><th></th>',
-      '</tr></thead><tbody>',
-      ...rows.map(r => {
-        const doc = (r.docNo || '').toString().trim();
-        const cust = (r.customer || '').toString().trim();
-        const st = (r.status || '').toString().trim();
-        const dt = (r.date || '').toString().slice(0,10);
-        const tot = (r.total ?? '')?.toString();
-        const safeDoc = doc.replace(/"/g,'&quot;');
-        return `<tr>
-          <td>${doc}</td>
-          <td>${cust}</td>
-          <td>${st}</td>
-          <td>${dt}</td>
-          <td>${tot}</td>
-          <td><button class="ok tiny" data-apply-doc="${safeDoc}">Apply</button></td>
-        </tr>`;
-      }),
-      '</tbody></table>'
-    ].join('');
-
-    box.innerHTML = html;
-
-    // Attach Apply handlers
-    [...box.querySelectorAll('button[data-apply-doc]')].forEach(btn=>{
-      btn.addEventListener('click', async (e)=>{
-        const docNo = e.currentTarget.getAttribute('data-apply-doc') || '';
-        if (!docNo) return;
-        await soApplyByDocNo(docNo);
-      });
-    });
-
+    // ... render rows w/ Apply buttons (keep your existing renderer)
   } catch (err) {
     console.error('SO search failed', err);
     box.innerHTML = `<div class="muted">Error: ${String(err.message || err)}</div>`;
   }
 }
+
 
 // Fetch full order (normalized) and apply to Intake
 async function soApplyByDocNo(docNo){
