@@ -166,20 +166,36 @@ function normalizeSalesOrder(r) {
 /* ------------------------- DocNo → Id resolver -------------------------- */
 
 async function resolveIdByDocNo(docNo) {
-  const TYPES = [130, 135, 131, 140, 7]; // broadened SO "header" types across tenants
+  const TYPES = [130, 135, 131, 140, 7]; // broadened SO header-ish types across tenants
   const F_DOC = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
   const F_ID  = ['Id','ID','id'];
 
-  const candidates = (() => {
-    const raw = String(docNo || '').trim();
-    const set = new Set([raw]);
-    if (raw && !/^SO[-\s]/i.test(raw)) {
-      set.add(`SO-${raw}`);
-      set.add(`SO ${raw}`);
+  const input = String(docNo || '').trim();
+  const isNumeric = /^\d+$/.test(input);
+
+  // --- Fast path: if the user typed a pure number, try it as an internal Id first ---
+  if (isNumeric) {
+    for (const TYPE of TYPES) {
+      const probe = await otPost('/document/get', { Type: TYPE, Id: Number(input) });
+      if (probe.ok && probe.json) {
+        const raw = Array.isArray(probe.json) ? probe.json[0] : probe.json;
+        // We already have the full document; return a synthetic resolution with TYPE/Id and the raw doc
+        return { id: Number(input), TYPE, row: { Id: Number(input) }, _raw: raw };
+      }
     }
-    if (/^\d+$/.test(raw)) {
-      const n = raw.length;
-      for (const w of [6,7,8]) if (w > n) set.add(raw.padStart(w, w));
+    // if none matched as an Id, fall through to DocNo strategies
+  }
+
+  // --- DocNo strategies: multi-field, eq/contains, scalar/array, SO-prefix, zero-pad ---
+  const candidates = (() => {
+    const set = new Set([input]);
+    if (input && !/^SO[-\s]/i.test(input)) {
+      set.add(`SO-${input}`);
+      set.add(`SO ${input}`);
+    }
+    if (isNumeric) {
+      const n = input.length;
+      for (const w of [6,7,8]) if (w > n) set.add(input.padStart(w, w));
     }
     return [...set];
   })();
@@ -213,6 +229,7 @@ async function resolveIdByDocNo(docNo) {
   }
   return null;
 }
+
 
 /* ----------------------------- Route ----------------------------------- */
 
