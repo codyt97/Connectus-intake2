@@ -1,7 +1,8 @@
 // /api/ordertime/salesorders/get.js
 //
-// Resolve a Sales Order by DocNo or internal Id and return a normalized payload.
-// Adds robust probing of /list payload variants and returns a rich debug trace on failure.
+// OrderTime tenant: /api/document/get is NOT available (404).
+// Use /api/list with the "RecordTypeEnum" contract and FilterValue (singular).
+// This route resolves by DocNo and returns a normalized sales order payload.
 
 const RAW_BASE =
   process.env.OT_BASE_URL ||
@@ -9,33 +10,34 @@ const RAW_BASE =
   process.env.ORDERTIME_BASE ||
   'https://services.ordertime.com';
 
-// Normalize base to ".../api"
+// normalize to .../api
 const BASE_ROOT = String(RAW_BASE).replace(/\/+$/,'').replace(/\/api$/,'');
 const BASE_API  = `${BASE_ROOT}/api`;
 
+// auth headers your other endpoints use
 const API_KEY = process.env.OT_API_KEY || process.env.ORDERTIME_API_KEY;
 const EMAIL   = process.env.OT_EMAIL    || process.env.ORDERTIME_EMAIL;
 const PASS    = process.env.OT_PASSWORD || process.env.ORDERTIME_PASSWORD;
 const DEVKEY  = process.env.OT_DEV_KEY  || process.env.ORDERTIME_DEV_KEY;
 
 function ensureEnv() {
-  if (!API_KEY) throw new Error('Missing API key (OT_API_KEY or ORDERTIME_API_KEY)');
-  if (!EMAIL)   throw new Error('Missing email (OT_EMAIL or ORDERTIME_EMAIL)');
-  if (!PASS && !DEVKEY) throw new Error('Missing secret (OT_PASSWORD/ORDERTIME_PASSWORD or OT_DEV_KEY/ORDERTIME_DEV_KEY)');
+  if (!API_KEY) throw new Error('Missing API key');
+  if (!EMAIL)   throw new Error('Missing email');
+  if (!PASS && !DEVKEY) throw new Error('Missing password/devkey');
 }
 
 function otHeaders() {
-  const h = { 'Content-Type':'application/json', 'Accept':'application/json', 'ApiKey':API_KEY, 'Email':EMAIL };
+  const h = { 'Content-Type':'application/json', 'Accept':'application/json', 'ApiKey': API_KEY, 'Email': EMAIL };
   if (DEVKEY) h.DevKey = DEVKEY; else h.Password = PASS;
   return h;
 }
 
 async function otPost(path, body) {
-  const url = `${BASE_API}${path.startsWith('/') ? '' : '/'}${path}`;
+  const url = `${BASE_API}${path.startsWith('/')?'':'/'}${path}`;
   const r = await fetch(url, { method:'POST', headers: otHeaders(), body: JSON.stringify(body||{}) });
   const text = await r.text();
   let json = null; try { json = JSON.parse(text); } catch {}
-  return { url, ok:r.ok, status:r.status, text, json };
+  return { url, status: r.status, ok: r.ok, json, text };
 }
 
 function normalizeListResult(data) {
@@ -54,41 +56,45 @@ function normalizeListResult(data) {
   return [];
 }
 
-function normalizeSalesOrder(r) {
+function normalizeSalesOrder(raw) {
   const get = (o,p,d='') => { try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; } };
+
   const billing = {
-    company: get(r,'CustomerRef.Name') || get(r,'CustomerName') || '',
-    contact: get(r,'BillTo.ContactName'),
-    phone:   get(r,'BillTo.Phone'),
-    email:   get(r,'BillTo.Email'),
-    street:  get(r,'BillTo.Address1'),
-    suite:   get(r,'BillTo.Address2'),
-    city:    get(r,'BillTo.City'),
-    state:   get(r,'BillTo.State'),
-    zip:     get(r,'BillTo.Zip'),
+    company: get(raw,'CustomerRef.Name') || get(raw,'CustomerName') || '',
+    contact: get(raw,'BillTo.ContactName'),
+    phone:   get(raw,'BillTo.Phone'),
+    email:   get(raw,'BillTo.Email'),
+    street:  get(raw,'BillTo.Address1'),
+    suite:   get(raw,'BillTo.Address2'),
+    city:    get(raw,'BillTo.City'),
+    state:   get(raw,'BillTo.State'),
+    zip:     get(raw,'BillTo.Zip'),
   };
+
   const shipping = {
-    company: get(r,'ShipTo.Company') || billing.company || '',
-    contact: get(r,'ShipTo.ContactName'),
-    phone:   get(r,'ShipTo.Phone'),
-    email:   get(r,'ShipTo.Email'),
-    street:  get(r,'ShipTo.Address1'),
-    suite:   get(r,'ShipTo.Address2'),
-    city:    get(r,'ShipTo.City'),
-    state:   get(r,'ShipTo.State'),
-    zip:     get(r,'ShipTo.Zip'),
-    residence: !!get(r,'ShipTo.Residential', false),
+    company: get(raw,'ShipTo.Company') || billing.company || '',
+    contact: get(raw,'ShipTo.ContactName'),
+    phone:   get(raw,'ShipTo.Phone'),
+    email:   get(raw,'ShipTo.Email'),
+    street:  get(raw,'ShipTo.Address1'),
+    suite:   get(raw,'ShipTo.Address2'),
+    city:    get(raw,'ShipTo.City'),
+    state:   get(raw,'ShipTo.State'),
+    zip:     get(raw,'ShipTo.Zip'),
+    residence: !!get(raw,'ShipTo.Residential', false),
   };
+
   const customer = {
-    id:    get(r,'CustomerRef.Id') || get(r,'CustomerId'),
-    name:  get(r,'CustomerRef.Name') || get(r,'CustomerName'),
-    po:    get(r,'PONumber') || '',
-    terms: get(r,'Terms') || '',
+    id:   get(raw,'CustomerRef.Id') || get(raw,'CustomerId'),
+    name: get(raw,'CustomerRef.Name') || get(raw,'CustomerName'),
+    po:   get(raw,'PONumber') || '',
+    terms:get(raw,'Terms') || '',
   };
-  const lines = (r?.Lines || r?.LineItems || []).map(L => {
+
+  const lines = (raw?.Lines || raw?.LineItems || []).map(L => {
     const g = (p,d='') => get(L,p,d);
-    const qty = Number(g('Quantity', 0));
-    const up  = Number(g('UnitPrice', 0));
+    const qty = Number(g('Quantity',0));
+    const up  = Number(g('UnitPrice',0));
     const ext = Number(g('Amount', qty*up));
     return {
       lineId: g('LineId') || g('Id') || g('LineNo'),
@@ -98,132 +104,72 @@ function normalizeSalesOrder(r) {
       description: g('Description') || '',
       qty, unitPrice: up, extPrice: ext,
       attributes: {
-        carrier: g('Custom.Carrier') || g('Carrier') || '',
+        carrier:     g('Custom.Carrier') || g('Carrier') || '',
         lteWifiBoth: g('Custom.LTE_WiFi_Both') || g('LTE_WiFi_Both') || '',
-        condition: g('Custom.New_CPO') || g('New_CPO') || '',
+        condition:   g('Custom.New_CPO') || g('New_CPO') || '',
       }
     };
   });
+
   return {
-    docNo: get(r,'DocNo') || get(r,'DocumentNo') || get(r,'DocNumber') || get(r,'Number') || get(r,'RefNo') || get(r,'RefNumber') || get(r,'DocNoDisplay'),
-    tranType: get(r,'TranType') || '',
+    docNo:
+      get(raw,'DocNo') || get(raw,'DocumentNo') || get(raw,'DocNumber') ||
+      get(raw,'Number') || get(raw,'RefNo') || get(raw,'RefNumber') ||
+      get(raw,'DocNoDisplay'),
+    tranType: get(raw,'TranType') || '',
     customer, billing, shipping, lines,
   };
 }
 
-async function resolveByIdOrDocNo(input) {
-  const TYPES = [130,135,131,140,7];
-  const OBJECT_TYPES = ['SalesOrder','SalesOrderHeader','SalesOrders','Sales Order']; // seen in some tenants
-  const F_DOC = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
-  const F_ID  = ['Id','ID','id'];
+// Fields we’ll try to match DocNo against (string only)
+const DOC_FIELDS = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
+
+// Several tenants use different numeric enums for SO header. We’ll try these, in order.
+const RECORD_TYPE_ENUMS = [130, 135, 131, 140, 7];
+
+async function listFindByDocNo(docNo, debug=false) {
+  // Build string-only candidate values (SO- prefix & zero-pad variants included)
+  const s = String(docNo || '').trim();
+  const cands = new Set([s]);
+  if (s && !/^SO[-\s]/i.test(s)) { cands.add(`SO-${s}`); cands.add(`SO ${s}`); }
+  if (/^\d+$/.test(s)) {
+    const n = s.length; for (const w of [6,7,8]) if (w>n) cands.add(s.padStart(w,w));
+  }
+  const candidates = [...cands].map(x => String(x));
+
+  // Try RecordTypeEnum payload with FilterValue (singular, string). Equals (0) first, then Contains (12).
   const attempts = [];
+  for (const RecordTypeEnum of RECORD_TYPE_ENUMS) {
+    for (const op of [0,12]) {
+      for (const v of candidates) {
+        const Filters = DOC_FIELDS.map(p => ({
+          PropertyName: p,
+          Operator: op,              // 0 = equals, 12 = contains
+          FilterValue: v             // singular value, STRING
+        }));
 
-  const val = String(input||'').trim();
-  const isNumeric = /^\d+$/.test(val);
+        const body = {
+          RecordTypeEnum,            // <-- critical for your tenant
+          NumberOfRecords: 1,
+          PageNumber: 1,
+          SortOrder: { PropertyName: DOC_FIELDS[0], Direction: 1 },
+          Filters
+        };
 
-  // 1) Numeric fast-path: try as internal Id via document/get
-  if (isNumeric) {
-    for (const TYPE of TYPES) {
-      const a = await otPost('/document/get', { Type: TYPE, Id: Number(val) });
-      attempts.push({ kind:'document/get(Id)', url:a.url, status:a.status, sample:a.text?.slice?.(0,120) });
-      if (a.ok && a.json) {
-        const raw = Array.isArray(a.json) ? a.json[0] : a.json;
-        return { ok:true, id:Number(val), TYPE, raw, attempts };
-      }
-    }
-  }
+        const resp = await otPost('/list', body);
+        attempts.push({ url: resp.url, status: resp.status, sample: resp.text?.slice?.(0,160) });
 
-  // Candidates for DocNo formats
-  const candidates = (() => {
-    const s = new Set([val]);
-    if (val && !/^SO[-\s]/i.test(val)) { s.add(`SO-${val}`); s.add(`SO ${val}`); }
-    if (/^\d+$/.test(val)) {
-      const n = val.length; for (const w of [6,7,8]) if (w>n) s.add(val.padStart(w,w));
-    }
-    return [...s].map(x => String(x)); // ensure strings only
-  })();
-
-  const LIST_PATHS = ['/list','/List'];
-
-  // 2) DocNo strategies across path, payload shape, and type styles
-  for (const path of LIST_PATHS) {
-    for (const TYPE of TYPES) {
-      for (const asArray of [true,false]) { // array first; some tenants require it
-        for (const op of [0,12]) { // equals, contains
-          // Payload variant A: FilterValueArray (strings only)
-          for (const v of candidates) {
-            const fv = asArray ? [v] : v; // value is string already
-            const Filters = F_DOC.map(p => ({ PropertyName:p, Operator:op, FilterValueArray: fv }));
-            const bodyA = { Type: TYPE, NumberOfRecords:1, PageNumber:1, SortOrder:{ PropertyName:F_DOC[0], Direction:1 }, Filters };
-            const a = await otPost(path, bodyA);
-            attempts.push({ kind:`list ${path} A(Type)`, url:a.url, status:a.status, sample:a.text?.slice?.(0,120) });
-            if (a.ok) {
-              const rows = normalizeListResult(a.json);
-              if (rows?.length) {
-                const row = rows[0];
-                const id = F_ID.map(k => row?.[k]).find(Boolean);
-                if (id) return { ok:true, id, TYPE, attempts };
-              }
-            }
-          }
-          // Payload variant B: FilterValue (singular)
-          for (const v of candidates) {
-            const fv = asArray ? [v] : v;
-            const Filters = F_DOC.map(p => ({ PropertyName:p, Operator:op, FilterValue: fv }));
-            const bodyB = { Type: TYPE, NumberOfRecords:1, PageNumber:1, SortOrder:{ PropertyName:F_DOC[0], Direction:1 }, Filters };
-            const b = await otPost(path, bodyB);
-            attempts.push({ kind:`list ${path} B(Type)`, url:b.url, status:b.status, sample:b.text?.slice?.(0,120) });
-            if (b.ok) {
-              const rows = normalizeListResult(b.json);
-              if (rows?.length) {
-                const row = rows[0];
-                const id = F_ID.map(k => row?.[k]).find(Boolean);
-                if (id) return { ok:true, id, TYPE, attempts };
-              }
-            }
-          }
-        }
-      }
-    }
-
-    // Try ObjectType (string) instead of Type (numeric)
-    for (const OBJ of OBJECT_TYPES) {
-      for (const asArray of [true,false]) {
-        for (const op of [0,12]) {
-          for (const v of candidates) {
-            const fv = asArray ? [v] : v;
-            const FiltersA = F_DOC.map(p => ({ PropertyName:p, Operator:op, FilterValueArray: fv }));
-            const bodyA = { ObjectType: OBJ, NumberOfRecords:1, PageNumber:1, SortOrder:{ PropertyName:F_DOC[0], Direction:1 }, Filters: FiltersA };
-            const a = await otPost(path, bodyA);
-            attempts.push({ kind:`list ${path} A(ObjectType)`, url:a.url, status:a.status, sample:a.text?.slice?.(0,120) });
-            if (a.ok) {
-              const rows = normalizeListResult(a.json);
-              if (rows?.length) {
-                const row = rows[0];
-                const id = ['Id','ID','id'].map(k => row?.[k]).find(Boolean);
-                if (id) return { ok:true, id, TYPE:null, attempts };
-              }
-            }
-
-            const FiltersB = F_DOC.map(p => ({ PropertyName:p, Operator:op, FilterValue: fv }));
-            const bodyB = { ObjectType: OBJ, NumberOfRecords:1, PageNumber:1, SortOrder:{ PropertyName:F_DOC[0], Direction:1 }, Filters: FiltersB };
-            const b = await otPost(path, bodyB);
-            attempts.push({ kind:`list ${path} B(ObjectType)`, url:b.url, status:b.status, sample:b.text?.slice?.(0,120) });
-            if (b.ok) {
-              const rows = normalizeListResult(b.json);
-              if (rows?.length) {
-                const row = rows[0];
-                const id = ['Id','ID','id'].map(k => row?.[k]).find(Boolean);
-                if (id) return { ok:true, id, TYPE:null, attempts };
-              }
-            }
+        if (resp.ok && resp.json) {
+          const rows = normalizeListResult(resp.json);
+          if (rows?.length) {
+            return { row: rows[0], attempts };
           }
         }
       }
     }
   }
 
-  return { ok:false, attempts };
+  return { row: null, attempts };
 }
 
 export default async function handler(req, res) {
@@ -234,27 +180,19 @@ export default async function handler(req, res) {
 
     ensureEnv();
 
-    const r = await resolveByIdOrDocNo(docNo);
-
-    if (!r.ok) {
-      // If explicit debug asked, show the matrix of attempts (status + first 120 chars)
-      if (debug === '1') return res.status(404).json({ error: `DocNo not found: ${docNo}`, attempts: r.attempts });
+    const found = await listFindByDocNo(docNo, debug === '1');
+    if (!found.row) {
+      if (debug === '1') {
+        return res.status(404).json({ error: `DocNo not found: ${docNo}`, attempts: found.attempts });
+      }
       return res.status(404).json({ error: `DocNo not found: ${docNo}` });
     }
 
-    // If we already got the raw doc via Id fast-path, normalize and return
-    if (r.raw) {
-      return res.status(200).json({ ok:true, order: normalizeSalesOrder(r.raw) });
-    }
+    // Some tenants return enough columns in /list that you can build the full order.
+    // If not, the row will at least have Id / CustomerRef etc. We’ll return the row as-is under raw.
+    const order = normalizeSalesOrder(found.row);
+    return res.status(200).json({ ok: true, order, raw: found.row });
 
-    // Otherwise fetch by Id now
-    const getRes = await otPost('/document/get', { Type: r.TYPE ?? 130, Id: r.id });
-    if (getRes.ok && getRes.json) {
-      const raw = Array.isArray(getRes.json) ? getRes.json[0] : getRes.json;
-      return res.status(200).json({ ok:true, order: normalizeSalesOrder(raw) });
-    }
-
-    return res.status(getRes.status || 502).json({ error: `document/get failed ${getRes.status}: ${getRes.text?.slice?.(0,300) || 'No body'}` });
   } catch (e) {
     const msg = e?.stack ? `${e.message}\n${e.stack}` : String(e || 'Server error');
     return res.status(500).json({ error: msg });
