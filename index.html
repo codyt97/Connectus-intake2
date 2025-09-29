@@ -2825,18 +2825,17 @@ function applyClonedOrder(){
 
 /* ===== Clone Existing Order helper ===== */
 // ---------- Clone Existing Sales Order (OrderTime) ----------
-async function openSOSearch(){
+function openSOSearch(){
   const q = (document.getElementById('cloneQuery').value || '').trim();
   const target = document.getElementById('cloneResults');
   if(!q){ target.innerHTML = 'Enter a query first.'; return; }
   target.innerHTML = 'Searching…';
   try{
-    // hit your proxy: GET /api/ordertime/salesorders/search?q=...
-    const results = await api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
+    // GET /api/ordertime/salesorders/search returns { results: [...] }
+    const { results } = await api(`/ordertime/salesorders/search?q=${encodeURIComponent(q)}`);
     if(!Array.isArray(results) || results.length === 0){
       target.innerHTML = 'No matches.'; return;
     }
-    // render small cards with Preview + Apply
     target.innerHTML = results.slice(0,25).map(so => `
       <div class="card" style="margin:6px 0;padding:10px">
         <div><strong>${so.number || so.id || 'SO'}</strong> — ${so.customerName || ''}</div>
@@ -2852,22 +2851,71 @@ async function openSOSearch(){
   }
 }
 
-async function loadSO(id){
+
+function loadSO(id){
   try{
-    // GET /api/ordertime/salesorders/:id
-    const so = await api(`/ordertime/salesorders/${encodeURIComponent(id)}`);
-    // show JSON in the drawer textarea so the user can review/edit
-    document.getElementById('clonePaste').value = JSON.stringify(so, null, 2);
+    // Use the docNo-based endpoint we control
+    const raw = await api(`/ordertime/salesorders/get?docNo=${encodeURIComponent(id)}`);
+
+    // Some backends return { ok, order }, others return the raw SO.
+    const base = raw?.order ?? raw;
+
+    // Normalize to the JSON shape your applyClonedOrder() already expects
+    const get = (o, p, d='') => { try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; } };
+
+    const billing = {
+      contact: get(base,'BillTo.ContactName'),
+      phone:   get(base,'BillTo.Phone'),
+      email:   get(base,'BillTo.Email'),
+      street:  get(base,'BillTo.Address1'),
+      suite:   get(base,'BillTo.Address2'),
+      city:    get(base,'BillTo.City'),
+      state:   get(base,'BillTo.State'),
+      zip:     get(base,'BillTo.Zip'),
+    };
+
+    const shipping = {
+      company: get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
+      contact: get(base,'ShipTo.ContactName'),
+      phone:   get(base,'ShipTo.Phone'),
+      email:   get(base,'ShipTo.Email'),
+      street:  get(base,'ShipTo.Address1'),
+      suite:   get(base,'ShipTo.Address2'),
+      city:    get(base,'ShipTo.City'),
+      state:   get(base,'ShipTo.State'),
+      zip:     get(base,'ShipTo.Zip'),
+      residence: !!get(base,'ShipTo.Residential', false),
+    };
+
+    const items = (base?.Lines || base?.LineItems || []).map(L => ({
+      sku:   get(L,'ItemRef.Code') || get(L,'ItemCode') || get(L,'SKU') || '',
+      desc:  get(L,'Description') || get(L,'ItemRef.Name') || '',
+      qty:   Number(get(L,'Quantity', 0)),
+      sell:  Number(get(L,'UnitPrice', 0)),
+      carrier: get(L,'Custom.Carrier') || get(L,'Carrier') || '',
+      cond:    get(L,'Custom.New_CPO') || get(L,'New_CPO') || '',
+    }));
+
+    const shaped = {
+      customer: { company: get(base,'CustomerRef.Name') || get(base,'CustomerName') || '', billing },
+      billing,
+      shipping,
+      items,
+      payment: { method: get(base,'PaymentMethod') || '', terms: get(base,'Terms') || '' },
+      shippingOptions: { pay: get(base,'ShipPayMethod') || '', speed: get(base,'ShipSpeed') || '', shortShip: get(base,'ShortShip') || '' }
+    };
+
+    document.getElementById('clonePaste').value = JSON.stringify(shaped, null, 2);
   }catch(err){
     alert(`Load SO failed: ${err.message}`);
   }
 }
 
+
 async function applySO(id){
   await loadSO(id);     // puts the JSON into #clonePaste
   applyClonedOrder();   // reuses your existing JSON→form mapper
 }
-
 
 
 function fillCloneExample(){
