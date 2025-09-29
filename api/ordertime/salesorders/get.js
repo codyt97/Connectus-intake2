@@ -1,14 +1,12 @@
 // /api/ordertime/salesorders/get.js
 //
-// Get a Sales Order by *DocNo* (human-facing number).
-// 1) Resolve internal Id via POST /list using tolerant filters
-//    (multi-type, multi-field, equals/contains, scalar/array, SO- prefix & zero-padding variants).
-// 2) Fetch full document by Id via POST /document/get (canonical).
-// 3) Return a normalized payload your UI can apply directly.
-//
-// This route REUSES your _ot.js helpers, so auth/payloads match the working endpoints.
+// Get a Sales Order by *DocNo* (human number) in two steps:
+//   1) Resolve internal Id via POST /list using tolerant filters
+//      (multi-type, multi-field, equals/contains, scalar/array, SO- prefix & zero-padding).
+//   2) Fetch the full document by Id via POST /document/get.
+// Returns a normalized object your UI can apply directly.
 
-import { assertEnv, tryPost, normalizeListResult } from '../../_ot';
+import { tryPost, normalizeListResult } from '../../_ot';
 
 // ---------- Safe JSON ----------
 const safeJSON = (t) => { try { return JSON.parse(t); } catch { return null; } };
@@ -90,11 +88,11 @@ function normalizeSalesOrder(r) {
 
 // ---------- DocNo → Id resolver using /list via tryPost (same auth as other routes) ----------
 async function resolveIdByDocNo(docNo) {
-  const TYPES = [130, 135, 131, 140, 7]; // common SO header-ish types across tenants
+  const TYPES = [130, 135, 131, 140, 7]; // common SO header-ish types
   const F_DOC = ['DocNo', 'DocumentNo', 'DocNumber', 'Number', 'RefNo', 'RefNumber', 'DocNoDisplay'];
   const F_ID  = ['Id', 'ID', 'id'];
 
-  // Try common display variants: raw, SO-prefixed, zero-padded numeric
+  // Candidate values: raw, SO- prefixed, zero-padded numeric
   const candidates = (() => {
     const raw = String(docNo || '').trim();
     const set = new Set([raw]);
@@ -146,12 +144,10 @@ export default async function handler(req, res) {
     const { docNo, debug } = req.query;
     if (!docNo) return res.status(400).json({ error: 'Missing ?docNo=' });
 
-    assertEnv(); // ensure required env is present for tryPost
-
     // 1) Resolve internal Id for the provided DocNo
     const resolved = await resolveIdByDocNo(docNo);
 
-    // Optional debug probe to inspect what /list returns on your tenant
+    // Optional: debug probe to see what /list returns on your tenant
     if (!resolved && debug === '1') {
       const F_DOC = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
       const candidates = [String(docNo), `SO-${docNo}`, `SO ${docNo}`];
@@ -177,7 +173,7 @@ export default async function handler(req, res) {
       return res.status(200).json({ ok: true, order: normalizeSalesOrder(raw) });
     }
 
-    // If /document/get failed, surface its response for troubleshooting
+    // If /document/get failed, surface its response
     return res.status(getRes.status || 502).json({
       error: `document/get failed ${getRes.status}: ${getRes.text?.slice?.(0, 300) || 'No body'}`,
     });
