@@ -1,6 +1,13 @@
 // /api/ordertime/salesorders/get.js
-const OT_BASE = process.env.ORDERTIME_BASE_URL || process.env.ORDERTIME_BASE || process.env.ORDERTIME_BASE_URL_FALLBACK || "https://services.ordertime.com";
-const OT_KEY  = process.env.ORDERTIME_API_KEY;
+const OT_BASE = process.env.ORDERTIME_BASE_URL
+             || process.env.ORDERTIME_BASE
+             || process.env.OT_BASE_URL
+             || process.env.ORDERTIME_BASE_URL_FALLBACK
+             || "https://services.ordertime.com";
+
+const OT_KEY  = process.env.ORDERTIME_API_KEY
+             || process.env.OT_API_KEY;
+
 
 function otHeaders() {
   if (!OT_KEY) throw new Error("Missing ORDERTIME_API_KEY");
