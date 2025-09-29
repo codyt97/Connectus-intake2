@@ -117,7 +117,7 @@ export async function listCustomersByName(q, page = 1, pageSize = 25) {
   return []; // fallback
 }
 
-/* ---------- Sales Orders helper (multi-strategy) ---------- */
+/* ---------- Sales Orders helper (multi-strategy, tolerant) ---------- */
 export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) {
   assertEnv();
 
@@ -126,14 +126,17 @@ export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) 
     docNo = '',
     customer = '',
     status = '',
-    dateFrom = '',  // ISO 'YYYY-MM-DD' recommended
+    dateFrom = '',
     dateTo = '',
   } = criteria;
 
-  // Most common SO header types I see in OT tenants.
-  const CANDIDATE_TYPES = [130, 135, 131]; // try several; first working wins
+  // Try several list endpoints (tenants vary)
+  const PATHS = ['/list', '/document/list', '/salesorder/list'];
 
-  // Field name variants across tenants/schemas.
+  // Most common SO header types seen across tenants
+  const TYPES = [130, 135, 131, 140, 7]; // keep yours and add a couple more
+
+  // Field variants across tenants
   const F = {
     DocNo:        ['DocNo', 'DocumentNo', 'DocNumber'],
     CustomerName: ['CustomerName', 'Customer', 'CustName'],
@@ -143,65 +146,88 @@ export async function searchSalesOrders(criteria = {}, page = 1, pageSize = 50) 
     Id:           ['Id', 'ID', 'id'],
   };
 
-  // Build LIKE filters for a given prop list and a value.
-  const likeFilters = (props, val) =>
-    (!val || !String(val).trim()) ? [] :
-    props.map(p => ({ PropertyName: p, Operator: 12, FilterValueArray: String(val) }));
+  const looksNumeric = (v) => /^[0-9\-]+$/.test(String(v || '').trim());
 
-  // Build date filters if provided (fallback to LIKE if BETWEEN isn’t supported in your tenant).
-  const dateFilters = [];
-  if (dateFrom && dateTo) {
-    // 7 := between (common), with 2-element array
-    dateFilters.push({ PropertyName: F.DocDate[0], Operator: 7, FilterValueArray: [dateFrom, dateTo] });
-  } else if (dateFrom) {
-    // 3 := >=
-    dateFilters.push({ PropertyName: F.DocDate[0], Operator: 3, FilterValueArray: dateFrom });
-  } else if (dateTo) {
-    // 5 := <=
-    dateFilters.push({ PropertyName: F.DocDate[0], Operator: 5, FilterValueArray: dateTo });
-  }
+  // LIKE filters (string or array variant)
+  const likeFilters = (props, val, asArray = false) => {
+    const v = (val == null ? '' : String(val)).trim();
+    if (!v) return [];
+    const fv = asArray ? [v] : v;
+    return props.map(p => ({ PropertyName: p, Operator: 12, FilterValueArray: fv })); // 12: contains
+  };
 
-  const filters =
-    [
-      ...likeFilters(F.DocNo, docNo || q),
-      ...likeFilters(F.CustomerName, customer || ''),
-      ...likeFilters(F.Status, status || ''),
-      ...(q && !docNo ? likeFilters(F.CustomerName, q) : []),
-      ...dateFilters,
-    ];
+  // EQUALS filters (for exact DocNo match when numeric-looking)
+  const eqFilters = (props, val, asArray = false) => {
+    const v = (val == null ? '' : String(val)).trim();
+    if (!v) return [];
+    const fv = asArray ? [v] : v;
+    return props.map(p => ({ PropertyName: p, Operator: 0, FilterValueArray: fv }));  // 0: equals
+  };
 
-  // Try each candidate type until one returns items or a definite 200
+  // Date range filters
+  const dateFiltersFor = (asArray) => {
+    const filters = [];
+    if (dateFrom && dateTo) {
+      filters.push({ PropertyName: F.DocDate[0], Operator: 7, FilterValueArray: [dateFrom, dateTo] }); // between
+    } else if (dateFrom) {
+      filters.push({ PropertyName: F.DocDate[0], Operator: 3, FilterValueArray: dateFrom }); // >=
+    } else if (dateTo) {
+      filters.push({ PropertyName: F.DocDate[0], Operator: 5, FilterValueArray: dateTo });   // <=
+    }
+    return filters;
+  };
+
+  const qDoc = (docNo || q || '').trim();
+  const tryAsArray = [false, true]; // scalar first, then array
   let lastErr = null;
-  for (const TYPE of CANDIDATE_TYPES) {
-    const body = {
-      Type: TYPE,
-      NumberOfRecords: Math.min(Math.max(Number(pageSize) || 50, 1), 100),
-      PageNumber: Number(page) || 1,
-      SortOrder: { PropertyName: F.DocNo[0], Direction: 1 },
-      Filters: filters.length ? filters : likeFilters(F.DocNo, q || ''), // default to q on DocNo
-    };
 
-    try {
-      const out = await tryPost('/list', body);
-      if (!out.ok) { lastErr = new Error(`/list ${out.status}: ${out.text.slice(0,180)}`); continue; }
+  for (const path of PATHS) {
+    for (const TYPE of TYPES) {
+      for (const arr of tryAsArray) {
+        // Build filters per variant
+        const base = [
+          ...likeFilters(F.CustomerName, customer, arr),
+          ...likeFilters(F.Status, status, arr),
+          ...(q && !docNo ? likeFilters(F.CustomerName, q, arr) : []),
+          ...dateFiltersFor(arr),
+        ];
 
-      const rows = normalizeListResult(out.json);
-      // Map results to a normalized shape
-      const mapped = rows.map(r => ({
-        id:        r[F.Id.find(k => k in r)] ?? null,
-        docNo:     r[F.DocNo.find(k => k in r)] ?? '',
-        customer:  r[F.CustomerName.find(k => k in r)] ?? '',
-        status:    r[F.Status.find(k => k in r)] ?? '',
-        date:      r[F.DocDate.find(k => k in r)] ?? '',
-        total:     r[F.Total.find(k => k in r)] ?? null,
-        raw:       r, // keep raw in case UI needs extra fields
-      }));
+        // Prefer DocNo match; if numeric-looking, try equals before like
+        const docFilters = looksNumeric(qDoc)
+          ? [...eqFilters(F.DocNo, qDoc, arr), ...likeFilters(F.DocNo, qDoc, arr)]
+          : likeFilters(F.DocNo, qDoc, arr);
 
-      // Accept on first 200; if array is empty and you passed a non-empty query, still return (it’s a valid 200)
-      return mapped;
-    } catch (e) {
-      lastErr = e;
-      continue;
+        const Filters = (docFilters.length || base.length) ? [...docFilters, ...base] : likeFilters(F.DocNo, qDoc, arr);
+
+        const body = {
+          Type: TYPE,
+          NumberOfRecords: Math.min(Math.max(Number(pageSize) || 50, 1), 100),
+          PageNumber: Number(page) || 1,
+          SortOrder: { PropertyName: F.DocNo[0], Direction: 1 },
+          Filters,
+        };
+
+        try {
+          const out = await tryPost(path, body);
+          if (!out.ok) { lastErr = new Error(`${path} ${out.status}: ${out.text.slice(0,180)}`); continue; }
+
+          const rows = normalizeListResult(out.json);
+          const mapped = rows.map(r => ({
+            id:        r[F.Id.find(k => k in r)] ?? null,
+            docNo:     r[F.DocNo.find(k => k in r)] ?? '',
+            customer:  r[F.CustomerName.find(k => k in r)] ?? '',
+            status:    r[F.Status.find(k => k in r)] ?? '',
+            date:      r[F.DocDate.find(k => k in r)] ?? '',
+            total:     r[F.Total.find(k => k in r)] ?? null,
+            raw:       r,
+          }));
+
+          return mapped; // accept first 200 (even if empty array)
+        } catch (e) {
+          lastErr = e;
+          continue;
+        }
+      }
     }
   }
 
