@@ -1,8 +1,11 @@
 // /api/ordertime/salesorders/get.js
 //
-// OrderTime tenant: /api/document/get is NOT available (404).
-// Use /api/list with the "RecordTypeEnum" contract and FilterValue (singular).
-// This route resolves by DocNo and returns a normalized sales order payload.
+// Your tenant rejects numeric Type and expects ObjectType strings.
+// We probe common Sales Order object names and query /api/list using:
+//   { ObjectType: "<name>", Filters: [{ PropertyName, Operator, FilterValue }] }
+//
+// We DO NOT call /api/document/get (it's 404 on your tenant).
+// On success we normalize the row to your UI shape and return it.
 
 const RAW_BASE =
   process.env.OT_BASE_URL ||
@@ -10,11 +13,9 @@ const RAW_BASE =
   process.env.ORDERTIME_BASE ||
   'https://services.ordertime.com';
 
-// normalize to .../api
 const BASE_ROOT = String(RAW_BASE).replace(/\/+$/,'').replace(/\/api$/,'');
 const BASE_API  = `${BASE_ROOT}/api`;
 
-// auth headers your other endpoints use
 const API_KEY = process.env.OT_API_KEY || process.env.ORDERTIME_API_KEY;
 const EMAIL   = process.env.OT_EMAIL    || process.env.ORDERTIME_EMAIL;
 const PASS    = process.env.OT_PASSWORD || process.env.ORDERTIME_PASSWORD;
@@ -27,17 +28,17 @@ function ensureEnv() {
 }
 
 function otHeaders() {
-  const h = { 'Content-Type':'application/json', 'Accept':'application/json', 'ApiKey': API_KEY, 'Email': EMAIL };
+  const h = { 'Content-Type':'application/json', 'Accept':'application/json', 'ApiKey':API_KEY, 'Email':EMAIL };
   if (DEVKEY) h.DevKey = DEVKEY; else h.Password = PASS;
   return h;
 }
 
 async function otPost(path, body) {
-  const url = `${BASE_API}${path.startsWith('/')?'':'/'}${path}`;
+  const url = `${BASE_API}${path.startsWith('/') ? '' : '/'}${path}`;
   const r = await fetch(url, { method:'POST', headers: otHeaders(), body: JSON.stringify(body||{}) });
   const text = await r.text();
   let json = null; try { json = JSON.parse(text); } catch {}
-  return { url, status: r.status, ok: r.ok, json, text };
+  return { url, ok:r.ok, status:r.status, text, json };
 }
 
 function normalizeListResult(data) {
@@ -121,55 +122,50 @@ function normalizeSalesOrder(raw) {
   };
 }
 
-// Fields we’ll try to match DocNo against (string only)
+// Candidate object names for Sales Order header on different tenants
+const SO_OBJECT_TYPES = [
+  'SalesOrderHeader',   // most common
+  'SalesOrder',
+  'Sales Order',
+  'SalesOrders'
+];
+
 const DOC_FIELDS = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
 
-// Several tenants use different numeric enums for SO header. We’ll try these, in order.
-const RECORD_TYPE_ENUMS = [130, 135, 131, 140, 7];
-
-async function listFindByDocNo(docNo, debug=false) {
-  // Build string-only candidate values (SO- prefix & zero-pad variants included)
-  const s = String(docNo || '').trim();
-  const cands = new Set([s]);
-  if (s && !/^SO[-\s]/i.test(s)) { cands.add(`SO-${s}`); cands.add(`SO ${s}`); }
+function buildCandidates(input) {
+  const s = String(input || '').trim();
+  const set = new Set([s]);
+  if (s && !/^SO[-\s]/i.test(s)) { set.add(`SO-${s}`); set.add(`SO ${s}`); }
   if (/^\d+$/.test(s)) {
-    const n = s.length; for (const w of [6,7,8]) if (w>n) cands.add(s.padStart(w,w));
+    const n = s.length; for (const w of [6,7,8]) if (w>n) set.add(s.padStart(w,w));
   }
-  const candidates = [...cands].map(x => String(x));
+  return [...set].map(String);
+}
 
-  // Try RecordTypeEnum payload with FilterValue (singular, string). Equals (0) first, then Contains (12).
-  const attempts = [];
-  for (const RecordTypeEnum of RECORD_TYPE_ENUMS) {
-    for (const op of [0,12]) {
-      for (const v of candidates) {
-        const Filters = DOC_FIELDS.map(p => ({
-          PropertyName: p,
-          Operator: op,              // 0 = equals, 12 = contains
-          FilterValue: v             // singular value, STRING
-        }));
-
-        const body = {
-          RecordTypeEnum,            // <-- critical for your tenant
-          NumberOfRecords: 1,
-          PageNumber: 1,
-          SortOrder: { PropertyName: DOC_FIELDS[0], Direction: 1 },
-          Filters
-        };
-
-        const resp = await otPost('/list', body);
-        attempts.push({ url: resp.url, status: resp.status, sample: resp.text?.slice?.(0,160) });
-
-        if (resp.ok && resp.json) {
-          const rows = normalizeListResult(resp.json);
-          if (rows?.length) {
-            return { row: rows[0], attempts };
-          }
-        }
-      }
+async function listByObjectType(objectType, docNo) {
+  const candidates = buildCandidates(docNo);
+  // equals (0) first, then contains (12)
+  for (const op of [0,12]) {
+    for (const v of candidates) {
+      const Filters = DOC_FIELDS.map(p => ({
+        PropertyName: p,
+        Operator: op,
+        FilterValue: v   // singular, STRING
+      }));
+      const body = {
+        ObjectType: objectType,
+        NumberOfRecords: 1,
+        PageNumber: 1,
+        SortOrder: { PropertyName: DOC_FIELDS[0], Direction: 1 },
+        Filters
+      };
+      const r = await otPost('/list', body);
+      if (!r.ok) continue;
+      const rows = normalizeListResult(r.json);
+      if (rows?.length) return { row: rows[0], attempt: { objectType, op, value: v } };
     }
   }
-
-  return { row: null, attempts };
+  return { row: null, attempt: null };
 }
 
 export default async function handler(req, res) {
@@ -180,18 +176,21 @@ export default async function handler(req, res) {
 
     ensureEnv();
 
-    const found = await listFindByDocNo(docNo, debug === '1');
-    if (!found.row) {
-      if (debug === '1') {
-        return res.status(404).json({ error: `DocNo not found: ${docNo}`, attempts: found.attempts });
+    // Probe object types in order until one returns a row
+    const attempts = [];
+    for (const objectType of SO_OBJECT_TYPES) {
+      const out = await listByObjectType(objectType, docNo);
+      attempts.push({ objectType, hit: !!out.row });
+      if (out.row) {
+        const order = normalizeSalesOrder(out.row);
+        return res.status(200).json({ ok: true, order, objectTypeUsed: objectType });
       }
-      return res.status(404).json({ error: `DocNo not found: ${docNo}` });
     }
 
-    // Some tenants return enough columns in /list that you can build the full order.
-    // If not, the row will at least have Id / CustomerRef etc. We’ll return the row as-is under raw.
-    const order = normalizeSalesOrder(found.row);
-    return res.status(200).json({ ok: true, order, raw: found.row });
+    if (debug === '1') {
+      return res.status(404).json({ error: `DocNo not found: ${docNo}`, attempts });
+    }
+    return res.status(404).json({ error: `DocNo not found: ${docNo}` });
 
   } catch (e) {
     const msg = e?.stack ? `${e.message}\n${e.stack}` : String(e || 'Server error');
