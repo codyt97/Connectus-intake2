@@ -1,17 +1,16 @@
 // /api/ordertime/salesorders/get.js
 //
-// Resolve a Sales Order by DocNo and return a normalized payload:
+// Resolve a Sales Order by DocNo or internal Id and return a normalized payload:
 // { docNo, tranType, customer, billing, shipping, lines[] }.
 //
-// Approach:
-//  1) Resolve internal Id via POST /api/list (tolerant: multi-type, multi-field,
-//     equals/contains, scalar/array, SO- prefix & zero-padding variants).
-//  2) Fetch full document by Id via POST /api/document/get.
-//  3) Normalize for your UI.
+// Strategy:
+//  1) If input is numeric, try it as an internal Id via POST /api/document/get (all common types).
+//  2) Else (or if Id lookup fails), search DocNo via POST /api/list with tolerant filters,
+//     trying both "/list" and "/List" path variants (some tenants are picky).
+//  3) Fetch full document by Id via POST /api/document/get and normalize.
+//  4) If still failing, return a FOCUSED debug object listing each URL we tried and its status.
 //
-// Self-contained: no imports from _ot.js (avoids export shape mismatches).
-
-/* ---------------------------- Env & base URL ---------------------------- */
+// Self-contained – no imports from _ot.js.
 
 const RAW_BASE =
   process.env.OT_BASE_URL ||
@@ -19,25 +18,18 @@ const RAW_BASE =
   process.env.ORDERTIME_BASE ||
   'https://services.ordertime.com'; // tolerate with/without /api
 
-// normalize to exactly .../api (avoid .../api/api)
+// Normalize to exactly ".../api" (avoid .../api/api & tolerate tenants that omit the suffix)
 const BASE_ROOT = String(RAW_BASE).replace(/\/+$/,'').replace(/\/api$/,'');
 const BASE_API  = `${BASE_ROOT}/api`;
 
 const API_KEY =
-  process.env.OT_API_KEY ||
-  process.env.ORDERTIME_API_KEY;
-
-const EMAIL =
-  process.env.OT_EMAIL ||
-  process.env.ORDERTIME_EMAIL;
-
-const PASS =
-  process.env.OT_PASSWORD ||
-  process.env.ORDERTIME_PASSWORD;
-
-const DEVKEY =
-  process.env.OT_DEV_KEY ||
-  process.env.ORDERTIME_DEV_KEY;
+  process.env.OT_API_KEY || process.env.ORDERTIME_API_KEY;
+const EMAIL   =
+  process.env.OT_EMAIL    || process.env.ORDERTIME_EMAIL;
+const PASS    =
+  process.env.OT_PASSWORD || process.env.ORDERTIME_PASSWORD;
+const DEVKEY  =
+  process.env.OT_DEV_KEY  || process.env.ORDERTIME_DEV_KEY;
 
 function ensureEnv() {
   if (!API_KEY) throw new Error('Missing API key (set OT_API_KEY or ORDERTIME_API_KEY)');
@@ -52,31 +44,23 @@ function otHeaders() {
     'ApiKey': API_KEY,
     'Email': EMAIL,
   };
-  if (DEVKEY) h.DevKey = DEVKEY;
-  else h.Password = PASS;
+  if (DEVKEY) h.DevKey = DEVKEY; else h.Password = PASS;
   return h;
 }
 
-const OT_DEBUG = process.env.OT_DEBUG === '1';
-
-/* ------------------------------- HTTP ---------------------------------- */
-
 async function otPost(path, body) {
   const url = `${BASE_API}${path.startsWith('/') ? '' : '/'}${path}`;
-  if (OT_DEBUG) console.log('OT POST →', url, JSON.stringify(body).slice(0, 500));
   const r = await fetch(url, {
     method: 'POST',
     headers: otHeaders(),
     body: JSON.stringify(body || {}),
   });
   const text = await r.text();
-  let json = null;
-  try { json = JSON.parse(text); } catch {}
-  if (OT_DEBUG) console.log('OT ←', r.status, (text || '').slice(0, 500));
-  return { ok: r.ok, status: r.status, text, json };
+  let json = null; try { json = JSON.parse(text); } catch {}
+  return { url, ok: r.ok, status: r.status, text, json };
 }
 
-/* ------------------------- list result normalizer ----------------------- */
+/* -------------------- list result & order normalizers ------------------- */
 
 function normalizeListResult(data) {
   if (!data) return [];
@@ -93,8 +77,6 @@ function normalizeListResult(data) {
   }
   return [];
 }
-
-/* ------------------------- order normalizer ----------------------------- */
 
 function normalizeSalesOrder(r) {
   const get = (o, p, d='') => { try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; } };
@@ -163,120 +145,112 @@ function normalizeSalesOrder(r) {
   };
 }
 
-/* ------------------------- DocNo → Id resolver -------------------------- */
+/* ----------------------- DocNo → Id (robust) ---------------------------- */
 
-async function resolveIdByDocNo(docNo) {
-  const TYPES = [130, 135, 131, 140, 7]; // broadened SO header-ish types across tenants
+async function resolveByIdOrDocNo(input) {
+  const TYPES = [130, 135, 131, 140, 7]; // common SO header-ish types
   const F_DOC = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
   const F_ID  = ['Id','ID','id'];
 
-  const input = String(docNo || '').trim();
-  const isNumeric = /^\d+$/.test(input);
+  const attempts = []; // for debug report
 
-  // --- Fast path: if the user typed a pure number, try it as an internal Id first ---
+  const val = String(input || '').trim();
+  const isNumeric = /^\d+$/.test(val);
+
+  // 1) If numeric, try as internal Id first (fast path)
   if (isNumeric) {
     for (const TYPE of TYPES) {
-      const probe = await otPost('/document/get', { Type: TYPE, Id: Number(input) });
-      if (probe.ok && probe.json) {
-        const raw = Array.isArray(probe.json) ? probe.json[0] : probe.json;
-        // We already have the full document; return a synthetic resolution with TYPE/Id and the raw doc
-        return { id: Number(input), TYPE, row: { Id: Number(input) }, _raw: raw };
+      const a = await otPost('/document/get', { Type: TYPE, Id: Number(val) });
+      attempts.push({ kind: 'document/get(Id)', url: a.url, status: a.status });
+      if (a.ok && a.json) {
+        const raw = Array.isArray(a.json) ? a.json[0] : a.json;
+        return { ok: true, id: Number(val), TYPE, raw, attempts };
       }
     }
-    // if none matched as an Id, fall through to DocNo strategies
   }
 
-  // --- DocNo strategies: multi-field, eq/contains, scalar/array, SO-prefix, zero-pad ---
+  // 2) DocNo strategies: SO-prefix & zero-pad candidates, equals & contains, scalar & array
   const candidates = (() => {
-    const set = new Set([input]);
-    if (input && !/^SO[-\s]/i.test(input)) {
-      set.add(`SO-${input}`);
-      set.add(`SO ${input}`);
+    const s = new Set([val]);
+    if (val && !/^SO[-\s]/i.test(val)) { s.add(`SO-${val}`); s.add(`SO ${val}`); }
+    if (/^\d+$/.test(val)) {
+      const n = val.length; for (const w of [6,7,8]) if (w > n) s.add(val.padStart(w, w));
     }
-    if (isNumeric) {
-      const n = input.length;
-      for (const w of [6,7,8]) if (w > n) set.add(input.padStart(w, w));
-    }
-    return [...set];
+    return [...s];
   })();
 
-  for (const TYPE of TYPES) {
-    for (const asArray of [false, true]) {
-      for (const op of [0, 12]) { // 0 = equals, 12 = contains
-        for (const v of candidates) {
-          const fv = asArray ? [v] : v;
-          const Filters = F_DOC.map(p => ({ PropertyName: p, Operator: op, FilterValueArray: fv }));
-          const body = {
-            Type: TYPE,
-            NumberOfRecords: 1,
-            PageNumber: 1,
-            SortOrder: { PropertyName: F_DOC[0], Direction: 1 },
-            Filters
-          };
+  const LIST_PATHS = ['/list','/List']; // try both casings
 
-          const out = await otPost('/list', body);
-          if (!out.ok) continue;
+  for (const path of LIST_PATHS) {
+    for (const TYPE of TYPES) {
+      for (const asArray of [false, true]) {
+        for (const op of [0, 12]) { // 0 = equals, 12 = contains
+          for (const v of candidates) {
+            const fv = asArray ? [v] : v;
+            const Filters = F_DOC.map(p => ({ PropertyName: p, Operator: op, FilterValueArray: fv }));
+            const body = {
+              Type: TYPE,
+              NumberOfRecords: 1,
+              PageNumber: 1,
+              SortOrder: { PropertyName: F_DOC[0], Direction: 1 },
+              Filters
+            };
+            const a = await otPost(path, body);
+            attempts.push({ kind: `list ${path}`, url: a.url, status: a.status });
+            if (!a.ok) continue;
 
-          const rows = normalizeListResult(out.json);
-          if (rows && rows.length) {
-            const row = rows[0];
-            const id = F_ID.map(k => row?.[k]).find(Boolean);
-            if (id) return { id, TYPE, row };
+            const rows = normalizeListResult(a.json);
+            if (rows && rows.length) {
+              const row = rows[0];
+              const id = F_ID.map(k => row?.[k]).find(Boolean);
+              if (id) return { ok: true, id, TYPE, attempts };
+            }
           }
         }
       }
     }
   }
-  return null;
+
+  return { ok: false, attempts };
 }
 
-
-/* ----------------------------- Route ----------------------------------- */
+/* -------------------------------- Route -------------------------------- */
 
 export default async function handler(req, res) {
   try {
     if (req.method !== 'GET') return res.status(405).json({ error: 'Method not allowed' });
-
     const { docNo, debug } = req.query;
     if (!docNo) return res.status(400).json({ error: 'Missing ?docNo=' });
 
     ensureEnv();
 
-    // 1) Resolve internal Id for DocNo
-    const resolved = await resolveIdByDocNo(docNo);
+    // Resolve by Id or DocNo
+    const r = await resolveByIdOrDocNo(docNo);
 
-    // Optional debug: broad "contains" probe to see what your tenant returns
-    if (!resolved && debug === '1') {
-      const F_DOC = ['DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay'];
-      const cands = [String(docNo), `SO-${docNo}`, `SO ${docNo}`];
-      const Filters = F_DOC.flatMap(p => cands.map(v => ({ PropertyName: p, Operator: 12, FilterValueArray: [v] })));
-      const probe = await otPost('/list', { Type: 130, NumberOfRecords: 5, PageNumber: 1, Filters });
-      return res.status(probe.ok ? 200 : 500).json({
-        debug: true,
-        request: { Type: 130, Filters },
-        response: probe.json || probe.text
-      });
+    // If debug requested or not found, expose what we tried
+    if ((!r.ok || debug === '1') && debug !== '0') {
+      if (!r.ok && debug === '1') {
+        return res.status(404).json({ error: `DocNo not found: ${docNo}`, attempts: r.attempts });
+      }
     }
 
-    if (!resolved) return res.status(404).json({ error: `DocNo not found: ${docNo}` });
-    // If the resolver already returned the raw doc (Id fast-path), use it
-if (resolved._raw) {
-  return res.status(200).json({ ok: true, order: normalizeSalesOrder(resolved._raw) });
-}
+    if (!r.ok) return res.status(404).json({ error: `DocNo not found: ${docNo}` });
 
-const { id, TYPE } = resolved;
+    // If we already got the raw doc via Id fast-path, normalize and return
+    if (r.raw) {
+      return res.status(200).json({ ok: true, order: normalizeSalesOrder(r.raw) });
+    }
 
-// Otherwise fetch by Id via /document/get
-const getRes = await otPost('/document/get', { Type: TYPE, Id: id });
-if (getRes.ok && getRes.json) {
-  const raw = Array.isArray(getRes.json) ? getRes.json[0] : getRes.json;
-  return res.status(200).json({ ok: true, order: normalizeSalesOrder(raw) });
-}
+    // Otherwise fetch by Id now
+    const getRes = await otPost('/document/get', { Type: r.TYPE, Id: r.id });
+    if (getRes.ok && getRes.json) {
+      const raw = Array.isArray(getRes.json) ? getRes.json[0] : getRes.json;
+      return res.status(200).json({ ok: true, order: normalizeSalesOrder(raw) });
+    }
 
-
-    // Surface upstream error for transparency
+    // Surface upstream error
     return res.status(getRes.status || 502).json({
-      error: `document/get failed ${getRes.status}: ${getRes.text?.slice?.(0, 300) || 'No body'}`
+      error: `document/get failed ${getRes.status}: ${getRes.text?.slice?.(0,300) || 'No body'}`,
     });
 
   } catch (e) {
