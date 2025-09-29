@@ -157,14 +157,14 @@ const DOC_FIELDS = [
   'DocNo','DocumentNo','DocNumber','Number','RefNo','RefNumber','DocNoDisplay',
   'OrderNo','SalesOrderNo','OrderNumber','SalesOrderNumber','DocumentNumber','DocNum','Doc_No'
 ];
-;
+
 
 function buildCandidates(input) {
   const s = String(input || '').trim();
   const set = new Set([s]);
   if (s && !/^SO[-\s]/i.test(s)) { set.add(`SO-${s}`); set.add(`SO ${s}`); }
   if (/^\d+$/.test(s)) {
-    const n = s.length; for (const w of [6,7,8]) if (w>n) set.add(s.padStart(w,w));
+    const n = s.length; for (const w of [6,7,8]) if (w > n) set.add(s.padStart(w,'0'));
   }
   return [...set].map(String);
 }
