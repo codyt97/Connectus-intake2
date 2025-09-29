@@ -80,29 +80,38 @@ function normalizeSalesOrder(raw) {
   };
 
   const lines = (raw?.LineItems || raw?.Lines || []).map(L => {
-    const g = (p,d='') => get(L,p,d);
-    const qty = Number(g('Quantity', 0));
-    const price = Number(g('Price', 0)) || Number(g('UnitPrice',0));
-    const ext   = Number(g('Amount', qty * price));
-    return {
-      lineId: g('Id') || g('LineId') || g('LineNo'),
-      itemId: g('ItemRef.Id') || g('ItemId'),
-      item:   g('ItemRef.Name') || g('ItemName') || '',
-      sku:    g('ItemRef.Code') || g('ItemCode') || g('SKU') || '',
-      description: g('Description') || '',
-      qty: qty,
-      unitPrice: price,
-      extPrice: ext,
-      attributes: {} // keep space for any custom fields you map later
-    };
-  });
+  const g = (p,d='') => get(L,p,d);
+
+  const qty   = Number(g('Quantity', 0));
+  const price = Number(g('Price', 0)) || Number(g('UnitPrice', 0));
+  const ext   = Number(g('Amount', qty * price));
+
+  // Robust SKU extraction across tenants
+  const sku =
+    g('ItemRef.Code') ||           // most common
+    g('ItemRef.ItemCode') ||
+    g('ItemRef.SKU') ||
+    g('ItemRef.Number') ||
+    g('ItemCode') ||
+    g('SKU') ||
+    g('ItemNumber') ||
+    g('PartNo') ||
+    g('PartNumber') ||
+    '';
 
   return {
-    docNo:   get(raw,'DocNo') || get(raw,'DocumentNo') || get(raw,'DocNumber') || get(raw,'Number'),
-    tranType: 'SalesOrder',
-    customer, billing, shipping, lines,
+    lineId:      g('Id') || g('LineId') || g('LineNo'),
+    itemId:      g('ItemRef.Id') || g('ItemId'),
+    item:        g('ItemRef.Name') || g('ItemName') || '',
+    sku,                                  // <-- OrderTime SKU now captured
+    description: g('Description') || g('ItemDescription') || '',
+    qty,
+    unitPrice:   price,
+    extPrice:    ext,
+    attributes: {}
   };
-}
+});
+
 
 export default async function handler(req, res) {
   try {
