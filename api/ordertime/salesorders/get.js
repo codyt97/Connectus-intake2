@@ -33,6 +33,13 @@ function otHeaders() {
   return h;
 }
 
+function pickObjectTypes(force) {
+  if (!force) return SO_OBJECT_TYPES;
+  // Put the forced one first, still try the rest after
+  const set = new Set([force, ...SO_OBJECT_TYPES]);
+  return [...set];
+}
+
 async function otPost(path, body) {
   const url = `${BASE_API}${path.startsWith('/') ? '' : '/'}${path}`;
   const r = await fetch(url, { method:'POST', headers: otHeaders(), body: JSON.stringify(body||{}) });
