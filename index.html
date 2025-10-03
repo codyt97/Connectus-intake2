@@ -449,6 +449,7 @@
               <th>Color</th>
               <th>OrderTime SKU</th>
               <th>Qty</th>
+              <th>Line Instruction</th>
               <th>LTE / Wi-Fi / Both</th>
               <th>Carrier</th>
               <th>Act Payout $</th>
@@ -912,51 +913,50 @@ function buildHeaderCSV() {
 }
 
 // ---- Build Lines CSV: DocNo,Item,TranType,(optional)LineItemID
+// Build Lines CSV: DocNo, Item, Qty, LineInstruction, TranType, (optional) LineItemID
 function buildLineCSV() {
-  const docNo = getDocNo();
-  const tranType = getDocTypeCode();
-  const tbl = document.getElementById('itemsTbl');
-  const body = document.getElementById('itemsBody');
-  const lines = [];
+  const docNo    = typeof getDocNo === 'function' ? getDocNo() : '';
+  const tranType = typeof getDocTypeCode === 'function' ? getDocTypeCode() : '';
+  const body     = document.getElementById('itemsBody');
+  const lines    = [];
 
   if (body) {
-    // Iterate rows; pull OrderTime SKU from the 4th column input (your table column order)
-    // <th> columns: [0:Description,1:Model,2:Color,3:OrderTime SKU,...]
     [...body.querySelectorAll('tr')].forEach(tr => {
-      const tds = [...tr.querySelectorAll('td')];
-      if (!tds.length) return;
+      const sku  = (tr.querySelector('td input[data-key="sku"]')?.value || '').trim();
+      const qty  = String(tr.querySelector('td input[data-key="qty"]')?.value ?? '').trim();
+      const instr= (tr.querySelector('td input[data-key="lineInstr"]')?.value || '').trim();
 
-      // SKU / Item
-      let item = '';
-      const skuCell = tds[3]; // 4th column
-      const skuInput = skuCell?.querySelector('input,textarea,select');
-      if (skuInput) item = (skuInput.value || '').trim();
+      if (!sku) return;
 
-      // Optional: look for a stored Line Item ID (hidden input or data attr if you add later)
+      // Optional persisted LineItemID (if you later add it)
       let lineId = '';
-      const hiddenLineId = tr.querySelector('input[name="lineItemId"], [data-lineid]');
-      if (hiddenLineId) {
-        lineId = (hiddenLineId.value || hiddenLineId.getAttribute('data-lineid') || '').trim();
-      }
+      const hid = tr.querySelector('input[name="lineItemId"], [data-lineid]');
+      if (hid) lineId = (hid.value || hid.getAttribute('data-lineid') || '').trim();
 
-      if (item) {
-        lines.push({ DocNo: docNo, Item: item, TranType: tranType, LineItemID: lineId });
-      }
+      lines.push({
+        DocNo: docNo,
+        Item: sku,
+        Qty: qty,
+        LineInstruction: instr,
+        TranType: tranType,
+        LineItemID: lineId
+      });
     });
   }
 
-  // Decide header shape: include LineItemID column only if any present
   const anyLineIds = lines.some(l => l.LineItemID);
-  const headers = anyLineIds ? ['DocNo','Item','TranType','LineItemID'] : ['DocNo','Item','TranType'];
+  const headers = anyLineIds
+    ? ['DocNo','Item','Qty','LineInstruction','TranType','LineItemID']
+    : ['DocNo','Item','Qty','LineInstruction','TranType'];
+
   const rows = lines.map(l => anyLineIds
-    ? [l.DocNo, l.Item, l.TranType, l.LineItemID]
-    : [l.DocNo, l.Item, l.TranType]
+    ? [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType, l.LineItemID]
+    : [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType]
   );
 
-  let csv = headers.join(',') + '\n';
-  csv += rows.map(r => r.map(csvEscape).join(',')).join('\n');
-  return csv;
+  return [headers.join(',')].concat(rows.map(r => r.map(csvEscape).join(','))).join('\n');
 }
+
 
 // ---- CSV escape
 function csvEscape(v) {
@@ -3029,6 +3029,7 @@ function addRow(prefill){
     {key:'color', ph:'Color'},
     {key:'sku', ph:'ORDERTIME-SKU'},
     {key:'qty', ph:'Qty', type:'number', min:1, val:1},
+    {key:'lineInstr', ph:'Line Instruction'},
     {key:'net', ph:'LTE / Wi-Fi / Both'},
     {key:'carrier', ph:'Carrier'},
     {key:'payout', ph:'$', type:'number', step:'0.01'},
