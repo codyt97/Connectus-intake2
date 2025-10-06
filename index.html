@@ -1138,7 +1138,7 @@ const SIM_CARD_OPTIONS = [
  // Exact mapping from visible SIM dropdown option to OrderTime SKU + Description
 const SIM_CARD_SKU_MAP = {
   'VZ-SIM3IN1': {
-     'VZ-SIM3IN1',
+    sku: 'VZ-SIM3IN1',
     desc: '3IN1 Verizon Locked 5G SIM Card (Black)'
   },
   'AT-SIM3IN1': {
@@ -2664,7 +2664,7 @@ async function loadSO(id){
       phone:   get(base,'BillTo.Phone'),
       email:   get(base,'BillTo.Email'),
       street:  get(base,'BillTo.Address2'),
-      suite:   get(base,'BillTo.Address1'),
+      suite:   get(base,'BillTo.Address2'),
       city:    get(base,'BillTo.City'),
       state:   get(base,'BillTo.State'),
       zip:     get(base,'BillTo.Zip'),
@@ -2676,7 +2676,7 @@ async function loadSO(id){
       phone:   get(base,'ShipTo.Phone'),
       email:   get(base,'ShipTo.Email'),
       street:  get(base,'ShipTo.Address2'),
-      suite:   get(base,'ShipTo.Address1'),
+      suite:   get(base,'ShipTo.Address2'),
       city:    get(base,'ShipTo.City'),
       state:   get(base,'ShipTo.State'),
       zip:     get(base,'ShipTo.Zip'),
