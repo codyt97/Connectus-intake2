@@ -2659,29 +2659,40 @@ async function loadSO(id){
       try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; }
     };
 
-    const billing = {
-      contact: get(base,'BillTo.ContactName'),
-      phone:   get(base,'BillTo.Phone'),
-      email:   get(base,'BillTo.Email'),
-      street:  get(base,'BillTo.Address1'),
-      suite:   get(base,'BillTo.Address2'),
-      city:    get(base,'BillTo.City'),
-      state:   get(base,'BillTo.State'),
-      zip:     get(base,'BillTo.Zip'),
-    };
+    const billing = (() => {
+  const a1 = (get(base,'BillTo.Address1') || '').trim();
+  const a2 = (get(base,'BillTo.Address2') || '').trim();
+  return {
+    contact: get(base,'BillTo.ContactName'),
+    phone:   get(base,'BillTo.Phone'),
+    email:   get(base,'BillTo.Email'),
+    street:  a1,
+    // drop Suite when it’s identical to Street or empty
+    suite:   a2 && a2 !== a1 ? a2 : '',
+    city:    get(base,'BillTo.City'),
+    state:   get(base,'BillTo.State'),
+    zip:     get(base,'BillTo.Zip'),
+  };
+})();
 
-    const shipping = {
-      company: get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
-      contact: get(base,'ShipTo.ContactName'),
-      phone:   get(base,'ShipTo.Phone'),
-      email:   get(base,'ShipTo.Email'),
-      street:  get(base,'ShipTo.Address1'),
-      suite:   get(base,'ShipTo.Address2'),
-      city:    get(base,'ShipTo.City'),
-      state:   get(base,'ShipTo.State'),
-      zip:     get(base,'ShipTo.Zip'),
-      residence: !!get(base,'ShipTo.Residential', false),
-    };
+
+    const shipping = (() => {
+  const a1 = (get(base,'ShipTo.Address1') || '').trim();
+  const a2 = (get(base,'ShipTo.Address2') || '').trim();
+  return {
+    company: get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
+    contact: get(base,'ShipTo.ContactName'),
+    phone:   get(base,'ShipTo.Phone'),
+    email:   get(base,'ShipTo.Email'),
+    street:  a1,
+    suite:   a2 && a2 !== a1 ? a2 : '',
+    city:    get(base,'ShipTo.City'),
+    state:   get(base,'ShipTo.State'),
+    zip:     get(base,'ShipTo.Zip'),
+    residence: !!get(base,'ShipTo.Residential', false),
+  };
+})();
+
 
     const items = (base?.Lines || base?.LineItems || []).map(L => ({
       sku:   get(L,'ItemRef.Code') || get(L,'ItemCode') || get(L,'SKU') || '',
