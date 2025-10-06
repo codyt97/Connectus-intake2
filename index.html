@@ -4066,9 +4066,9 @@ async function replaceItemsWithOrderLines(lines){
     // Carrier
     setCellInput(tds[6], L.attributes?.carrier || '');
     // Sell Price
-    setCellInput(tds[10], (L.unitPrice ?? '').toString());
+    setCellInput(tds[11], (L.unitPrice ?? '').toString());
     // New/CPO
-    setCellInput(tds[11], L.attributes?.condition || '');
+    setCellInput(tds[12], L.attributes?.condition || '');
 
     // Optional: keep Line Item ID (hidden) if your CSV needs it
     const hidden = document.createElement('input');
