@@ -2660,38 +2660,40 @@ async function loadSO(id){
     };
 
     const billing = (() => {
-  const a1 = (get(base,'BillTo.Address1') || '').trim();
-  const a2 = (get(base,'BillTo.Address2') || '').trim();
+  // Prefer normalized shape if present, else fall back to raw BillTo.*
+  const s1 = (get(base,'billing.street') || get(base,'BillTo.Address1') || '').trim();
+  const s2 = (get(base,'billing.suite')  || get(base,'BillTo.Address2') || '').trim();
   return {
-    contact: get(base,'BillTo.ContactName'),
-    phone:   get(base,'BillTo.Phone'),
-    email:   get(base,'BillTo.Email'),
-    street:  a1,
-    // drop Suite when it’s identical to Street or empty
-    suite:   a2 && a2 !== a1 ? a2 : '',
-    city:    get(base,'BillTo.City'),
-    state:   get(base,'BillTo.State'),
-    zip:     get(base,'BillTo.Zip'),
+    contact: get(base,'billing.contact') || get(base,'BillTo.ContactName'),
+    phone:   get(base,'billing.phone')   || get(base,'BillTo.Phone'),
+    email:   get(base,'billing.email')   || get(base,'BillTo.Email'),
+    street:  s1,
+    suite:   s2 && s2 !== s1 ? s2 : '',
+    city:    get(base,'billing.city')    || get(base,'BillTo.City'),
+    state:   get(base,'billing.state')   || get(base,'BillTo.State'),
+    zip:     get(base,'billing.zip')     || get(base,'BillTo.Zip'),
   };
 })();
+
 
 
     const shipping = (() => {
-  const a1 = (get(base,'ShipTo.Address1') || '').trim();
-  const a2 = (get(base,'ShipTo.Address2') || '').trim();
+  const s1 = (get(base,'shipping.street') || get(base,'ShipTo.Address1') || '').trim();
+  const s2 = (get(base,'shipping.suite')  || get(base,'ShipTo.Address2') || '').trim();
   return {
-    company: get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
-    contact: get(base,'ShipTo.ContactName'),
-    phone:   get(base,'ShipTo.Phone'),
-    email:   get(base,'ShipTo.Email'),
-    street:  a1,
-    suite:   a2 && a2 !== a1 ? a2 : '',
-    city:    get(base,'ShipTo.City'),
-    state:   get(base,'ShipTo.State'),
-    zip:     get(base,'ShipTo.Zip'),
-    residence: !!get(base,'ShipTo.Residential', false),
+    company: get(base,'shipping.company') || get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
+    contact: get(base,'shipping.contact') || get(base,'ShipTo.ContactName'),
+    phone:   get(base,'shipping.phone')   || get(base,'ShipTo.Phone'),
+    email:   get(base,'shipping.email')   || get(base,'ShipTo.Email'),
+    street:  s1,
+    suite:   s2 && s2 !== s1 ? s2 : '',
+    city:    get(base,'shipping.city')    || get(base,'ShipTo.City'),
+    state:   get(base,'shipping.state')   || get(base,'ShipTo.State'),
+    zip:     get(base,'shipping.zip')     || get(base,'ShipTo.Zip'),
+    residence: !!(get(base,'shipping.residence') ?? get(base,'ShipTo.Residential', false)),
   };
 })();
+
 
 
     const items = (base?.Lines || base?.LineItems || []).map(L => ({
