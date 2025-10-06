@@ -61,7 +61,7 @@ function normalizeSalesOrder(raw) {
   };
 
   const shipping = {
-    company: get(raw,'ShipAddress.Addr1') || billing.company || '',
+    company: get(raw,'CustomerRef.Name') || billing.company || '',
     contact: get(raw,'ShipAddress.Contact'),
     phone:   get(raw,'ShipAddress.Phone'),
     email:   get(raw,'ShipAddress.Email'),
