@@ -901,34 +901,113 @@ function getCustomerPO() {
 }
 
 // ---- Build Header CSV: DocNo,Customer,CustomerPO,TranType
+// ---- Build Header CSV: with shipping + terms + dates
 function buildHeaderCSV() {
-  const headers = ['DocNo','Customer','CustomerPO','TranType'];
-  const row = [
-    getDocNo(),
-    getCustomerName(),
-    getCustomerPO(),
-    getDocTypeCode()
+  // Map UI → CSV columns expected by OrderTime import
+  const headers = [
+    'DocNo',
+    'Customer',
+    'CustomerPO',
+    'TranType',
+    // commercial terms
+    'Terms',
+    'ShipVia',
+    'OrderDate',
+    'PromiseDate',
+    // ship-to block
+    'ShipToName',
+    'ShipToCompany',
+    'ShipToAddress1',
+    'ShipToAddress2',
+    'ShipToCity',
+    'ShipToState',
+    'ShipToPostalCode',
+    'ShipToCountry',
+    'ShipToPhone',
+    'ShipToEmail'
   ];
+
+  // --- helpers to read current UI fields ---
+  const _ = (id) => (document.getElementById(id)?.value || '').trim();
+
+  // Terms: from “Payment Terms Procedure”
+  const terms = _('payTerms');
+
+  // ShipVia: simplest/cleanest is Carrier + Speed (e.g., "FedEx Ground")
+  const shipVia = [ _('shipMethod'), _('shipSpeed') ].filter(Boolean).join(' ').trim();
+
+  // Dates: OrderDate = today (or leave blank), PromiseDate = Expected Ship Date
+  const pad2 = (n) => String(n).padStart(2, '0');
+  const today = new Date();
+  const orderDate = `${pad2(today.getMonth()+1)}/${pad2(today.getDate())}/${today.getFullYear()}`;
+  const promiseDate = _('expShipDate'); // already yyyy-mm-dd; OT accepts mm/dd/yyyy better
+  const promiseMMDDYYYY = promiseDate
+    ? (() => {
+        const [yyyy, mm, dd] = promiseDate.split('-');
+        return `${mm}/${dd}/${yyyy}`;
+      })()
+    : '';
+
+  // Ship-to block (all from Shipping panel)
+  const shipToName    = _('shipContact');
+  const shipToCompany = _('shipCompany');
+  const shipToAddr1   = _('shipStreet');
+  const shipToAddr2   = _('shipSuite');
+  const shipToCity    = _('shipCity');
+  const shipToState   = _('shipState');
+  const shipToPostal  = _('shipZip');
+  const shipToCountry = 'USA'; // set default (you can add a dropdown later)
+  const shipToPhone   = _('shipPhone');
+  const shipToEmail   = _('shipEmail');
+
+  const row = [
+    getDocNo(),            // DocNo (blank for new)
+    getCustomerName(),     // Customer (Billing Company)
+    getCustomerPO(),       // CustomerPO
+    getDocTypeCode(),      // TranType (7=SO, 13=Quote)
+    terms,                 // Terms
+    shipVia,               // ShipVia
+    orderDate,             // OrderDate (MM/DD/YYYY)
+    promiseMMDDYYYY,       // PromiseDate (MM/DD/YYYY)
+    shipToName,            // ShipToName
+    shipToCompany,         // ShipToCompany
+    shipToAddr1,           // ShipToAddress1
+    shipToAddr2,           // ShipToAddress2
+    shipToCity,            // ShipToCity
+    shipToState,           // ShipToState
+    shipToPostal,          // ShipToPostalCode
+    shipToCountry,         // ShipToCountry
+    shipToPhone,           // ShipToPhone
+    shipToEmail            // ShipToEmail
+  ];
+
   return headers.join(',') + '\n' + row.map(csvEscape).join(',');
 }
 
+
 // ---- Build Lines CSV: DocNo,Item,TranType,(optional)LineItemID
 // Build Lines CSV: DocNo, Item, Qty, LineInstruction, TranType, (optional) LineItemID
+// ---- Build Lines CSV: DocNo, Item, Quantity, LineInstruction, UnitPrice, TranType, (optional) LineID
 function buildLineCSV() {
   const docNo    = typeof getDocNo === 'function' ? getDocNo() : '';
   const tranType = typeof getDocTypeCode === 'function' ? getDocTypeCode() : '';
   const body     = document.getElementById('itemsBody');
   const lines    = [];
 
+  const get = (tr, key) => (tr.querySelector(`td input[data-key="${key}"]`)?.value || '').trim();
+
   if (body) {
     [...body.querySelectorAll('tr')].forEach(tr => {
-      const sku  = (tr.querySelector('td input[data-key="sku"]')?.value || '').trim();
-      const qty  = String(tr.querySelector('td input[data-key="qty"]')?.value ?? '').trim();
-      const instr= (tr.querySelector('td input[data-key="lineInstr"]')?.value || '').trim();
+      const sku        = get(tr, 'sku');
+      const qtyRaw     = get(tr, 'qty');
+      const qty        = qtyRaw ? String(qtyRaw) : '1';
+      const instr      = get(tr, 'lineInstr');
+      const sellRaw    = get(tr, 'sell');        // “Sell Price” column in your table
+      const unitPrice  = sellRaw || '';          // optional; OT will use default if blank
 
       if (!sku) return;
 
-      // Optional persisted LineItemID (if you later add it)
+      // Optional persisted Line Item ID (for updates to existing docs)
       let lineId = '';
       const hid = tr.querySelector('input[name="lineItemId"], [data-lineid]');
       if (hid) lineId = (hid.value || hid.getAttribute('data-lineid') || '').trim();
@@ -936,26 +1015,28 @@ function buildLineCSV() {
       lines.push({
         DocNo: docNo,
         Item: sku,
-        Qty: qty,
+        Quantity: qty,
         LineInstruction: instr,
+        UnitPrice: unitPrice,
         TranType: tranType,
-        LineItemID: lineId
+        LineID: lineId
       });
     });
   }
 
-  const anyLineIds = lines.some(l => l.LineItemID);
+  const anyLineIds = lines.some(l => l.LineID);
   const headers = anyLineIds
-    ? ['DocNo','Item','Qty','LineInstruction','TranType','LineItemID']
-    : ['DocNo','Item','Qty','LineInstruction','TranType'];
+    ? ['DocNo','Item','Quantity','LineInstruction','UnitPrice','TranType','LineID']
+    : ['DocNo','Item','Quantity','LineInstruction','UnitPrice','TranType'];
 
   const rows = lines.map(l => anyLineIds
-    ? [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType, l.LineItemID]
-    : [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType]
+    ? [l.DocNo, l.Item, l.Quantity, l.LineInstruction, l.UnitPrice, l.TranType, l.LineID]
+    : [l.DocNo, l.Item, l.Quantity, l.LineInstruction, l.UnitPrice, l.TranType]
   );
 
   return [headers.join(',')].concat(rows.map(r => r.map(csvEscape).join(','))).join('\n');
 }
+
 
 
 // ---- CSV escape
