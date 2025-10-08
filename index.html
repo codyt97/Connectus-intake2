@@ -969,7 +969,7 @@ function buildLineCSV() {
     });
   }
 
-  const headers = ['No','Line Instructions','Quantity','Tran Type'];
+  const headers = ['No.','Line Instructions','Quantity','Tran Type'];
   const lines = rows.map(r => r.map(csvEscape).join(',')).join('\n');
   return headers.join(',') + '\n' + lines;
 }
