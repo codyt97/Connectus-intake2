@@ -831,17 +831,30 @@ City, State ZIP"></textarea>
 <script>
     // ---------- Gmail compose helpers ----------
 function openGmailCompose({to, subject, body}) {
-  // Gmail web compose URL
+  // Build Gmail compose URL
   const base = "https://mail.google.com/mail/?view=cm&fs=1";
-  const url = `${base}&to=${encodeURIComponent(to || "")}` +
-              `&su=${encodeURIComponent(subject || "")}` +
-              `&body=${encodeURIComponent(body || "")}`;
+  const url =
+    `${base}&to=${encodeURIComponent(to || "")}` +
+    `&su=${encodeURIComponent(subject || "")}` +
+    `&body=${encodeURIComponent(body || "")}`;
 
-  // Open in a new tab/window
-  const win = window.open(url, "_blank", "noopener,noreferrer");
-  if (!win) {
-    alert("Popup blocked. Please allow popups for this site to open Gmail.");
-  }
+  // Prefer opening via a real <a> element (less likely to be blocked than window.open)
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';          // open in new tab
+  a.rel = 'noopener';           // security; avoid 'noreferrer' which some policies block
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+
+  // Fallback: same-tab navigation if the new tab was blocked
+  // (We can't detect reliably, so offer a gentle fallback)
+  setTimeout(() => {
+    // If user still on the page and Gmail didn't open, try same-tab
+    // (Comment out if you don't want same-tab fallback)
+    // window.location.href = url;
+  }, 200);
+}
 }
 function composeSSPInGmail(){
   const to      = document.getElementById('sspTo')?.value || '';
