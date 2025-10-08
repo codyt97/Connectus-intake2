@@ -974,8 +974,6 @@ function buildLineCSV() {
   return headers.join(',') + '\n' + lines;
 }
 
-  return [headers.join(',')].concat(rows.map(r => r.map(csvEscape).join(','))).join('\n');
-}
 
 
 /* ==== New-Device CSV (row-scoped, line-per-line) ==== */
