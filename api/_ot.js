@@ -266,7 +266,7 @@ return {
     ].filter(Boolean).join(' ').trim(),
     phone:   x.PrimaryContact?.Phone || '',       // if your tenant exposes it
     email:   x.BillAddress?.Email || '',          // OT puts email on the address block
-    street:  x.BillAddress?.Addr2 || '',
+    street:  x.BillAddress?.Addr1 || '',
     suite:   x.BillAddress?.Addr2 || x.BillAddress?.Addr3 || '',
     city:    x.BillAddress?.City || '',
     state:   x.BillAddress?.State || '',
@@ -278,7 +278,7 @@ return {
     contact: '',                                   // fill if your tenant has ship-to contact fields
     phone:   '',                                   // fill if present
     email:   x.PrimaryShipAddress?.Email || '',
-    street:  x.PrimaryShipAddress?.Addr2 || '',
+    street:  x.PrimaryShipAddress?.Addr1 || '',
     suite:   x.PrimaryShipAddress?.Addr2 || x.PrimaryShipAddress?.Addr3 || '',
     city:    x.PrimaryShipAddress?.City || '',
     state:   x.PrimaryShipAddress?.State || '',
