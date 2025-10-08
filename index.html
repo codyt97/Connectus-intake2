@@ -974,21 +974,9 @@ function buildLineCSV() {
   return headers.join(',') + '\n' + lines;
 }
 
-  const rows = lines.map(l => anyLineIds
-    ? [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType, l.LineItemID]
-    : [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType]
-  );
-
   return [headers.join(',')].concat(rows.map(r => r.map(csvEscape).join(','))).join('\n');
 }
 
-
-// ---- CSV escape
-function csvEscape(v) {
-  const s = String(v ?? '');
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
 
 /* ==== New-Device CSV (row-scoped, line-per-line) ==== */
 
