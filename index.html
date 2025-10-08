@@ -923,6 +923,8 @@ function csvEscape(v) {
 
 // ---------------------------------------------------------------------------
 
+
+  
 // ---- Build Header CSV: DocNo,Customer,CustomerPO,TranType,Ship To,Is New
 // Requirements:
 // - Ship To = "Primary"
@@ -943,36 +945,49 @@ function buildHeaderCSV() {
 }
 
 
-// ---- Build Lines CSV: EXACT columns required by OrderTime template
-// Headers: No, Line Instructions, Quantity, Tran Type
-// Mapping:
-//   No                 -> shared DocNo (same as Header)
-//   Line Instructions  -> per-line instruction field
-//   Quantity           -> per-line qty
-//   Tran Type          -> getDocTypeCode() (7 or 13)
+// ---- Build Lines CSV to match required template:
+// No.,Customer,Item,ItemType,Line Instructions,Quantity,Price,Tran Type
 function buildLineCSV() {
   const docNo    = getOrSeedDocNo();
   const tranType = (typeof getDocTypeCode === 'function' ? getDocTypeCode() : '').toString();
+  const customer = (typeof getCustomerName === 'function' ? getCustomerName() : '').trim();
   const body     = document.getElementById('itemsBody');
+
+  // small helper for row fields
+  const getField = (tr, key, sel = 'input') =>
+    (tr.querySelector(`td ${sel}[data-key="${key}"]`)?.value || '').toString().trim();
 
   const rows = [];
   if (body) {
     [...body.querySelectorAll('tr')].forEach(tr => {
-      const sku   = (tr.querySelector('td input[data-key="sku"]')?.value || '').trim();
-      const qty   = String(tr.querySelector('td input[data-key="qty"]')?.value ?? '').trim();
-      const instr = (tr.querySelector('td input[data-key="lineInstr"]')?.value || '').trim();
+      const sku      = getField(tr, 'sku');                    // Item
+      const qty      = getField(tr, 'qty');                    // Quantity
+      const instr    = getField(tr, 'lineInstr');              // Line Instructions
+      const price    = getField(tr, 'price');                  // Price (unit)
+      let   itemType = getField(tr, 'itemType', 'select');     // ItemType from <select> if present
+      if (!itemType) itemType = 'Part';                        // default if omitted
 
-      // Skip incomplete rows to avoid importer crashes
+      // Skip incomplete rows (prevents importer errors)
       if (!sku) return;
 
-      rows.push([docNo, instr, qty, tranType]);
+      rows.push([
+        docNo,           // No.  (shared DocNo)
+        customer,        // Customer
+        sku,             // Item
+        itemType,        // ItemType
+        instr,           // Line Instructions
+        qty,             // Quantity
+        price,           // Price
+        tranType         // Tran Type (7 or 13)
+      ]);
     });
   }
 
-  const headers = ['No.','Line Instructions','Quantity','Tran Type'];
+  const headers = ['No.','Customer','Item','ItemType','Line Instructions','Quantity','Price','Tran Type'];
   const lines = rows.map(r => r.map(csvEscape).join(',')).join('\n');
   return headers.join(',') + '\n' + lines;
 }
+
 
 
 
