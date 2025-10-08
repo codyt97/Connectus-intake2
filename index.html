@@ -901,113 +901,34 @@ function getCustomerPO() {
 }
 
 // ---- Build Header CSV: DocNo,Customer,CustomerPO,TranType
-// ---- Build Header CSV: with shipping + terms + dates
 function buildHeaderCSV() {
-  // Map UI → CSV columns expected by OrderTime import
-  const headers = [
-    'DocNo',
-    'Customer',
-    'CustomerPO',
-    'TranType',
-    // commercial terms
-    'Terms',
-    'ShipVia',
-    'OrderDate',
-    'PromiseDate',
-    // ship-to block
-    'ShipToName',
-    'ShipToCompany',
-    'ShipToAddress1',
-    'ShipToAddress2',
-    'ShipToCity',
-    'ShipToState',
-    'ShipToPostalCode',
-    'ShipToCountry',
-    'ShipToPhone',
-    'ShipToEmail'
-  ];
-
-  // --- helpers to read current UI fields ---
-  const _ = (id) => (document.getElementById(id)?.value || '').trim();
-
-  // Terms: from “Payment Terms Procedure”
-  const terms = _('payTerms');
-
-  // ShipVia: simplest/cleanest is Carrier + Speed (e.g., "FedEx Ground")
-  const shipVia = [ _('shipMethod'), _('shipSpeed') ].filter(Boolean).join(' ').trim();
-
-  // Dates: OrderDate = today (or leave blank), PromiseDate = Expected Ship Date
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const today = new Date();
-  const orderDate = `${pad2(today.getMonth()+1)}/${pad2(today.getDate())}/${today.getFullYear()}`;
-  const promiseDate = _('expShipDate'); // already yyyy-mm-dd; OT accepts mm/dd/yyyy better
-  const promiseMMDDYYYY = promiseDate
-    ? (() => {
-        const [yyyy, mm, dd] = promiseDate.split('-');
-        return `${mm}/${dd}/${yyyy}`;
-      })()
-    : '';
-
-  // Ship-to block (all from Shipping panel)
-  const shipToName    = _('shipContact');
-  const shipToCompany = _('shipCompany');
-  const shipToAddr1   = _('shipStreet');
-  const shipToAddr2   = _('shipSuite');
-  const shipToCity    = _('shipCity');
-  const shipToState   = _('shipState');
-  const shipToPostal  = _('shipZip');
-  const shipToCountry = 'USA'; // set default (you can add a dropdown later)
-  const shipToPhone   = _('shipPhone');
-  const shipToEmail   = _('shipEmail');
-
+  const headers = ['DocNo','Customer','CustomerPO','TranType'];
   const row = [
-    getDocNo(),            // DocNo (blank for new)
-    getCustomerName(),     // Customer (Billing Company)
-    getCustomerPO(),       // CustomerPO
-    getDocTypeCode(),      // TranType (7=SO, 13=Quote)
-    terms,                 // Terms
-    shipVia,               // ShipVia
-    orderDate,             // OrderDate (MM/DD/YYYY)
-    promiseMMDDYYYY,       // PromiseDate (MM/DD/YYYY)
-    shipToName,            // ShipToName
-    shipToCompany,         // ShipToCompany
-    shipToAddr1,           // ShipToAddress1
-    shipToAddr2,           // ShipToAddress2
-    shipToCity,            // ShipToCity
-    shipToState,           // ShipToState
-    shipToPostal,          // ShipToPostalCode
-    shipToCountry,         // ShipToCountry
-    shipToPhone,           // ShipToPhone
-    shipToEmail            // ShipToEmail
+    getDocNo(),
+    getCustomerName(),
+    getCustomerPO(),
+    getDocTypeCode()
   ];
-
   return headers.join(',') + '\n' + row.map(csvEscape).join(',');
 }
 
-
 // ---- Build Lines CSV: DocNo,Item,TranType,(optional)LineItemID
 // Build Lines CSV: DocNo, Item, Qty, LineInstruction, TranType, (optional) LineItemID
-// ---- Build Lines CSV: DocNo, Item, Quantity, LineInstruction, UnitPrice, TranType, (optional) LineID
 function buildLineCSV() {
   const docNo    = typeof getDocNo === 'function' ? getDocNo() : '';
   const tranType = typeof getDocTypeCode === 'function' ? getDocTypeCode() : '';
   const body     = document.getElementById('itemsBody');
   const lines    = [];
 
-  const get = (tr, key) => (tr.querySelector(`td input[data-key="${key}"]`)?.value || '').trim();
-
   if (body) {
     [...body.querySelectorAll('tr')].forEach(tr => {
-      const sku        = get(tr, 'sku');
-      const qtyRaw     = get(tr, 'qty');
-      const qty        = qtyRaw ? String(qtyRaw) : '1';
-      const instr      = get(tr, 'lineInstr');
-      const sellRaw    = get(tr, 'sell');        // “Sell Price” column in your table
-      const unitPrice  = sellRaw || '';          // optional; OT will use default if blank
+      const sku  = (tr.querySelector('td input[data-key="sku"]')?.value || '').trim();
+      const qty  = String(tr.querySelector('td input[data-key="qty"]')?.value ?? '').trim();
+      const instr= (tr.querySelector('td input[data-key="lineInstr"]')?.value || '').trim();
 
       if (!sku) return;
 
-      // Optional persisted Line Item ID (for updates to existing docs)
+      // Optional persisted LineItemID (if you later add it)
       let lineId = '';
       const hid = tr.querySelector('input[name="lineItemId"], [data-lineid]');
       if (hid) lineId = (hid.value || hid.getAttribute('data-lineid') || '').trim();
@@ -1015,28 +936,26 @@ function buildLineCSV() {
       lines.push({
         DocNo: docNo,
         Item: sku,
-        Quantity: qty,
+        Qty: qty,
         LineInstruction: instr,
-        UnitPrice: unitPrice,
         TranType: tranType,
-        LineID: lineId
+        LineItemID: lineId
       });
     });
   }
 
-  const anyLineIds = lines.some(l => l.LineID);
+  const anyLineIds = lines.some(l => l.LineItemID);
   const headers = anyLineIds
-    ? ['DocNo','Item','Quantity','LineInstruction','UnitPrice','TranType','LineID']
-    : ['DocNo','Item','Quantity','LineInstruction','UnitPrice','TranType'];
+    ? ['DocNo','Item','Qty','LineInstruction','TranType','LineItemID']
+    : ['DocNo','Item','Qty','LineInstruction','TranType'];
 
   const rows = lines.map(l => anyLineIds
-    ? [l.DocNo, l.Item, l.Quantity, l.LineInstruction, l.UnitPrice, l.TranType, l.LineID]
-    : [l.DocNo, l.Item, l.Quantity, l.LineInstruction, l.UnitPrice, l.TranType]
+    ? [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType, l.LineItemID]
+    : [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType]
   );
 
   return [headers.join(',')].concat(rows.map(r => r.map(csvEscape).join(','))).join('\n');
 }
-
 
 
 // ---- CSV escape
@@ -2303,7 +2222,8 @@ function loadReps(){
       {name:"John Tropeano", email:"john.tropeano@connectuscorp.com", slug:"john-tropeano", template:BASE_TEMPLATES["John Tropeano"]},
       {name:"Greg Flannigan", email:"greg.flannigan@connectuscorp.com", slug:"greg-flannigan", template:BASE_TEMPLATES["Greg Flannigan"]},
       {name:"Suliman Mohmand", email:"suliman.mohmand@connectuscorp.com", slug:"suliman-mohmand", template:BASE_TEMPLATES["Suliman Mohmand"]},
-      {name:"Orlando", email:"orlando.calderon@connectuscorp.com", slug:"orlando-calderon", template:BASE_TEMPLATES["Orlando"]}
+      {name:"Orlando Calderon", email:"orlando.calderon@connectuscorp.com", slug:"orlando-calderon", template:BASE_TEMPLATES["Orlando Calderon"]},
+      {name:"Greg Weichert", email:"greg.weichert@connectuscorp.com", slug:"Greg Weichert", template:BASE_TEMPLATES["Greg Weichert"]}
     ];
     localStorage.setItem(LS_REPS_KEY, JSON.stringify(reps));
   }
@@ -2740,42 +2660,29 @@ async function loadSO(id){
       try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; }
     };
 
-    const billing = (() => {
-  // Prefer normalized shape if present, else fall back to raw BillTo.*
-  const s1 = (get(base,'billing.street') || get(base,'BillTo.Address1') || '').trim();
-  const s2 = (get(base,'billing.suite')  || get(base,'BillTo.Address2') || '').trim();
-  return {
-    contact: get(base,'billing.contact') || get(base,'BillTo.ContactName'),
-    phone:   get(base,'billing.phone')   || get(base,'BillTo.Phone'),
-    email:   get(base,'billing.email')   || get(base,'BillTo.Email'),
-    street:  s1,
-    suite:   s2 && s2 !== s1 ? s2 : '',
-    city:    get(base,'billing.city')    || get(base,'BillTo.City'),
-    state:   get(base,'billing.state')   || get(base,'BillTo.State'),
-    zip:     get(base,'billing.zip')     || get(base,'BillTo.Zip'),
-  };
-})();
+    const billing = {
+      contact: get(base,'BillTo.ContactName'),
+      phone:   get(base,'BillTo.Phone'),
+      email:   get(base,'BillTo.Email'),
+      street:  get(base,'BillTo.Address1'),
+      suite:   get(base,'BillTo.Address2'),
+      city:    get(base,'BillTo.City'),
+      state:   get(base,'BillTo.State'),
+      zip:     get(base,'BillTo.Zip'),
+    };
 
-
-
-    const shipping = (() => {
-  const s1 = (get(base,'shipping.street') || get(base,'ShipTo.Address1') || '').trim();
-  const s2 = (get(base,'shipping.suite')  || get(base,'ShipTo.Address2') || '').trim();
-  return {
-    company: get(base,'shipping.company') || get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
-    contact: get(base,'shipping.contact') || get(base,'ShipTo.ContactName'),
-    phone:   get(base,'shipping.phone')   || get(base,'ShipTo.Phone'),
-    email:   get(base,'shipping.email')   || get(base,'ShipTo.Email'),
-    street:  s1,
-    suite:   s2 && s2 !== s1 ? s2 : '',
-    city:    get(base,'shipping.city')    || get(base,'ShipTo.City'),
-    state:   get(base,'shipping.state')   || get(base,'ShipTo.State'),
-    zip:     get(base,'shipping.zip')     || get(base,'ShipTo.Zip'),
-    residence: !!(get(base,'shipping.residence') ?? get(base,'ShipTo.Residential', false)),
-  };
-})();
-
-
+    const shipping = {
+      company: get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
+      contact: get(base,'ShipTo.ContactName'),
+      phone:   get(base,'ShipTo.Phone'),
+      email:   get(base,'ShipTo.Email'),
+      street:  get(base,'ShipTo.Address1'),
+      suite:   get(base,'ShipTo.Address2'),
+      city:    get(base,'ShipTo.City'),
+      state:   get(base,'ShipTo.State'),
+      zip:     get(base,'ShipTo.Zip'),
+      residence: !!get(base,'ShipTo.Residential', false),
+    };
 
     const items = (base?.Lines || base?.LineItems || []).map(L => ({
       sku:   get(L,'ItemRef.Code') || get(L,'ItemCode') || get(L,'SKU') || '',
@@ -2956,39 +2863,29 @@ async function loadSO(id){
     // Normalize to the JSON shape your applyClonedOrder() already expects
     const get = (o, p, d='') => { try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; } };
 
-    const billing = (() => {
-  const s1 = (get(base,'billing.street') || get(base,'BillTo.Address1') || '').trim();
-  const s2 = (get(base,'billing.suite')  || get(base,'BillTo.Address2') || '').trim();
-  return {
-    contact: get(base,'billing.contact') || get(base,'BillTo.ContactName'),
-    phone:   get(base,'billing.phone')   || get(base,'BillTo.Phone'),
-    email:   get(base,'billing.email')   || get(base,'BillTo.Email'),
-    street:  s1,
-    suite:   s2 && s2 !== s1 ? s2 : '',
-    city:    get(base,'billing.city')    || get(base,'BillTo.City'),
-    state:   get(base,'billing.state')   || get(base,'BillTo.State'),
-    zip:     get(base,'billing.zip')     || get(base,'BillTo.Zip'),
-  };
-})();
+    const billing = {
+      contact: get(base,'BillTo.ContactName'),
+      phone:   get(base,'BillTo.Phone'),
+      email:   get(base,'BillTo.Email'),
+      street:  get(base,'BillTo.Address1'),
+      suite:   get(base,'BillTo.Address2'),
+      city:    get(base,'BillTo.City'),
+      state:   get(base,'BillTo.State'),
+      zip:     get(base,'BillTo.Zip'),
+    };
 
-
-    const shipping = (() => {
-  const s1 = (get(base,'shipping.street') || get(base,'ShipTo.Address1') || '').trim();
-  const s2 = (get(base,'shipping.suite')  || get(base,'ShipTo.Address2') || '').trim();
-  return {
-    company: get(base,'shipping.company') || get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
-    contact: get(base,'shipping.contact') || get(base,'ShipTo.ContactName'),
-    phone:   get(base,'shipping.phone')   || get(base,'ShipTo.Phone'),
-    email:   get(base,'shipping.email')   || get(base,'ShipTo.Email'),
-    street:  s1,
-    suite:   s2 && s2 !== s1 ? s2 : '',
-    city:    get(base,'shipping.city')    || get(base,'ShipTo.City'),
-    state:   get(base,'shipping.state')   || get(base,'ShipTo.State'),
-    zip:     get(base,'shipping.zip')     || get(base,'ShipTo.Zip'),
-    residence: !!(get(base,'shipping.residence') ?? get(base,'ShipTo.Residential', false)),
-  };
-})();
-
+    const shipping = {
+      company: get(base,'ShipTo.Company') || get(base,'CustomerRef.Name') || get(base,'CustomerName'),
+      contact: get(base,'ShipTo.ContactName'),
+      phone:   get(base,'ShipTo.Phone'),
+      email:   get(base,'ShipTo.Email'),
+      street:  get(base,'ShipTo.Address1'),
+      suite:   get(base,'ShipTo.Address2'),
+      city:    get(base,'ShipTo.City'),
+      state:   get(base,'ShipTo.State'),
+      zip:     get(base,'ShipTo.Zip'),
+      residence: !!get(base,'ShipTo.Residential', false),
+    };
 
     const items = (base?.Lines || base?.LineItems || []).map(L => ({
       sku:   get(L,'ItemRef.Code') || get(L,'ItemCode') || get(L,'SKU') || '',
