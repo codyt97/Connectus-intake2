@@ -960,16 +960,17 @@ function buildLineCSV() {
       if (!sku) return;
 
       rows.push([
-        ''.              // id (empty as requested)
-        docNo,           // No.  (shared DocNo)
-        customer,        // Customer
-        sku,             // Item
-        itemType,        // ItemType
-        instr,           // Line Instructions
-        qty,             // Quantity
-        price,           // Price
-        tranType         // Tran Type (7 or 13)
-      ]);
+  '',                  // id
+  docNo,               // No.
+  customer,            // Customer
+  sku,                 // Item
+  itemType || 'Part',  // ItemType
+  instr,               // Line Instruction
+  qty,                 // Quantity
+  price,               // Price
+  tranType             // Tran Type
+]);
+
     });
   }
 
