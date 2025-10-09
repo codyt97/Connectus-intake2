@@ -2995,42 +2995,30 @@ function composeSSP(){
 }
 
 function composeSSPInGmail(){
-  const to = (document.getElementById('sspTo')?.value || '').trim();
-  const subject = (document.getElementById('sspSubject')?.value || SSP_INVITE_SUBJECT).trim();
-  const body = (document.getElementById('sspBody')?.value || '').trim();
+  const toEl   = document.getElementById('sspTo');
+  const subEl  = document.getElementById('sspSubject');
+  const bodyEl = document.getElementById('sspBody');
+  const to      = toEl ? toEl.value : '';
+  const subject = subEl ? subEl.value : '';
+  const body    = bodyEl ? bodyEl.value : '';
+  openGmailCompose({ to, subject, body });
+}
 
-  if(!to){
-    alert('Add a recipient email first.');
-    return;
-  }
 function openGmailCompose({to, subject, body}) {
+  // Same behavior as the previously working file
   const base = "https://mail.google.com/mail/?view=cm&fs=1";
-
-  // keep the URL sane — giant bodies break with SSO/redirects
-  function clampBody(txt, max=6000){
-    const s = String(txt || "");
-    return s.length <= max ? s : s.slice(0, max) + "\n\n…(truncated)";
-  }
-
   const url =
     `${base}&to=${encodeURIComponent(to || "")}` +
     `&su=${encodeURIComponent(subject || "")}` +
-    `&body=${encodeURIComponent(clampBody(body))}`;
+    `&body=${encodeURIComponent(body || "")}`;
 
-  // anchor-click is less likely to be blocked than window.open
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';
-  a.rel = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-
-  // Optional same-tab fallback (uncomment if desired):
-  // setTimeout(()=>{ window.location.href = url; }, 200);
+  // Previous working approach
+  const win = window.open(url, "_blank", "noopener,noreferrer");
+  if (!win) {
+    // Fallback if a popup blocker intervenes
+    window.location.href = url;
+  }
 }
-
-
 
 
 /* ===== Items & example ===== */
