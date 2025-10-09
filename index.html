@@ -953,6 +953,7 @@ function buildLineCSV() {
       if (!sku) return;
 
       rows.push([
+        ''.              // id (empty as requested)
         docNo,           // No.  (shared DocNo)
         customer,        // Customer
         sku,             // Item
@@ -965,7 +966,7 @@ function buildLineCSV() {
     });
   }
 
-  const headers = ['No.','Customer','Item','ItemType','Line Instructions','Quantity','Price','Tran Type'];
+  const headers = ['id','No.','Customer','Item','ItemType','Line Instructions','Quantity','Price','Tran Type'];
   const lines = rows.map(r => r.map(csvEscape).join(',')).join('\n');
   return headers.join(',') + '\n' + lines;
 }
