@@ -915,7 +915,7 @@ function csvEscape(v) {
 // - TranType: Quote=13, Sales Order=7 (getDocTypeCode should map this)
 // - DocNo shared with Lines via getOrSeedDocNo()
 function buildHeaderCSV() {
-  const headers = ['DocNo','Customer','CustomerPO','TranType','Ship To','Is New'];
+  const headers = ['DocNo','Customer','CustomerPO','TranType','Ship To','Is New','Customer Requested Ship Date'];
   const row = [
     getOrSeedDocNo(),           // DocNo
     getCustomerName(),          // Customer
