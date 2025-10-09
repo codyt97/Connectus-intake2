@@ -3003,10 +3003,10 @@ function composeSSPInGmail(){
     alert('Add a recipient email first.');
     return;
   }
-  function openGmailCompose({to, subject, body}) {
+function openGmailCompose({to, subject, body}) {
   const base = "https://mail.google.com/mail/?view=cm&fs=1";
 
-  // keep the URL sane — huge bodies break with SSO/redirects
+  // keep the URL sane — giant bodies break with SSO/redirects
   function clampBody(txt, max=6000){
     const s = String(txt || "");
     return s.length <= max ? s : s.slice(0, max) + "\n\n…(truncated)";
@@ -3018,17 +3018,18 @@ function composeSSPInGmail(){
     `&body=${encodeURIComponent(clampBody(body))}`;
 
   // anchor-click is less likely to be blocked than window.open
-  const a = document.createElement("a");
+  const a = document.createElement('a');
   a.href = url;
-  a.target = "_blank";
-  a.rel = "noopener";
+  a.target = '_blank';
+  a.rel = 'noopener';
   document.body.appendChild(a);
   a.click();
   a.remove();
 
-  // optional same-tab fallback if the new tab was blocked
-  // setTimeout(()=> { window.location.href = url; }, 200);
+  // Optional same-tab fallback (uncomment if desired):
+  // setTimeout(()=>{ window.location.href = url; }, 200);
 }
+
 
 
 
