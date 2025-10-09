@@ -830,45 +830,16 @@ City, State ZIP"></textarea>
 
 <script>
     // ---------- Gmail compose helpers ----------
-function openGmailCompose({to, subject, body}) {
-  // Build Gmail compose URL
-  const base = "https://mail.google.com/mail/?view=cm&fs=1";
-  const url =
-    `${base}&to=${encodeURIComponent(to || "")}` +
-    `&su=${encodeURIComponent(subject || "")}` +
-    `&body=${encodeURIComponent(body || "")}`;
+function openGmailWithCSV() {
+  const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
+  const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
+  const csv     = document.getElementById('csvPreview')?.value || buildCSV();
 
-  // Prefer opening via a real <a> element (less likely to be blocked than window.open)
-  const a = document.createElement('a');
-  a.href = url;
-  a.target = '_blank';          // open in new tab
-  a.rel = 'noopener';           // security; avoid 'noreferrer' which some policies block
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
+  const header = `Hello Order Management,\n\nPlease find the intake details below in CSV format.\n\n`;
+  const footer = `\n\n— ConnectUS Intake`;
+  const body   = `${header}${csv}${footer}`;
 
-  // Fallback: same-tab navigation if the new tab was blocked
-  // (We can't detect reliably, so offer a gentle fallback)
-  setTimeout(() => {
-    // If user still on the page and Gmail didn't open, try same-tab
-    // (Comment out if you don't want same-tab fallback)
-    // window.location.href = url;
-  }, 200);
-}
-function composeSSPInGmail(){
-  const to      = document.getElementById('sspTo')?.value || '';
-  const subject = document.getElementById('sspSubject')?.value || '';
-  const body    = document.getElementById('sspBody')?.value || '';
-  openGmailCompose({ to, subject, body });
-}
-function openDrawer(id){
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.classList.add('active');
-  if (id === 'drawerEmail') {
-    const ta = document.getElementById('csvPreview');
-    if (ta) ta.value = buildCSV();
-  }
+  openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
 
 // ---- Helper: map current wizard doc type to ERP TranType code
