@@ -793,7 +793,7 @@ City, State ZIP"></textarea>
       <button class="ok" onclick="copySSP()">Copy to Clipboard</button>
       <button class="ghost" onclick="composeSSP()">Open Mail Client</button>
       <!-- ✨ Add this new Gmail button -->
-      <button class="ok" onclick="composeSSPInGmail()">Open in Gmail</button>
+      <button type="button" class="ok" onclick="composeSSPInGmail()">Open in Gmail</button>
     </div>
 
     <div class="tiny">Primary Rep & Billing Contact should be set. Template auto-fills from the rep database.</div>
@@ -818,7 +818,8 @@ City, State ZIP"></textarea>
   <button class="ok" onclick="copyCSVToClipboard()">Copy CSV</button>
   <button class="ghost" onclick="downloadHeaderCSVFile()">Download Sales Order Header (CSV)</button>
   <button class="ghost" onclick="downloadLineCSVFile()">Download Sales Order Line (CSV)</button>
-  <button class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
+  <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
+
 </div>
 
     <div class="tiny" style="margin-top:8px">
@@ -830,25 +831,6 @@ City, State ZIP"></textarea>
 
 <script>
     // ---------- Gmail compose helpers ----------
-function openGmailCompose({to, subject, body}) {
-  // Gmail web compose URL
-  const base = "https://mail.google.com/mail/?view=cm&fs=1";
-  const url = `${base}&to=${encodeURIComponent(to || "")}` +
-              `&su=${encodeURIComponent(subject || "")}` +
-              `&body=${encodeURIComponent(body || "")}`;
-
-  // Open in a new tab/window
-  const win = window.open(url, "_blank", "noopener,noreferrer");
-  if (!win) {
-    alert("Popup blocked. Please allow popups for this site to open Gmail.");
-  }
-}
-function composeSSPInGmail(){
-  const to      = document.getElementById('sspTo')?.value || '';
-  const subject = document.getElementById('sspSubject')?.value || '';
-  const body    = document.getElementById('sspBody')?.value || '';
-  openGmailCompose({ to, subject, body });
-}
 function openGmailWithCSV() {
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
@@ -860,6 +842,7 @@ function openGmailWithCSV() {
 
   openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
+
 // ---- Helper: map current wizard doc type to ERP TranType code
 function getDocTypeCode() {
   // radios in Step 3 (Document Type): QUOTE / SALES ORDER / CLONE (clone still resolves to a base type)
@@ -900,70 +883,104 @@ function getCustomerPO() {
   return '';
 }
 
-// ---- Build Header CSV: DocNo,Customer,CustomerPO,TranType
+// ---- CSV + DocNo helpers (NEW) --------------------------------------------
+
+// Seed a temporary DocNo (numeric) if the page doesn't already provide one.
+// Stays constant for the session so Header + Lines share the same DocNo.
+function __genDocNo() {
+  return String(Date.now()); // 13-digit time-based numeric string
+}
+function getOrSeedDocNo() {
+  const existing = (typeof getDocNo === 'function' ? getDocNo() : '')?.trim();
+  if (existing) return existing;
+  if (!window.__tempDocNo) window.__tempDocNo = __genDocNo();
+  return window.__tempDocNo;
+}
+
+// CSV field escaper (kept same semantics you already use)
+function csvEscape(v) {
+  const s = (v ?? '').toString();
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+// ---------------------------------------------------------------------------
+
+
+  
+// ---- Build Header CSV: DocNo,Customer,CustomerPO,TranType,Ship To,Is New
+// Requirements:
+// - Ship To = "Primary"
+// - Is New = "TRUE"
+// - TranType: Quote=13, Sales Order=7 (getDocTypeCode should map this)
+// - DocNo shared with Lines via getOrSeedDocNo()
 function buildHeaderCSV() {
-  const headers = ['DocNo','Customer','CustomerPO','TranType'];
+  const headers = ['DocNo','Customer','CustomerPO','TranType','Ship To','Is New','Customer Requested Ship Date'];
+
+  // read existing date input (Shipping tab)
+  const reqDate = (document.getElementById('reqShipDate')?.value || '').trim();
+
   const row = [
-    getDocNo(),
-    getCustomerName(),
-    getCustomerPO(),
-    getDocTypeCode()
+    getOrSeedDocNo(),   // DocNo
+    getCustomerName(),  // Customer
+    getCustomerPO(),    // CustomerPO
+    getDocTypeCode(),   // TranType
+    'Primary',          // Ship To
+    'TRUE',             // Is New
+    reqDate             // Customer Requested Ship Date
   ];
   return headers.join(',') + '\n' + row.map(csvEscape).join(',');
 }
 
-// ---- Build Lines CSV: DocNo,Item,TranType,(optional)LineItemID
-// Build Lines CSV: DocNo, Item, Qty, LineInstruction, TranType, (optional) LineItemID
-function buildLineCSV() {
-  const docNo    = typeof getDocNo === 'function' ? getDocNo() : '';
-  const tranType = typeof getDocTypeCode === 'function' ? getDocTypeCode() : '';
-  const body     = document.getElementById('itemsBody');
-  const lines    = [];
 
+
+// ---- Build Lines CSV to match required template:
+// No.,Customer,Item,ItemType,Line Instructions,Quantity,Price,Tran Type
+function buildLineCSV() {
+  const docNo    = getOrSeedDocNo();
+  const tranType = (typeof getDocTypeCode === 'function' ? getDocTypeCode() : '').toString();
+  const customer = (typeof getCustomerName === 'function' ? getCustomerName() : '').trim();
+  const body     = document.getElementById('itemsBody');
+
+  // small helper for row fields
+  const getField = (tr, key, sel = 'input') =>
+    (tr.querySelector(`td ${sel}[data-key="${key}"]`)?.value || '').toString().trim();
+
+  const rows = [];
   if (body) {
     [...body.querySelectorAll('tr')].forEach(tr => {
-      const sku  = (tr.querySelector('td input[data-key="sku"]')?.value || '').trim();
-      const qty  = String(tr.querySelector('td input[data-key="qty"]')?.value ?? '').trim();
-      const instr= (tr.querySelector('td input[data-key="lineInstr"]')?.value || '').trim();
+      const sku      = getField(tr, 'sku');                    // Item
+      const qty      = getField(tr, 'qty');                    // Quantity
+      const instr    = getField(tr, 'lineInstr');              // Line Instructions
+      const price    = getField(tr, 'price');                  // Price (unit)
+      let   itemType = getField(tr, 'itemType', 'select');     // ItemType from <select> if present
+      if (!itemType) itemType = 'Part';                        // default if omitted
 
+      // Skip incomplete rows (prevents importer errors)
       if (!sku) return;
 
-      // Optional persisted LineItemID (if you later add it)
-      let lineId = '';
-      const hid = tr.querySelector('input[name="lineItemId"], [data-lineid]');
-      if (hid) lineId = (hid.value || hid.getAttribute('data-lineid') || '').trim();
+      rows.push([
+  '',                  // id
+  docNo,               // No.
+  customer,            // Customer
+  sku,                 // Item
+  itemType || 'Part',  // ItemType
+  instr,               // Line Instruction
+  qty,                 // Quantity
+  price,               // Price
+  tranType             // Tran Type
+]);
 
-      lines.push({
-        DocNo: docNo,
-        Item: sku,
-        Qty: qty,
-        LineInstruction: instr,
-        TranType: tranType,
-        LineItemID: lineId
-      });
     });
   }
 
-  const anyLineIds = lines.some(l => l.LineItemID);
-  const headers = anyLineIds
-    ? ['DocNo','Item','Qty','LineInstruction','TranType','LineItemID']
-    : ['DocNo','Item','Qty','LineInstruction','TranType'];
-
-  const rows = lines.map(l => anyLineIds
-    ? [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType, l.LineItemID]
-    : [l.DocNo, l.Item, l.Qty, l.LineInstruction, l.TranType]
-  );
-
-  return [headers.join(',')].concat(rows.map(r => r.map(csvEscape).join(','))).join('\n');
+  const headers = ['id','No.','Customer','Item','ItemType','Line Instruction','Quantity','Price','Tran Type'];
+  const lines = rows.map(r => r.map(csvEscape).join(',')).join('\n');
+  return headers.join(',') + '\n' + lines;
 }
 
 
-// ---- CSV escape
-function csvEscape(v) {
-  const s = String(v ?? '');
-  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-  return s;
-}
+
 
 /* ==== New-Device CSV (row-scoped, line-per-line) ==== */
 
@@ -1066,21 +1083,21 @@ function downloadBlobCSV(filename, csvText) {
 }
 
 
-// Replaces old "downloadCSVFile"
 function downloadHeaderCSVFile() {
-  const csv = buildHeaderCSV();
-  const docNo = getDocNo();
-  const name = docNo ? `sales-order-header_${docNo}.csv` : 'sales-order-header.csv';
+  const csv   = buildHeaderCSV();
+  const docNo = getOrSeedDocNo();
+  const name  = `sales-order-header_${docNo}.csv`;
   downloadBlobCSV(name, csv);
 }
 
-// New: Line CSV
+
 function downloadLineCSVFile() {
-  const csv = buildLineCSV();
-  const docNo = getDocNo();
-  const name = docNo ? `sales-order-lines_${docNo}.csv` : 'sales-order-lines.csv';
+  const csv   = buildLineCSV();
+  const docNo = getOrSeedDocNo();
+  const name  = `sales-order-lines_${docNo}.csv`;
   downloadBlobCSV(name, csv);
 }
+
 
 
 
@@ -1173,7 +1190,7 @@ const SIM_CARD_SKU_MAP = {
     sku: 'US-SIM3IN15G',
     desc: '3 in 1 US Cellular Locked 5G SIM Card'
   },
-  'eSim Embendded in the phone': {
+  'eSIM Embendded in the phone': {
     sku: 'ESIM-EMBED',
     desc: 'eSIM embedded in the phone'
   },
@@ -2987,25 +3004,32 @@ function composeSSP(){
 }
 
 function composeSSPInGmail(){
-  const to = (document.getElementById('sspTo')?.value || '').trim();
-  const subject = (document.getElementById('sspSubject')?.value || SSP_INVITE_SUBJECT).trim();
-  const body = (document.getElementById('sspBody')?.value || '').trim();
-
-  if(!to){
-    alert('Add a recipient email first.');
-    return;
-  }
+  const toEl   = document.getElementById('sspTo');
+  const subEl  = document.getElementById('sspSubject');
+  const bodyEl = document.getElementById('sspBody');
+  const to      = toEl ? toEl.value : '';
+  const subject = subEl ? subEl.value : '';
+  const body    = bodyEl ? bodyEl.value : '';
   openGmailCompose({ to, subject, body });
-  // Gmail web compose URL
-  const gmailUrl =
-    `https://mail.google.com/mail/?view=cm&fs=1` +
-    `&to=${encodeURIComponent(to)}` +
-    `&su=${encodeURIComponent(subject)}` +
-    `&body=${encodeURIComponent(body)}`;
-
-  // Open in a new tab (avoids navigating away)
-  window.open(gmailUrl, '_blank', 'noopener');
 }
+
+function openGmailCompose({to, subject, body}) {
+  const base = "https://mail.google.com/mail/?view=cm&fs=1";
+  const url =
+    `${base}&to=${encodeURIComponent(to || "")}` +
+    `&su=${encodeURIComponent(subject || "")}` +
+    `&body=${encodeURIComponent(body || "")}`;
+
+  // Open ONLY in a new tab
+  const a = document.createElement('a');
+  a.href = url;
+  a.target = '_blank';
+  a.rel = 'noopener';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+}
+
 
 
 /* ===== Items & example ===== */
