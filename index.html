@@ -329,12 +329,13 @@
   <!-- <button class="ok" id="btnSubmitIntake">Submit Intake</button> -->
   <span id="submitStatus" class="tiny" style="margin-left:10px"></span>
 </div>
-function openEmailDrawerGuarded(){
+<script>
+  function openEmailDrawerGuarded(){
   const { ok, missing } = validateRequiredForEmail();
   if (!ok){ showValidationWarning(missing); return; }
   openDrawer('drawerEmail');
 }
-
+</script>
 
     <!-- CUSTOMER -->
     <section class="card" data-panel="customer">
@@ -529,7 +530,11 @@ function openEmailDrawerGuarded(){
             <div data-subpanel="insurance" style="display:none">
               <div class="grid">
                 <section class="three">
-                  <label>Insurance Plan</label><select id="insPlan"><option>None</option><option>AKKO</option><option>Other</option></select>
+                  <label>Insurance Plan</label>
+                  <select id="insPlan">
+                  <option>None</option>
+                  <option>AKKO</option>
+                  </select>
                   <label style="margin-top:8px">Deductible</label><select id="insDed"><option>$0</option><option>$50</option><option>$100</option></select>
                 </section>
                 <section class="three">
@@ -874,10 +879,6 @@ function openGmailWithCSV() {
 }
 
 /* ===== Small helpers ===== */
-function val(id){ ... }
-function bool(id){ ... }
-function getSelText(id){ ... }
-
 function isMissingSelectOrEmpty(el){
   if (!el) return true;
   const raw  = (el.value || '').trim();
@@ -1131,6 +1132,92 @@ const SHIP_METHOD_OPTIONS = [
   'USPSParcel'
 ];
 
+ // ===== Insurance: auto "Decline of Protection" line =====
+const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
+const DECLINE_DESC = 'Customer has declined device protection/insurance';
+const DECLINE_PRICE = '0.00';
+
+// Try to get a field by data-key, else fallback by column index
+function _getCellInput(tr, key, fallbackColIdx){
+  let el = tr.querySelector(`[data-key="${key}"]`);
+  if (el) return el;
+  if (typeof fallbackColIdx === 'number'){
+    const td = tr.querySelectorAll('td')[fallbackColIdx];
+    if (td) el = td.querySelector('input,textarea,select');
+  }
+  return el || null;
+}
+
+function findDeclineRow(){
+  const body = document.getElementById('itemsBody');
+  if (!body) return null;
+  const rows = [...body.querySelectorAll('tr')];
+  return rows.find(tr => {
+    const skuEl = _getCellInput(tr, 'sku', 3);
+    const sku = (skuEl?.value || '').trim();
+    return sku === DECLINE_SKU || tr.dataset.decline === 'true';
+  }) || null;
+}
+
+function ensureItemsTableVisible(){
+  // If there are no rows, add one so we can insert the decline line
+  const body = document.getElementById('itemsBody');
+  if (!body) return null;
+  if (!body.querySelector('tr') && typeof window.addRow === 'function'){
+    addRow();
+  }
+  // Prefer a blank row; otherwise, reuse the first row
+  let target = [...body.querySelectorAll('tr')].find(tr => {
+    const skuEl = _getCellInput(tr, 'sku', 3);
+    const priceEl = _getCellInput(tr, 'price', 11) || _getCellInput(tr, 'sell', 11);
+    const hasAny = [...tr.querySelectorAll('input,select,textarea')].some(i => (i.value||'').trim());
+    return !hasAny || (!(skuEl?.value||'').trim() && !(priceEl?.value||'').trim());
+  });
+  if (!target){
+    if (typeof window.addRow === 'function') addRow();
+    target = [...body.querySelectorAll('tr')].slice(-1)[0] || null;
+  }
+  return target;
+}
+
+function upsertDeclineInsuranceLine(){
+  let tr = findDeclineRow();
+  if (!tr){
+    tr = ensureItemsTableVisible();
+    if (!tr) return; // nothing we can do
+  }
+  // Fill fields
+  const descEl  = _getCellInput(tr, 'desc', 0);
+  const skuEl   = _getCellInput(tr, 'sku', 3);
+  const priceEl = _getCellInput(tr, 'price', 11) || _getCellInput(tr, 'sell', 11);
+  if (descEl)  descEl.value  = DECLINE_DESC;
+  if (skuEl)   skuEl.value   = DECLINE_SKU;
+  if (priceEl) priceEl.value = DECLINE_PRICE;
+
+  // Make it identifiable so we can remove it later if plan changes
+  tr.dataset.decline = 'true';
+}
+
+function removeDeclineInsuranceLine(){
+  const tr = findDeclineRow();
+  if (!tr) return;
+  // If the decline row is the only content on that line, clear it; else, delete the row
+  const inputs = [...tr.querySelectorAll('input,select,textarea')];
+  inputs.forEach(i => { i.value = ''; });
+  delete tr.dataset.decline;
+  // Optionally, you could fully remove the row:
+  // tr.parentElement?.removeChild(tr);
+}
+
+function onInsurancePlanChange(){
+  const val = (document.getElementById('insPlan')?.value || '').trim().toLowerCase();
+  if (val === 'none'){
+    upsertDeclineInsuranceLine();
+  } else {
+    removeDeclineInsuranceLine();
+  }
+}
+ 
 function populateShipMethod(){
   const sel = document.getElementById('shipMethod');
   if (!sel) return;
@@ -1190,7 +1277,15 @@ window.addEventListener('DOMContentLoaded', () => {
 
   // Enable main tabs (Sales Reps ↔ Intake)
   initMainTabs();
+  const insSel = document.getElementById('insPlan');
+if (insSel){
+  insSel.addEventListener('change', onInsurancePlanChange);
+  // Initialize on load to reflect current selection:
+  onInsurancePlanChange();
+}
+
 });
+  
 
 
 
@@ -2091,14 +2186,41 @@ function populateInsurancePlanDropdown(){
   const sel = q$('#insPlan'); if (!sel) return;
   const keep = sel.value;
   sel.innerHTML = '';
+
+  // Always include "None"
   sel.appendChild(ensureEl('option', {value:INS_PLAN_NONE_VAL}, 'None'));
-  // sel.appendChild(ensureEl('option', {value:'__OTHER__'}, 'Other (manual)'));
-  INS_CATALOG.forEach(it=>{
-    const label = `${it.desc} (${it.sku})`;
-    sel.appendChild(ensureEl('option', {value:it.sku, 'data-sku':it.sku, 'data-desc':it.desc}, label));
-  });
-  if (keep) sel.value = keep;
+
+  // Prefer real AKKO from catalog if available; else add a safe fallback
+  let akko = null;
+  if (Array.isArray(INS_CATALOG) && INS_CATALOG.length){
+    akko = INS_CATALOG.find(it => {
+      const d = (it.desc || '').toLowerCase();
+      const s = (it.sku  || '').toLowerCase();
+      return d.includes('akko') || s.includes('akko');
+    }) || null;
+  }
+
+  if (akko){
+    const label = `${akko.desc} (${akko.sku})`;
+    sel.appendChild(ensureEl('option', {
+      value: akko.sku,
+      'data-sku': akko.sku,
+      'data-desc': akko.desc
+    }, label));
+  } else {
+    // Fallback if CSV is missing or fetch failed
+    sel.appendChild(ensureEl('option', {
+      value: 'AKKO',
+      'data-sku': 'AKKO',
+      'data-desc': 'AKKO Insurance'
+    }, 'AKKO'));
+  }
+
+  // Keep prior selection if still valid; otherwise default to None
+  sel.value = (keep && [...sel.options].some(o => o.value === keep)) ? keep : INS_PLAN_NONE_VAL;
 }
+
+
 
 (async function initInsuranceCatalog(){
   // ⛳ Update this path to where you host the CSV publicly in your app:
@@ -2162,6 +2284,28 @@ function ensureInsuranceLineForRow(baseTr){
   if (!baseTr || !planSel) return;
 
   const planVal = planSel.value || INS_PLAN_NONE_VAL;
+    // When Insurance = None -> ensure a $0 "decline" line on the current row
+  const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
+  const DECLINE_DESC = 'Customer has declined device protection/insurance';
+
+  const skuEl   = baseTr.querySelector('[data-key="sku"]')   || baseTr.querySelectorAll('td')[3]?.querySelector('input,textarea,select');
+  const descEl  = baseTr.querySelector('[data-key="desc"]')  || baseTr.querySelectorAll('td')[0]?.querySelector('input,textarea,select');
+  const priceEl = baseTr.querySelector('[data-key="price"]') || baseTr.querySelector('[data-key="sell"]') || baseTr.querySelectorAll('td')[11]?.querySelector('input,textarea,select');
+
+  if (String(planVal) === String(INS_PLAN_NONE_VAL)) {
+    if (descEl)  descEl.value  = DECLINE_DESC;
+    if (skuEl)   skuEl.value   = DECLINE_SKU;
+    if (priceEl) priceEl.value = '0.00';
+    baseTr.dataset.decline = 'true';
+  } else {
+    // If switching away from None and this row was a decline row, clear it
+    if (baseTr.dataset.decline === 'true') {
+      if (descEl)  descEl.value  = '';
+      if (skuEl)   skuEl.value   = '';
+      if (priceEl) priceEl.value = '';
+      delete baseTr.dataset.decline;
+    }
+  }
 
   let sku = '', desc = '';
   if (planVal === INS_PLAN_NONE_VAL) {
@@ -3498,6 +3642,8 @@ function getItems(){
     return obj;
   }).filter(o => Object.values(o).some(v => v));
 }
+
+
   
 function getCurrentRowQty(){
   const lastRow=document.querySelector('#itemsBody tr:last-child');
