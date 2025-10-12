@@ -7,6 +7,9 @@
 
 <style>
   /* ===== White + Green theme ===== */
+  .error { border-color: var(--danger) !important; box-shadow: 0 0 0 3px #dc262633 !important; }
+.warnbox { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px; border-radius:10px; font-size:12px; margin-top:8px; }
+
   :root{
     /* palette */
     --bg:#ffffff;                /* page background */
@@ -322,10 +325,15 @@
     </div>
     <!-- Global action: keep original format/logic, always visible -->
 <div class="actions">
-  <button class="ghost" id="btnOpenEmail" onclick="openDrawer('drawerEmail')">Email Order Management</button>
+  <button class="ghost" id="btnOpenEmail" onclick="openEmailDrawerGuarded()">Email Order Management</button>
   <!-- <button class="ok" id="btnSubmitIntake">Submit Intake</button> -->
   <span id="submitStatus" class="tiny" style="margin-left:10px"></span>
 </div>
+function openEmailDrawerGuarded(){
+  const { ok, missing } = validateRequiredForEmail();
+  if (!ok){ showValidationWarning(missing); return; }
+  openDrawer('drawerEmail');
+}
 
 
     <!-- CUSTOMER -->
@@ -851,6 +859,9 @@ City, State ZIP"></textarea>
 <script>
     // ---------- Gmail compose helpers ----------
 function openGmailWithCSV() {
+  const { ok, missing } = validateRequiredForEmail();
+  if (!ok){ showValidationWarning(missing); return; }
+
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
   const csv     = document.getElementById('csvPreview')?.value || buildCSV();
@@ -861,6 +872,86 @@ function openGmailWithCSV() {
 
   openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
+
+/* ===== Small helpers ===== */
+function val(id){ ... }
+function bool(id){ ... }
+function getSelText(id){ ... }
+
+function isMissingSelectOrEmpty(el){
+  if (!el) return true;
+  const raw  = (el.value || '').trim();
+  const text = (el.options && el.selectedIndex >= 0) ? (el.options[el.selectedIndex].text || '').trim() : '';
+  return !raw || /^select/i.test(text);
+}
+function markErr(id){ const el = document.getElementById(id); if (el) el.classList.add('error'); }
+function clearErr(id){ const el = document.getElementById(id); if (el) el.classList.remove('error'); }
+function statusBox(){ const b = document.getElementById('submitStatus'); if (b) b.innerHTML=''; return b; }
+
+function validateRequiredForEmail(){
+  const miss = [];
+  ['shipPayMethod','shipMethod','freightType','reqShipDate','simCard','pairingOption','simHandling','insPlan'].forEach(clearErr);
+  clearErr('itemsCard');
+
+  const checkSel = (id, label)=>{
+    const el = document.getElementById(id);
+    if (isMissingSelectOrEmpty(el)){ miss.push(label); markErr(id); }
+  };
+
+  checkSel('shipPayMethod','Shipping Payment Method');
+  checkSel('shipMethod','Ship Method');
+  checkSel('freightType','Freight Type');
+
+  const rqd = document.getElementById('reqShipDate');
+  if (!rqd || !(rqd.value||'').trim()){ miss.push('Customer Requested Ship Date'); markErr('reqShipDate'); }
+
+  checkSel('simCard','SIM Card');
+  checkSel('pairingOption','Pairing Option');
+  checkSel('simHandling','SIM Handling');
+  checkSel('insPlan','Insurance Plan');
+
+  const body = document.getElementById('itemsBody');
+  let anyValidLine = false;
+  if (body){
+    [...body.querySelectorAll('tr')].forEach((tr, idx)=>{
+      const skuEl   = tr.querySelector('[data-key="sku"]');
+      const priceEl = tr.querySelector('[data-key="price"], [data-key="sell"]') ||
+                      tr.querySelectorAll('td')[11]?.querySelector('input,textarea,select');
+      const sku   = (skuEl?.value || '').trim();
+      const price = (priceEl?.value || '').trim();
+      const rowHasAnyInput = [...tr.querySelectorAll('input,select,textarea')].some(i => (i.value||'').trim());
+      const inPlay = rowHasAnyInput || sku || price;
+
+      const errs = [];
+      if (inPlay && !sku){ errs.push('OrderTime SKU'); skuEl && skuEl.classList.add('error'); }
+      if (inPlay && !price){ errs.push('Sell Price'); priceEl && priceEl.classList.add('error'); }
+      if (errs.length) miss.push(`Line ${idx+1}: ${errs.join(', ')}`);
+      if (sku && price) anyValidLine = true;
+    });
+  }
+  if (!anyValidLine){ miss.push('At least one line with OrderTime SKU and Sell Price'); markErr('itemsCard'); }
+
+  return { ok: miss.length === 0, missing: miss };
+}
+
+function showValidationWarning(missing){
+  const box = statusBox();
+  const html = `
+    <div class="warnbox">
+      <strong>Complete these before emailing Order Management:</strong>
+      <ul style="margin:6px 0 0 18px">${missing.map(m=>`<li>${m}</li>`).join('')}</ul>
+    </div>`;
+  if (box) box.innerHTML = html; else alert(`Please complete:\n- ${missing.join('\n- ')}`);
+}
+
+// Keep your Quick Validate button useful
+window.validateForm = function(){
+  const { ok, missing } = validateRequiredForEmail();
+  const box = statusBox();
+  if (ok){ if (box) box.innerHTML = '<span class="tiny" style="color:var(--ok)">All required fields look good.</span>'; }
+  else { showValidationWarning(missing); }
+};
+  
 
 // ---- Helper: map current wizard doc type to ERP TranType code
 function getDocTypeCode() {
