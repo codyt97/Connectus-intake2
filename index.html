@@ -1422,6 +1422,7 @@ function buildLineCSV() {
       if (!sku) return; // skip incomplete rows
 
       const price     = getSellPrice(tr);                      // 👈 robust Sell Price → Price
+      const qcost     = getQuotedCost(tr);                     // 👈 NEW: Quoted Cost
       const actPayout = getPayout(tr);                         // 👈 Act Payout $
 
       rows.push([
@@ -1433,6 +1434,7 @@ function buildLineCSV() {
         instr,               // Line Instruction
         qty,                 // Quantity
         price,               // Price (Sell Price)
+        'Quoted Cost',     // 👈 NEW
         actPayout,           // 👈 Act Payout $
         tranType             // Tran Type
       ]);
