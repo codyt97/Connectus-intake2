@@ -1441,7 +1441,7 @@ function buildLineCSV() {
     });
   }
 
-  const headers = ['id','No.','Customer','Item','ItemType','Line Instruction','Quantity','Price','Act Payout $','Tran Type']; // 👈 NEW header
+  const headers = ['id','No.','Customer','Item','ItemType','Line Instruction','Quantity','Price','Quoted Cost','Act Payout $','Tran Type']; // 👈 NEW header
   const lines = rows.map(r => r.map(csvEscape).join(',')).join('\n');
   return headers.join(',') + '\n' + lines;
 }
@@ -1721,10 +1721,14 @@ const PAIRING_SKU_MAP = {
   },
   'iNTERNAL cuc sIM pAIR & ACTIVATION': {
     sku: 'INT DEVICE ACTIVATE/SIM PAIR',
-    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION'
+    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION',
+   
   }
   // Add more mappings here as you add more pairing options/SKUs.
-  
+  'N?A': {
+    sku: '',
+    desc: ''
+  }
 };
 
   // A lowercase set of all pairing SKUs so we can identify & remove them
