@@ -10,11 +10,9 @@
   .error { border-color: var(--danger) !important; box-shadow: 0 0 0 3px #dc262633 !important; }
 .warnbox { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px; border-radius:10px; font-size:12px; margin-top:8px; }
 
-  :root{
-    /* palette */
-    --bg:#ffffff;                /* page background */
-    --ink:#0b1b12;               /* primary text (very dark green) */
-    --muted:#5b6b61;             /* secondary text */
+  :root{for (const k in SIM_CARD_SKU_MAP) {
+  SIM_CARD_SKU_MAP[k].price = '0.00';
+}
     --line:#e6efe9;              /* subtle borders */
     --card:#ffffff;              /* cards/drawers */
     --accent:#16a34a;            /* primary green */
@@ -1626,7 +1624,7 @@ const SIM_CARD_OPTIONS = [
 
 // Force all SIM SKUs to $0.00 by default
 for (const k in SIM_CARD_SKU_MAP) {
-  SIM_CARD_SKU_MAP[k].price = '0.00';
+  SIM_CARD_SKU_MAP[k].'Sell Price' = '0.00';
 }
 
  // Exact mapping from visible SIM dropdown option to OrderTime SKU + Description
