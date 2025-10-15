@@ -1357,6 +1357,9 @@ function buildHeaderCSV() {
   const freight      = get('freightType');
   const allowPartial = checked('allowPartial') ? 'TRUE' : 'FALSE';
   const blindShip    = checked('blindShip') ? 'TRUE' : 'FALSE';
+    // Order Instruction (Step 5)
+  const oiType = getSelText('oiType');
+
 
   const rep1      = getSelText('rep1');
   const rep2      = getSelText('rep2');
