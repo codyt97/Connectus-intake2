@@ -1387,7 +1387,8 @@ function buildLineCSV() {
   if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
   if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
   const COL_PAYOUT = (typeof window.COL_PAYOUT !== 'undefined') ? window.COL_PAYOUT : 8;  // "Act Payout $" (9th col)
-  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Sell Price" (12th col)
+  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11;  // Sell Price
+  const COL_QC     = (typeof window.COL_QC     !== 'undefined') ? window.COL_QC     : 15;  // Quoted Cost
 
   // Robust getters for payout & price
   function getPayout(tr) {
@@ -1410,7 +1411,15 @@ function buildLineCSV() {
     const el = tr?.querySelectorAll('td')[COL_SELL]?.querySelector('input,textarea,select');
     return (el?.value || '').toString().trim();
   }
-
+  // ✅ define the Quoted Cost getter
+  function getQuotedCost(tr) {
+    let v = getField(tr, 'quotedCost');
+    if (v) return v;
+    v = getField(tr, 'cost'); // fallback key
+    if (v) return v;
+    const el = tr?.querySelectorAll('td')[COL_QC]?.querySelector('input,textarea,select');
+    return (el?.value || '').toString().trim();
+  }
   const rows = [];
   if (body) {
     [...body.querySelectorAll('tr')].forEach(tr => {
@@ -1422,7 +1431,7 @@ function buildLineCSV() {
       if (!sku) return; // skip incomplete rows
 
       const price     = getSellPrice(tr);                      // 👈 robust Sell Price → Price
-      const qcost     = getQuotedCost(tr);                     // 👈 NEW: Quoted Cost
+      const qcost     = getQuotedCost(tr);                     // ✅ actual Quoted Cost value
       const actPayout = getPayout(tr);                         // 👈 Act Payout $
 
       rows.push([
@@ -1434,7 +1443,7 @@ function buildLineCSV() {
         instr,               // Line Instruction
         qty,                 // Quantity
         price,               // Price (Sell Price)
-        'Quoted Cost',     // 👈 NEW
+        qcost,               // ✅ Quoted Cost
         actPayout,           // 👈 Act Payout $
         tranType             // Tran Type
       ]);
