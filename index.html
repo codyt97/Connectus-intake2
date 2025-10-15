@@ -1622,6 +1622,10 @@ const SIM_CARD_OPTIONS = [
   'US-SIM3IN15G',
   'eSIM Embendded in the phone',
   'NO SIM CARD',
+  // Force all SIM SKUs to $0.00 by default
+for (const k in SIM_CARD_SKU_MAP) {
+  SIM_CARD_SKU_MAP[k].price = '0.00';
+}
 ];
  // Exact mapping from visible SIM dropdown option to OrderTime SKU + Description
 const SIM_CARD_SKU_MAP = {
