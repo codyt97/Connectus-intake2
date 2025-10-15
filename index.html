@@ -300,10 +300,25 @@
       <label class="chip"><input type="radio" name="wizScope" value="hardware+pro"> Hardware + Pro services</label>
     </div>
   </div>
+   
+  <!-- Step 5 -->
+  <div class="wiz-row" id="wizStep4" style="display:none">
+    <div class="wiz-label">5) Order Instruction</div>
+    <div class="wiz-opts" style="min-width:260px">
+      <select id="oiType" style="min-width:240px;padding:8px;border:1px solid var(--line);border-radius:10px">
+        <option value="">Select Order Instruction…</option>
+        <option>Standart Order</option>
+        <option>Ship to 3PL</option>
+        <option>CUSTOM-Order and shipping instructions</option>
+        <option>CUSTOM-Order Instructions</option>
+        <option>CUSTOM-Shipping Instruction</option>
+      </select>
+    </div>
+  </div>
 
   <div class="wiz-hint" id="wizHint">Complete steps 1–4 to unlock the intake tabs.</div>
 </section>
-
+ 
 
     <!-- toggles -->
     <div class="bar" id="toggleBar" style="display:none" aria-hidden="true">
@@ -1305,7 +1320,7 @@ function buildHeaderCSV() {
     'Terms','Payment Method','BOBO Acct #','Ship Method','Freight Type','Shipping Payment Method','FedEx Account #','UPS Account #',
     'Allow Ship Partial','Blind Ship','Primary Sales Rep','Secondary Sales Rep','Carrier Rep','Carrier Rep Email','Carrier Rep Phone',
     'Company Name / Care Of','Contact Name','Contact Phone','Email','Street Address','Floor / Suite','City','State','Zip Code',
-    'Internal Notes'
+    'Internal Notes','Order Instruction Type'
   ];
 
   const get = (id)=> (document.getElementById(id)?.value || '').trim();
