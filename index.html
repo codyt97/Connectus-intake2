@@ -4653,6 +4653,17 @@ function setCellInput(td, val) {
   if (el) el.value = (val ?? '').toString();
 }
 </script>
+<script>
+// --- Totals: hard-kill UI + provide a safe no-op for old callers ---
+(function(){
+  if (typeof window.refreshTotals !== 'function') {
+    window.refreshTotals = function(){};   // prevents "not defined" errors
+  }
+  // Remove the old totals box if it still exists
+  const tb = document.getElementById('totalsBox');
+  if (tb) tb.remove();
+})();
+</script>
 
 </body>
 </html>
