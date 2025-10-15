@@ -2287,7 +2287,7 @@ function ensureInsuranceLineForRow(baseTr){
 
   const planVal = planSel.value || INS_PLAN_NONE_VAL;
     // When Insurance = None -> ensure a $0 "decline" line on the current row
-  const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
+  const DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
   const DECLINE_DESC = 'Customer has declined device protection/insurance';
 
   const skuEl   = baseTr.querySelector('[data-key="sku"]')   || baseTr.querySelectorAll('td')[3]?.querySelector('input,textarea,select');
