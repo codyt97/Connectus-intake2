@@ -690,6 +690,7 @@ City, State ZIP"></textarea>
       <label class="chip"><input type="checkbox" id="svcEnabled"> Include Services for this item</label>
       <label style="margin-top:10px">Tier</label>
       <select id="svcTier">
+        <option value="0">N/A</option>
         <option value="0">Tier 0 (under ~5 min)</option>
         <option value="1">Tier 1 (≤ 15 min)</option>
         <option value="2">Tier 2 (≤ 30 min)</option>
@@ -3709,46 +3710,46 @@ function recalcServices(){
 }
 
 /* ===== Totals ===== */
-//function parseNum(x){ const n=parseFloat(String(x).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; }
-//function fmt(n){ return `$${(Math.round(n*100)/100).toFixed(2)}`; }
-//
-//function computeTotals(){
- // const items=getItems();
- // let linesSubtotal=0;
-//  items.forEach(l=>{
-  //  const qty=parseNum(l.qty), price=parseNum(l.sell);
-    //linesSubtotal += qty*price;
-  //});
+function parseNum(x){ const n=parseFloat(String(x).replace(/[^0-9.\-]/g,'')); return isFinite(n)?n:0; }
+function fmt(n){ return `$${(Math.round(n*100)/100).toFixed(2)}`; }
 
-//  const qty = getCurrentRowQty();
-//  const accQty=parseNum(val('accQty')); const accSell=parseNum(val('accSell'));
-//  const accTotal = accQty*accSell*qty;
+function computeTotals(){
+  const items=getItems();
+  let linesSubtotal=0;
+  items.forEach(l=>{
+    const qty=parseNum(l.qty), price=parseNum(l.sell);
+    linesSubtotal += qty*price;
+  });
 
-//  const svcEnabled=document.getElementById('svcEnabled').checked;
-//  const svcPer=parseNum(val('svcCostPer'));
-//  const svcTotal = svcEnabled ? svcPer*qty : 0;
+  const qty = getCurrentRowQty();
+  const accQty=parseNum(val('accQty')); const accSell=parseNum(val('accSell'));
+  const accTotal = accQty*accSell*qty;
 
-//  const insSell=parseNum(val('insSell'));
-//  const insTotal = insSell*qty;
+  const svcEnabled=document.getElementById('svcEnabled').checked;
+  const svcPer=parseNum(val('svcCostPer'));
+  const svcTotal = svcEnabled ? svcPer*qty : 0;
 
-  //const taxExempt = document.getElementById('taxExempt').checked;
-  //const taxable = linesSubtotal + accTotal + svcTotal + insTotal;
-  //const tax = taxExempt ? 0 : taxable*TAX_RATE;
-//  const grand = taxable + tax;
+  const insSell=parseNum(val('insSell'));
+  const insTotal = insSell*qty;
 
-  //return {linesSubtotal, accTotal, svcTotal, insTotal, tax, grand, taxable, taxExempt};
-//}
-//function refreshTotals(){
-//  const t=computeTotals();
-//  document.getElementById('tLines').textContent=fmt(t.linesSubtotal);
-//  document.getElementById('tAcc').textContent=fmt(t.accTotal);
-//  document.getElementById('tSvc').textContent=fmt(t.svcTotal);
-//  document.getElementById('tIns').textContent=fmt(t.insTotal);
-//  document.getElementById('tTax').textContent=fmt(t.tax);
-//  document.getElementById('tGrand').textContent=fmt(t.grand);
-//  document.getElementById('totalsBox').style.display='';
-//  document.getElementById('taxNote').textContent = t.taxExempt ? 'Tax Exempt: tax not applied.' : `Tax rate: ${(TAX_RATE*100).toFixed(2)}%`;
-//}
+  const taxExempt = document.getElementById('taxExempt').checked;
+  const taxable = linesSubtotal + accTotal + svcTotal + insTotal;
+  const tax = taxExempt ? 0 : taxable*TAX_RATE;
+  const grand = taxable + tax;
+
+  return {linesSubtotal, accTotal, svcTotal, insTotal, tax, grand, taxable, taxExempt};
+}
+function refreshTotals(){
+  const t=computeTotals();
+  document.getElementById('tLines').textContent=fmt(t.linesSubtotal);
+  document.getElementById('tAcc').textContent=fmt(t.accTotal);
+  document.getElementById('tSvc').textContent=fmt(t.svcTotal);
+  document.getElementById('tIns').textContent=fmt(t.insTotal);
+  document.getElementById('tTax').textContent=fmt(t.tax);
+  document.getElementById('tGrand').textContent=fmt(t.grand);
+  document.getElementById('totalsBox').style.display='';
+  document.getElementById('taxNote').textContent = t.taxExempt ? 'Tax Exempt: tax not applied.' : `Tax rate: ${(TAX_RATE*100).toFixed(2)}%`;
+}
 
 /* ===== Summary / Validation ===== */
 function val(id){return (document.getElementById(id)?.value||'').trim()}
@@ -3803,11 +3804,11 @@ function buildSummary(){
   parts.push(`- ABM: ${bool('mdmABM')?'Yes':'No'} | Knox (KME): ${bool('mdmKnox')?'Yes':'No'} | Knox Account #: ${val('knoxAccount')||'—'} | Zero Touch: ${bool('mdmZeroTouch')?'Yes':'No'} | MDM Pro: ${bool('mdmPro')?'Yes':'No'}`);
   parts.push(`- MDM Notes: ${val('mdmNotes')||'—'}`);
   parts.push('');
- // parts.push('TOTALS');
- // parts.push(`- Lines Subtotal: ${fmt(t.linesSubtotal)}`);
- // parts.push(`- Accessories: ${fmt(t.accTotal)}; Services: ${fmt(t.svcTotal)}; Insurance: ${fmt(t.insTotal)}`);
-//  parts.push(`- Tax: ${fmt(t.tax)} ${t.taxExempt?'(Exempt)':''}`);
- // parts.push(`= GRAND TOTAL: ${fmt(t.grand)}`);
+  parts.push('TOTALS');
+  parts.push(`- Lines Subtotal: ${fmt(t.linesSubtotal)}`);
+  parts.push(`- Accessories: ${fmt(t.accTotal)}; Services: ${fmt(t.svcTotal)}; Insurance: ${fmt(t.insTotal)}`);
+  parts.push(`- Tax: ${fmt(t.tax)} ${t.taxExempt?'(Exempt)':''}`);
+  parts.push(`= GRAND TOTAL: ${fmt(t.grand)}`);
 
   document.getElementById('summary').textContent=parts.join('\n');
 
@@ -4652,17 +4653,6 @@ function setCellInput(td, val) {
   const el = td.querySelector('input,textarea,select');
   if (el) el.value = (val ?? '').toString();
 }
-</script>
-<script>
-// --- Totals: hard-kill UI + provide a safe no-op for old callers ---
-(function(){
-  if (typeof window.refreshTotals !== 'function') {
-    window.refreshTotals = function(){};   // prevents "not defined" errors
-  }
-  // Remove the old totals box if it still exists
-  const tb = document.getElementById('totalsBox');
-  if (tb) tb.remove();
-})();
 </script>
 
 </body>
