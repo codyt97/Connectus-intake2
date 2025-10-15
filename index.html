@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -8,6 +7,9 @@
 
 <style>
   /* ===== White + Green theme ===== */
+  .error { border-color: var(--danger) !important; box-shadow: 0 0 0 3px #dc262633 !important; }
+.warnbox { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px; border-radius:10px; font-size:12px; margin-top:8px; }
+
   :root{
     /* palette */
     --bg:#ffffff;                /* page background */
@@ -323,11 +325,17 @@
     </div>
     <!-- Global action: keep original format/logic, always visible -->
 <div class="actions">
-  <button class="ghost" id="btnOpenEmail" onclick="openDrawer('drawerEmail')">Email Order Management</button>
+  <button class="ghost" id="btnOpenEmail" onclick="openEmailDrawerGuarded()">Email Order Management</button>
   <!-- <button class="ok" id="btnSubmitIntake">Submit Intake</button> -->
   <span id="submitStatus" class="tiny" style="margin-left:10px"></span>
 </div>
-
+<script>
+  function openEmailDrawerGuarded(){
+  const { ok, missing } = validateRequiredForEmail();
+  if (!ok){ showValidationWarning(missing); return; }
+  openDrawer('drawerEmail');
+}
+</script>
 
     <!-- CUSTOMER -->
     <section class="card" data-panel="customer">
@@ -361,8 +369,26 @@
 
         <section class="two">
           <h3>Payment & Tax</h3>
-          <label>Payment Method</label>
-          <select id="payMethod"><option value="">Select Payment Method</option><option>ACH</option><option>Wire</option><option>Credit Card</option><option>Net Terms</option></select>
+          <select id="payMethod">
+  <option value="">Select Payment Method…</option>
+  <option>ACH</option>
+  <option>Bill.com</option>
+  <option>BOBO Verizon</option>
+  <option>Check</option>
+  <option>ConnectUs Leasing</option>
+  <option>Credit Card</option>
+  <option>DaaS</option>
+  <option>Financing Partner</option>
+  <option>PayPal</option>
+  <option>Wire Transfer</option>
+</select>
+
+<!-- Conditional: only when Payment Method = BOBO Verizon -->
+<div id="boboBlock" style="display:none; margin-top:8px">
+  <label>BOBO Acct #</label>
+  <input id="boboAcct" placeholder="Enter BOBO account number" />
+</div>
+
           <label style="margin-top:10px">Payment Terms Procedure</label><input id="payTerms" placeholder="e.g., Net 30, upfront %" />
           <label class="chip" style="margin-top:10px"><input type="checkbox" id="hasAgreement"> Purchase Agreement (no POs)</label>
           <label class="chip" style="margin-top:6px"><input type="checkbox" id="taxExempt"> Tax Exempt? (attach certificate)</label>
@@ -387,20 +413,22 @@
           <h3>Shipping Options</h3>
 
 <!-- NEW: Carrier method -->
-<label>Shipping Method</label>
-<select id="shipMethod">
-  <option value="">Select Carrier</option>
-  <option value="FedEx">FedEx</option>
-  <option value="UPS">UPS</option>
+<label>Ship Method</label>
+<select id="shipMethod"></select>
+<label>Shipping Payment Method</label>
+<select id="shipPayMethod">
+  <option value="">Select Shipping Payment Method</option>
+  <option>Bill to ConnectUs UPS Account</option>
+  <option>Bill to ConnectUs FedEx Account</option>
+  <option>Bill to ConnectUs FedEx Account and Charge Cust.</option>
+  <option>Bill to ConnectUs UPS Account and Charge Cust</option>
+  <option>Customer UPS Account</option>
+  <option>Customer FedEx Account</option>
+  <option>Customer Provided Label</option>
+  <option>N/A</option>
 </select>
 
-<label style="margin-top:10px">Shipping Payment Method</label>
-<select id="shipPay">
-  <option value="">Select Shipping Pmt Method</option>
-  <option value="Prepaid">Prepaid</option>
-  <option value="Collect">Collect</option>
-  <option value="3rd Party">3rd Party</option>
-</select>
+
 
 <!-- NEW: Only visible when 3rd Party is chosen -->
 <div id="thirdPartyBlock" style="display:none; margin-top:8px">
@@ -408,22 +436,21 @@
   <input id="thirdPartyAcct" placeholder="Enter account number" />
   <div class="tiny">Shown only for 3rd Party billing; label adapts to chosen carrier.</div>
 </div>
-
-<label style="margin-top:10px">Shipping Speed</label>
-<select id="shipSpeed">
-  <option value="">Select Shipping Speed</option>
-  <option>Ground</option>
-  <option>2-Day</option>
-  <option>Overnight</option>
+<label style="margin-top:10px">Freight Type</label>
+<select id="freightType">
+  <option value="">Select Freight Type</option>
+  <option>[TPB] Third Party Billing, to the account number supplied below</option>
+  <option>N/A</option>
 </select>
 
-<label style="margin-top:10px">Short Ship?</label>
-<select id="shortShip">
-  <option value="">Select</option>
-  <option>No</option>
-  <option>Yes (Backorder OK)</option>
-</select>
+<div style="margin-top:10px">
+  <label class="chip"><input type="checkbox" id="allowPartial"> Allow Ship Partial</label>
+  <label class="chip" style="margin-left:10px"><input type="checkbox" id="blindShip"> Blind Ship</label>
+</div>
+  
 
+
+</section>
 
         <section class="full">
           <h3>Internal Notes</h3>
@@ -503,7 +530,11 @@
             <div data-subpanel="insurance" style="display:none">
               <div class="grid">
                 <section class="three">
-                  <label>Insurance Plan</label><select id="insPlan"><option>None</option><option>AKKO</option><option>Other</option></select>
+                  <label>Insurance Plan</label>
+                  <select id="insPlan">
+                  <option>None</option>
+                  <option>AKKO</option>
+                  </select>
                   <label style="margin-top:8px">Deductible</label><select id="insDed"><option>$0</option><option>$50</option><option>$100</option></select>
                 </section>
                 <section class="three">
@@ -619,6 +650,18 @@ City, State ZIP"></textarea>
 </div>
 
           
+          <!-- Totals -->
+          <div class="totals" id="totalsBox" style="display:none">
+            <h4>Totals (current document)</h4>
+            <div class="rowline"><span>Lines Subtotal</span><strong id="tLines">$0.00</strong></div>
+            <div class="rowline"><span>Accessories</span><strong id="tAcc">$0.00</strong></div>
+            <div class="rowline"><span>Services</span><strong id="tSvc">$0.00</strong></div>
+            <div class="rowline"><span>Insurance</span><strong id="tIns">$0.00</strong></div>
+            <div class="rowline"><span>Tax</span><strong id="tTax">$0.00</strong></div>
+            <div class="divider"></div>
+            <div class="rowline"><span><strong>Grand Total</strong></span><strong id="tGrand">$0.00</strong></div>
+            <div class="tiny" id="taxNote"></div>
+          </div>
         </section>
       </div>
     </section>
@@ -647,7 +690,6 @@ City, State ZIP"></textarea>
       <label class="chip"><input type="checkbox" id="svcEnabled"> Include Services for this item</label>
       <label style="margin-top:10px">Tier</label>
       <select id="svcTier">
-        <option value="">N/A</option>
         <option value="0">Tier 0 (under ~5 min)</option>
         <option value="1">Tier 1 (≤ 15 min)</option>
         <option value="2">Tier 2 (≤ 30 min)</option>
@@ -822,6 +864,9 @@ City, State ZIP"></textarea>
 <script>
     // ---------- Gmail compose helpers ----------
 function openGmailWithCSV() {
+  const { ok, missing } = validateRequiredForEmail();
+  if (!ok){ showValidationWarning(missing); return; }
+
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
   const csv     = document.getElementById('csvPreview')?.value || buildCSV();
@@ -832,6 +877,82 @@ function openGmailWithCSV() {
 
   openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
+
+/* ===== Small helpers ===== */
+function isMissingSelectOrEmpty(el){
+  if (!el) return true;
+  const raw  = (el.value || '').trim();
+  const text = (el.options && el.selectedIndex >= 0) ? (el.options[el.selectedIndex].text || '').trim() : '';
+  return !raw || /^select/i.test(text);
+}
+function markErr(id){ const el = document.getElementById(id); if (el) el.classList.add('error'); }
+function clearErr(id){ const el = document.getElementById(id); if (el) el.classList.remove('error'); }
+function statusBox(){ const b = document.getElementById('submitStatus'); if (b) b.innerHTML=''; return b; }
+
+function validateRequiredForEmail(){
+  const miss = [];
+  ['shipPayMethod','shipMethod','freightType','reqShipDate','simCard','pairingOption','simHandling','insPlan'].forEach(clearErr);
+  clearErr('itemsCard');
+
+  const checkSel = (id, label)=>{
+    const el = document.getElementById(id);
+    if (isMissingSelectOrEmpty(el)){ miss.push(label); markErr(id); }
+  };
+
+  checkSel('shipPayMethod','Shipping Payment Method');
+  checkSel('shipMethod','Ship Method');
+  checkSel('freightType','Freight Type');
+
+  const rqd = document.getElementById('reqShipDate');
+  if (!rqd || !(rqd.value||'').trim()){ miss.push('Customer Requested Ship Date'); markErr('reqShipDate'); }
+
+  checkSel('simCard','SIM Card');
+  checkSel('pairingOption','Pairing Option');
+  checkSel('simHandling','SIM Handling');
+  checkSel('insPlan','Insurance Plan');
+
+  const body = document.getElementById('itemsBody');
+  let anyValidLine = false;
+  if (body){
+    [...body.querySelectorAll('tr')].forEach((tr, idx)=>{
+      const skuEl   = tr.querySelector('[data-key="sku"]');
+      const priceEl = tr.querySelector('[data-key="price"], [data-key="sell"]') ||
+                      tr.querySelectorAll('td')[11]?.querySelector('input,textarea,select');
+      const sku   = (skuEl?.value || '').trim();
+      const price = (priceEl?.value || '').trim();
+      const rowHasAnyInput = [...tr.querySelectorAll('input,select,textarea')].some(i => (i.value||'').trim());
+      const inPlay = rowHasAnyInput || sku || price;
+
+      const errs = [];
+      if (inPlay && !sku){ errs.push('OrderTime SKU'); skuEl && skuEl.classList.add('error'); }
+      if (inPlay && !price){ errs.push('Sell Price'); priceEl && priceEl.classList.add('error'); }
+      if (errs.length) miss.push(`Line ${idx+1}: ${errs.join(', ')}`);
+      if (sku && price) anyValidLine = true;
+    });
+  }
+  if (!anyValidLine){ miss.push('At least one line with OrderTime SKU and Sell Price'); markErr('itemsCard'); }
+
+  return { ok: miss.length === 0, missing: miss };
+}
+
+function showValidationWarning(missing){
+  const box = statusBox();
+  const html = `
+    <div class="warnbox">
+      <strong>Complete these before emailing Order Management:</strong>
+      <ul style="margin:6px 0 0 18px">${missing.map(m=>`<li>${m}</li>`).join('')}</ul>
+    </div>`;
+  if (box) box.innerHTML = html; else alert(`Please complete:\n- ${missing.join('\n- ')}`);
+}
+
+// Keep your Quick Validate button useful
+window.validateForm = function(){
+  const { ok, missing } = validateRequiredForEmail();
+  const box = statusBox();
+  if (ok){ if (box) box.innerHTML = '<span class="tiny" style="color:var(--ok)">All required fields look good.</span>'; }
+  else { showValidationWarning(missing); }
+};
+  
 
 // ---- Helper: map current wizard doc type to ERP TranType code
 function getDocTypeCode() {
@@ -896,6 +1017,278 @@ function csvEscape(v) {
 
 // ---------------------------------------------------------------------------
 
+/* ===== Small helpers ===== */
+function val(id){ return (document.getElementById(id)?.value || '').trim(); }
+function bool(id){ return !!document.getElementById(id)?.checked; }
+function getSelText(id){
+  const el = document.getElementById(id);
+  if(!el) return '';
+  const i = el.selectedIndex;
+  return i >= 0 ? (el.options[i].text || '').trim() : '';
+}
+
+/* ===== Payment: BOBO Verizon toggle ===== */
+function updateBoboUI(){
+  const pm = (document.getElementById('payMethod')?.value || '').toLowerCase();
+  document.getElementById('boboBlock').style.display = (pm === 'bobo verizon') ? '' : 'none';
+}
+
+/* ===== Shipping: show/hide 3rd-party account + label ===== */
+function updateThirdPartyUI(){
+  const sel   = document.getElementById('shipPayMethod');
+  const val   = (sel && sel.options[sel.selectedIndex] ? sel.options[sel.selectedIndex].text : '').trim();
+  const block = document.getElementById('thirdPartyBlock');
+  const label = document.getElementById('thirdPartyLabel');
+  const input = document.getElementById('thirdPartyAcct');
+
+  const lower = (val || '').toLowerCase();
+  const isUPS   = lower.includes('ups');
+  const isFedEx = lower.includes('fedex');
+
+  // Show the block for ANY UPS/FedEx selection (Customer or ConnectUs-billed variants)
+  const needsAcct = isUPS || isFedEx;
+  block.style.display = needsAcct ? '' : 'none';
+
+  // Label + placeholder reflect grouping
+  if (label){
+    if (isUPS)       label.textContent = 'UPS Account #';
+    else if (isFedEx) label.textContent = 'FedEx Account #';
+    else             label.textContent = 'Account #';
+  }
+  if (input){
+    if (isUPS)       input.placeholder = 'Enter UPS account number';
+    else if (isFedEx) input.placeholder = 'Enter FedEx account number';
+    else             input.placeholder = 'Enter account number';
+  }
+
+  // --- Auto-fill for ConnectUS-billed methods (prefix match) ---
+  // Matches both the base option and the "... and Charge Cust" variants.
+  const startsWith = (s, prefix) => s.startsWith(prefix.toLowerCase());
+  const isConnectUsUPS   = startsWith(lower, 'bill to connectus ups account');
+  const isConnectUsFedEx = startsWith(lower, 'bill to connectus fedex account');
+
+  // Respect manual edits: only overwrite if empty OR previously auto-filled
+  const wasAuto = input?.dataset?.autofill === 'true';
+  const isEmpty = !input?.value?.trim();
+
+  if (needsAcct) {
+    if (isConnectUsUPS && (isEmpty || wasAuto)) {
+      input.value = CONNECTUS_UPS_ACCT;
+      input.dataset.autofill = 'true';
+    } else if (isConnectUsFedEx && (isEmpty || wasAuto)) {
+      input.value = CONNECTUS_FEDEX_ACCT;
+      input.dataset.autofill = 'true';
+    } else if (!isConnectUsUPS && !isConnectUsFedEx && wasAuto) {
+      // Switching away from ConnectUS-billed: clear previous auto-fill
+      input.value = '';
+      input.dataset.autofill = 'false';
+    }
+  } else if (wasAuto) {
+    // Hide path: clear auto-filled value to avoid stale data
+    input.value = '';
+    input.dataset.autofill = 'false';
+  }
+}
+
+
+// ===== Ship Method catalog (from your screenshots) =====
+const SHIP_METHOD_OPTIONS = [
+  '3PL KOP',
+  'Amazon Fulfillment',
+  'AmazonJP-FreeEcon',
+  'AmazonJP-NextDay',
+  'AmazonJP-SecondDay',
+  'CUSTOMER PICKING UP AT WAREHOUSE',
+  'Customer Provided Label or TRUCK/LTL (SEE ROUTING GUIDE) - RTG',
+  'EbayJP',
+  'FedEx 2 Day - FED2',
+  'FedEx Express Saver (Three Day) - FEES',
+  'FedEx First Overnight 8:30AM - FED0',
+  'FedEx Ground Delivery - RPSC',
+  'FedEx Ground Home Delivery - RPHD',
+  'FedEx International Economy - FIES',
+  'FedEx International Priority - FIPS',
+  'FedEx OneRate 2-day',
+  'FedEx Priority Overnight - FED1',
+  'FedEx Priority Overnight P1 Saturday - FEDS',
+  'FreeEconomy Econ US Dom',
+  'N/A',
+  'NextDay Next US D2D Dom',
+  'SecondDay Second US D2D Dom',
+  'Standard Std US D2D Dom',
+  'UPS 2nd Day Air A.M. - UPA2',
+  'UPS 2nd Day Air - UPA2',
+  'UPS 3 Day (Commercial) - UPS3',
+  'UPS Canada Standard - UPCG',
+  'UPS Ground (Commercial) - UPSC',
+  'UPS Ground (Residential) - UPSR',
+  'UPS Next Day Air - UPS1',
+  'UPS Next Day Air Early A.M. - UPSE',
+  'UPS Next Day Air Saver - UPSA',
+  'USPS 1st Class Large Envelope (Machine Processable) - PP1E',
+  'USPS First-class Mail - PP1',
+  'USPS Priority Express Mail (1-Day) - PPA',
+  'USPS Priority Mail (3-Day) - PPPR',
+  'USPSParcel'
+];
+
+ // ===== Insurance: auto "Decline of Protection" line =====
+const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
+const DECLINE_DESC = 'Customer has declined device protection/insurance';
+const DECLINE_PRICE = '0.00';
+
+// Try to get a field by data-key, else fallback by column index
+function _getCellInput(tr, key, fallbackColIdx){
+  let el = tr.querySelector(`[data-key="${key}"]`);
+  if (el) return el;
+  if (typeof fallbackColIdx === 'number'){
+    const td = tr.querySelectorAll('td')[fallbackColIdx];
+    if (td) el = td.querySelector('input,textarea,select');
+  }
+  return el || null;
+}
+
+function findDeclineRow(){
+  const body = document.getElementById('itemsBody');
+  if (!body) return null;
+  const rows = [...body.querySelectorAll('tr')];
+  return rows.find(tr => {
+    const skuEl = _getCellInput(tr, 'sku', 3);
+    const sku = (skuEl?.value || '').trim();
+    return sku === DECLINE_SKU || tr.dataset.decline === 'true';
+  }) || null;
+}
+
+function ensureItemsTableVisible(){
+  // If there are no rows, add one so we can insert the decline line
+  const body = document.getElementById('itemsBody');
+  if (!body) return null;
+  if (!body.querySelector('tr') && typeof window.addRow === 'function'){
+    addRow();
+  }
+  // Prefer a blank row; otherwise, reuse the first row
+  let target = [...body.querySelectorAll('tr')].find(tr => {
+    const skuEl = _getCellInput(tr, 'sku', 3);
+    const priceEl = _getCellInput(tr, 'price', 11) || _getCellInput(tr, 'sell', 11);
+    const hasAny = [...tr.querySelectorAll('input,select,textarea')].some(i => (i.value||'').trim());
+    return !hasAny || (!(skuEl?.value||'').trim() && !(priceEl?.value||'').trim());
+  });
+  if (!target){
+    if (typeof window.addRow === 'function') addRow();
+    target = [...body.querySelectorAll('tr')].slice(-1)[0] || null;
+  }
+  return target;
+}
+
+function upsertDeclineInsuranceLine(){
+  let tr = findDeclineRow();
+  if (!tr){
+    tr = ensureItemsTableVisible();
+    if (!tr) return; // nothing we can do
+  }
+  // Fill fields
+  const descEl  = _getCellInput(tr, 'desc', 0);
+  const skuEl   = _getCellInput(tr, 'sku', 3);
+  const priceEl = _getCellInput(tr, 'price', 11) || _getCellInput(tr, 'sell', 11);
+  if (descEl)  descEl.value  = DECLINE_DESC;
+  if (skuEl)   skuEl.value   = DECLINE_SKU;
+  if (priceEl) priceEl.value = DECLINE_PRICE;
+
+  // Make it identifiable so we can remove it later if plan changes
+  tr.dataset.decline = 'true';
+}
+
+function removeDeclineInsuranceLine(){
+  const tr = findDeclineRow();
+  if (!tr) return;
+  // If the decline row is the only content on that line, clear it; else, delete the row
+  const inputs = [...tr.querySelectorAll('input,select,textarea')];
+  inputs.forEach(i => { i.value = ''; });
+  delete tr.dataset.decline;
+  // Optionally, you could fully remove the row:
+  // tr.parentElement?.removeChild(tr);
+}
+
+function onInsurancePlanChange(){
+  const val = (document.getElementById('insPlan')?.value || '').trim().toLowerCase();
+  if (val === 'none'){
+    upsertDeclineInsuranceLine();
+  } else {
+    removeDeclineInsuranceLine();
+  }
+}
+ 
+function populateShipMethod(){
+  const sel = document.getElementById('shipMethod');
+  if (!sel) return;
+  sel.innerHTML = '';
+  const ph = document.createElement('option');
+  ph.value = ''; ph.textContent = 'Select Ship Method';
+  sel.appendChild(ph);
+  SHIP_METHOD_OPTIONS.forEach(txt => {
+    const o = document.createElement('option');
+    o.textContent = txt;
+    sel.appendChild(o);
+  });
+}
+function initMainTabs(){
+  const tabs = document.querySelectorAll('.mtab');
+  const panels = document.querySelectorAll('[data-mainpanel]');
+  if (!tabs.length || !panels.length) return;
+
+  function activate(name){
+    // buttons
+    tabs.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.main === name);
+    });
+    // panels
+    panels.forEach(p => {
+      p.classList.toggle('active', p.getAttribute('data-mainpanel') === name);
+    });
+  }
+
+  tabs.forEach(btn => {
+    btn.addEventListener('click', () => activate(btn.dataset.main));
+  });
+
+  // keep current selection (uses the button with .active, defaults to "reps")
+  const current = document.querySelector('.mtab.active')?.dataset?.main || 'reps';
+  activate(current);
+}
+
+
+
+/* ===== Wire up events on load ===== */
+window.addEventListener('DOMContentLoaded', () => {
+  const pm = document.getElementById('payMethod');
+  if (pm) { pm.addEventListener('change', updateBoboUI); updateBoboUI(); }
+
+  const spm = document.getElementById('shipPayMethod');
+  if (spm) spm.addEventListener('change', updateThirdPartyUI);
+  updateThirdPartyUI();
+    // If user types in the account field, stop future auto-overwrites
+  const tpInput = document.getElementById('thirdPartyAcct');
+  if (tpInput) {
+    tpInput.addEventListener('input', () => { tpInput.dataset.autofill = 'false'; });
+  }
+
+  // Populate the new Ship Method list
+  populateShipMethod();
+
+  // Enable main tabs (Sales Reps ↔ Intake)
+  initMainTabs();
+  const insSel = document.getElementById('insPlan');
+if (insSel){
+  insSel.addEventListener('change', onInsurancePlanChange);
+  // Initialize on load to reflect current selection:
+  onInsurancePlanChange();
+}
+
+});
+  
+
+
+
 
   
 // ---- Build Header CSV: DocNo,Customer,CustomerPO,TranType,Ship To,Is New
@@ -905,22 +1298,75 @@ function csvEscape(v) {
 // - TranType: Quote=13, Sales Order=7 (getDocTypeCode should map this)
 // - DocNo shared with Lines via getOrSeedDocNo()
 function buildHeaderCSV() {
-  const headers = ['DocNo','Customer','CustomerPO','TranType','Ship To','Is New','Customer Requested Ship Date'];
+  // Columns (now includes Ship Method and Internal Notes)
+  const headers = [
+    'DocNo','Customer','CustomerPO','TranType','Ship To','Is New','Customer Requested Ship Date',
+    'Terms','Payment Method','BOBO Acct #','Ship Method','Freight Type','Shipping Payment Method','FedEx Account #','UPS Account #',
+    'Allow Ship Partial','Blind Ship','Primary Sales Rep','Secondary Sales Rep','Carrier Rep','Carrier Rep Email','Carrier Rep Phone',
+    'Company Name / Care Of','Contact Name','Contact Phone','Email','Street Address','Floor / Suite','City','State','Zip Code',
+    'Internal Notes'
+  ];
 
-  // read existing date input (Shipping tab)
-  const reqDate = (document.getElementById('reqShipDate')?.value || '').trim();
+  const get = (id)=> (document.getElementById(id)?.value || '').trim();
+  const checked = (id)=> !!document.getElementById(id)?.checked;
+
+  const docNo   = getOrSeedDocNo();
+  const cust    = getCustomerName();
+  const po      = getCustomerPO();
+  const tran    = getDocTypeCode();
+
+  const reqDate    = get('reqShipDate');
+  const terms      = get('payTerms');
+  const payMeth    = get('payMethod');
+  const bobo       = (String(payMeth).toLowerCase() === 'bobo verizon') ? get('boboAcct') : '';
+  const shipMethod = getSelText('shipMethod');
+  const otShip     = getSelText('shipPayMethod'); // exact OT string
+
+  // Third-party account routing (UPS/FedEx keyword)
+  let fedexAcct = '', upsAcct = '';
+  const acct = get('thirdPartyAcct');
+  const selLower = (otShip || '').toLowerCase();
+  if (selLower.includes('ups'))   upsAcct = acct;
+  if (selLower.includes('fedex')) fedexAcct = acct;
+
+  const freight      = get('freightType');
+  const allowPartial = checked('allowPartial') ? 'TRUE' : 'FALSE';
+  const blindShip    = checked('blindShip') ? 'TRUE' : 'FALSE';
+
+  const rep1      = getSelText('rep1');
+  const rep2      = getSelText('rep2');
+  const crep      = get('carrierRepName');
+  const crepEmail = get('carrierRepEmail');
+  const crepPhone = get('carrierRepPhone');
+
+  // Ship-to
+  const shipCompany = get('shipCompany');
+  const shipContact = get('shipContact');
+  const shipPhone   = get('shipPhone');
+  const shipEmail   = get('shipEmail');
+  const shipAddr1   = get('shipStreet');
+  const shipAddr2   = get('shipSuite');
+  const shipCity    = get('shipCity');
+  const shipState   = get('shipState');
+  const shipZip     = get('shipZip');
+
+  // Internal Notes
+  const notesVal = (document.getElementById('notes')?.value || '').trim();
 
   const row = [
-    getOrSeedDocNo(),   // DocNo
-    getCustomerName(),  // Customer
-    getCustomerPO(),    // CustomerPO
-    getDocTypeCode(),   // TranType
-    'Primary',          // Ship To
-    'TRUE',             // Is New
-    reqDate             // Customer Requested Ship Date
+    docNo, cust, po, tran,
+    'Primary', 'TRUE', reqDate,
+    terms, payMeth, bobo, shipMethod, freight, otShip, fedexAcct, upsAcct,
+    allowPartial, blindShip, rep1, rep2, crep, crepEmail, crepPhone,
+    shipCompany, shipContact, shipPhone, shipEmail, shipAddr1, shipAddr2, shipCity, shipState, shipZip,
+    notesVal
   ];
+
   return headers.join(',') + '\n' + row.map(csvEscape).join(',');
 }
+
+
+
 
 
 
@@ -932,43 +1378,71 @@ function buildLineCSV() {
   const customer = (typeof getCustomerName === 'function' ? getCustomerName() : '').trim();
   const body     = document.getElementById('itemsBody');
 
-  // small helper for row fields
+  // Keep your existing helper
   const getField = (tr, key, sel = 'input') =>
     (tr.querySelector(`td ${sel}[data-key="${key}"]`)?.value || '').toString().trim();
+
+  // Column indexes (from the table header)
+  if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
+  if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
+  const COL_PAYOUT = (typeof window.COL_PAYOUT !== 'undefined') ? window.COL_PAYOUT : 8;  // "Act Payout $" (9th col)
+  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Sell Price" (12th col)
+
+  // Robust getters for payout & price
+  function getPayout(tr) {
+    // Try data-key first
+    let v = getField(tr, 'payout');
+    if (v) return v;
+    // Fallback by column index
+    const el = tr?.querySelectorAll('td')[COL_PAYOUT]?.querySelector('input,textarea,select');
+    return (el?.value || '').toString().trim();
+  }
+
+  function getSellPrice(tr) {
+    // Preferred: data-key="price"
+    let v = getField(tr, 'price');
+    if (v) return v;
+    // Fallback: data-key="sell"
+    v = getField(tr, 'sell');
+    if (v) return v;
+    // Fallback: by column index (Sell Price column)
+    const el = tr?.querySelectorAll('td')[COL_SELL]?.querySelector('input,textarea,select');
+    return (el?.value || '').toString().trim();
+  }
 
   const rows = [];
   if (body) {
     [...body.querySelectorAll('tr')].forEach(tr => {
       const sku      = getField(tr, 'sku');                    // Item
       const qty      = getField(tr, 'qty');                    // Quantity
-      const instr    = getField(tr, 'lineInstr');              // Line Instructions
-      const price    = getField(tr, 'price');                  // Price (unit)
-      const qcost    = getField(tr, 'cost');                   // Quoted Cost (unit)
-      let   itemType = getField(tr, 'itemType', 'select');     // ItemType from <select> if present
-      if (!itemType) itemType = 'Part';                        // default if omitted
+      const instr    = getField(tr, 'lineInstr');              // Line Instruction
+      let   itemType = getField(tr, 'itemType', 'select');     // ItemType
+      if (!itemType) itemType = 'Part';
+      if (!sku) return; // skip incomplete rows
 
-      // Skip incomplete rows (prevents importer errors)
-      if (!sku) return;
+      const price     = getSellPrice(tr);                      // 👈 robust Sell Price → Price
+      const actPayout = getPayout(tr);                         // 👈 Act Payout $
 
       rows.push([
-  '',                  // id
-  docNo,               // No.
-  customer,            // Customer
-  sku,                 // Item
-  itemType || 'Part',  // ItemType
-  instr,               // Line Instruction
-  qty,                 // Quantity
-  price,               // Price
-  tranType             // Tran Type
-]);
-
+        '',                  // id
+        docNo,               // No.
+        customer,            // Customer
+        sku,                 // Item
+        itemType || 'Part',  // ItemType
+        instr,               // Line Instruction
+        qty,                 // Quantity
+        price,               // Price (Sell Price)
+        actPayout,           // 👈 Act Payout $
+        tranType             // Tran Type
+      ]);
     });
   }
 
-  const headers = ['id','No.','Customer','Item','ItemType','Line Instruction','Quantity','Price','Quoted Cost','Tran Type'];
+  const headers = ['id','No.','Customer','Item','ItemType','Line Instruction','Quantity','Price','Act Payout $','Tran Type']; // 👈 NEW header
   const lines = rows.map(r => r.map(csvEscape).join(',')).join('\n');
   return headers.join(',') + '\n' + lines;
 }
+
 
 
 
@@ -1110,6 +1584,10 @@ const TAX_RATE = 0.08;
 const RATE_PER_MIN = 0.80;
 const SSP_INVITE_SUBJECT = "Set up your ConnectUS Self-Service Portal (SSP)";
 
+// ConnectUS carrier accounts for auto-fill
+const CONNECTUS_UPS_ACCT   = '5116V0';
+const CONNECTUS_FEDEX_ACCT = '407700201';
+
 async function api(path, { method='GET', headers={}, body } = {}){
   const res = await fetch(`${API_BASE}${path}`, {
     method,
@@ -1201,6 +1679,7 @@ const SIM_HANDLING_OPTIONS = [
   'Tape SIM Card to Box',
   'Embedded SIM',
   'No Sim Card',
+  'N/A'
 ];
 
 const PAIRING_OPTIONS = [
@@ -1708,14 +2187,41 @@ function populateInsurancePlanDropdown(){
   const sel = q$('#insPlan'); if (!sel) return;
   const keep = sel.value;
   sel.innerHTML = '';
+
+  // Always include "None"
   sel.appendChild(ensureEl('option', {value:INS_PLAN_NONE_VAL}, 'None'));
-  // sel.appendChild(ensureEl('option', {value:'__OTHER__'}, 'Other (manual)'));
-  INS_CATALOG.forEach(it=>{
-    const label = `${it.desc} (${it.sku})`;
-    sel.appendChild(ensureEl('option', {value:it.sku, 'data-sku':it.sku, 'data-desc':it.desc}, label));
-  });
-  if (keep) sel.value = keep;
+
+  // Prefer real AKKO from catalog if available; else add a safe fallback
+  let akko = null;
+  if (Array.isArray(INS_CATALOG) && INS_CATALOG.length){
+    akko = INS_CATALOG.find(it => {
+      const d = (it.desc || '').toLowerCase();
+      const s = (it.sku  || '').toLowerCase();
+      return d.includes('akko') || s.includes('akko');
+    }) || null;
+  }
+
+  if (akko){
+    const label = `${akko.desc} (${akko.sku})`;
+    sel.appendChild(ensureEl('option', {
+      value: akko.sku,
+      'data-sku': akko.sku,
+      'data-desc': akko.desc
+    }, label));
+  } else {
+    // Fallback if CSV is missing or fetch failed
+    sel.appendChild(ensureEl('option', {
+      value: 'AKKO',
+      'data-sku': 'AKKO',
+      'data-desc': 'AKKO Insurance'
+    }, 'AKKO'));
+  }
+
+  // Keep prior selection if still valid; otherwise default to None
+  sel.value = (keep && [...sel.options].some(o => o.value === keep)) ? keep : INS_PLAN_NONE_VAL;
 }
+
+
 
 (async function initInsuranceCatalog(){
   // ⛳ Update this path to where you host the CSV publicly in your app:
@@ -1779,6 +2285,28 @@ function ensureInsuranceLineForRow(baseTr){
   if (!baseTr || !planSel) return;
 
   const planVal = planSel.value || INS_PLAN_NONE_VAL;
+    // When Insurance = None -> ensure a $0 "decline" line on the current row
+  const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
+  const DECLINE_DESC = 'Customer has declined device protection/insurance';
+
+  const skuEl   = baseTr.querySelector('[data-key="sku"]')   || baseTr.querySelectorAll('td')[3]?.querySelector('input,textarea,select');
+  const descEl  = baseTr.querySelector('[data-key="desc"]')  || baseTr.querySelectorAll('td')[0]?.querySelector('input,textarea,select');
+  const priceEl = baseTr.querySelector('[data-key="price"]') || baseTr.querySelector('[data-key="sell"]') || baseTr.querySelectorAll('td')[11]?.querySelector('input,textarea,select');
+
+  if (String(planVal) === String(INS_PLAN_NONE_VAL)) {
+    if (descEl)  descEl.value  = DECLINE_DESC;
+    if (skuEl)   skuEl.value   = DECLINE_SKU;
+    if (priceEl) priceEl.value = '0.00';
+    baseTr.dataset.decline = 'true';
+  } else {
+    // If switching away from None and this row was a decline row, clear it
+    if (baseTr.dataset.decline === 'true') {
+      if (descEl)  descEl.value  = '';
+      if (skuEl)   skuEl.value   = '';
+      if (priceEl) priceEl.value = '';
+      delete baseTr.dataset.decline;
+    }
+  }
 
   let sku = '', desc = '';
   if (planVal === INS_PLAN_NONE_VAL) {
@@ -2107,6 +2635,16 @@ Orlando
  `
 };
 
+/* ===== Payment: BOBO Verizon toggle ===== */
+function updateBoboUI(){
+  const sel = document.getElementById('payMethod');
+  const block = document.getElementById('boboBlock');
+  if(!sel || !block) return;
+  const val = (sel.value || '').toLowerCase();
+  block.style.display = (val === 'bobo verizon') ? '' : 'none';
+}
+
+  
 /* ===== Shipping: 3rd party toggle ===== */
 function updateThirdPartyAccountUI(){
   const pay = document.getElementById('shipPay')?.value || '';
@@ -2128,6 +2666,8 @@ function updateThirdPartyAccountUI(){
 
 // Bind events once DOM is ready
 window.addEventListener('DOMContentLoaded', () => {
+  const payMethodSel = document.getElementById('payMethod');
+  if (payMethodSel){ payMethodSel.addEventListener('change', updateBoboUI); updateBoboUI(); }
   const paySel = document.getElementById('shipPay');
   const methodSel = document.getElementById('shipMethod');
   if(paySel)   paySel.addEventListener('change', updateThirdPartyAccountUI);
@@ -2275,7 +2815,7 @@ function setWizardDone(isDone){
 // After renderRepList() in init()
 populateWizardRepSelect();
 
-
+ 
 
 /* ===== Wizard: Step 1 (Sales Rep) ===== */
 function populateWizardRepSelect(){
@@ -3103,6 +3643,8 @@ function getItems(){
     return obj;
   }).filter(o => Object.values(o).some(v => v));
 }
+
+
   
 function getCurrentRowQty(){
   const lastRow=document.querySelector('#itemsBody tr:last-child');
@@ -3148,18 +3690,11 @@ document.getElementById('itemsBody').addEventListener('input', e=>{
   if(e.target?.dataset?.key==='qty') recalcServices();
 });
 function tierToMinutes(){
-  const v = document.getElementById('svcTier').value;          // '' means N/A
-  if (v === '') {
-    document.getElementById('svcMinutes').value = '';
-    document.getElementById('svcSKU').value = '';
-    return;
-  }
-  const tier = parseInt(v, 10);
+  const tier=parseInt(document.getElementById('svcTier').value||'0',10);
   const minutes = tier===0 ? 5 : tier*15;
   document.getElementById('svcMinutes').value = minutes;
   document.getElementById('svcSKU').value = `PROSERV-TIER-${tier}`;
 }
-
 function recalcServices(){
   const enabled = document.getElementById('svcEnabled').checked;
   const minutes = parseFloat(document.getElementById('svcMinutes').value||'0');
@@ -3218,6 +3753,12 @@ function refreshTotals(){
 /* ===== Summary / Validation ===== */
 function val(id){return (document.getElementById(id)?.value||'').trim()}
 function bool(id){return document.getElementById(id)?.checked}
+function getSelText(id){
+  const el = document.getElementById(id);
+  if(!el) return '';
+  const i = el.selectedIndex;
+  return i>=0 ? (el.options[i].text||'').trim() : '';
+}
 function buildSummary(){
   const docType=[...document.querySelectorAll('input[name="doctype"]')].find(x=>x.checked)?.value||'QUOTE';
   const lines=getItems();
