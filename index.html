@@ -659,6 +659,7 @@ City, State ZIP"></textarea>
       <label class="chip"><input type="checkbox" id="svcEnabled"> Include Services for this item</label>
       <label style="margin-top:10px">Tier</label>
       <select id="svcTier">
+        <option value="">N/A</option>
         <option value="0">Tier 0 (under ~5 min)</option>
         <option value="1">Tier 1 (≤ 15 min)</option>
         <option value="2">Tier 2 (≤ 30 min)</option>
@@ -954,6 +955,7 @@ function buildLineCSV() {
       const qty      = getField(tr, 'qty');                    // Quantity
       const instr    = getField(tr, 'lineInstr');              // Line Instructions
       const price    = getField(tr, 'price');                  // Price (unit)
+      const qcost    = getField(tr, 'cost');                   // Quoted Cost (unit)
       let   itemType = getField(tr, 'itemType', 'select');     // ItemType from <select> if present
       if (!itemType) itemType = 'Part';                        // default if omitted
 
@@ -3158,11 +3160,18 @@ document.getElementById('itemsBody').addEventListener('input', e=>{
   if(e.target?.dataset?.key==='qty') recalcServices();
 });
 function tierToMinutes(){
-  const tier=parseInt(document.getElementById('svcTier').value||'0',10);
+  const v = document.getElementById('svcTier').value;          // '' means N/A
+  if (v === '') {
+    document.getElementById('svcMinutes').value = '';
+    document.getElementById('svcSKU').value = '';
+    return;
+  }
+  const tier = parseInt(v, 10);
   const minutes = tier===0 ? 5 : tier*15;
   document.getElementById('svcMinutes').value = minutes;
   document.getElementById('svcSKU').value = `PROSERV-TIER-${tier}`;
 }
+
 function recalcServices(){
   const enabled = document.getElementById('svcEnabled').checked;
   const minutes = parseFloat(document.getElementById('svcMinutes').value||'0');
