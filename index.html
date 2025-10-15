@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>ConnectUS — Sales Reps • Intake</title>
- 
+
 <style>
   /* ===== White + Green theme ===== */
   .error { border-color: var(--danger) !important; box-shadow: 0 0 0 3px #dc262633 !important; }
@@ -690,8 +690,7 @@ City, State ZIP"></textarea>
       <label class="chip"><input type="checkbox" id="svcEnabled"> Include Services for this item</label>
       <label style="margin-top:10px">Tier</label>
       <select id="svcTier">
-       <option value="0">N/A</option> 
-       <option value="0">Tier 0 (under ~5 min)</option>
+        <option value="0">Tier 0 (under ~5 min)</option>
         <option value="1">Tier 1 (≤ 15 min)</option>
         <option value="2">Tier 2 (≤ 30 min)</option>
         <option value="3">Tier 3 (≤ 45 min)</option>
@@ -709,7 +708,7 @@ City, State ZIP"></textarea>
       <input id="svcCostTotal" type="number" step="0.01" readonly />
     </section>
   </div>
-  <div class="tiny">N/A defaults to 0 minutes. Tiers 1–4 auto-set minutes = tier × 15.</div>
+  <div class="tiny">Tier 0 defaults to 5 minutes. Tiers 1–4 auto-set minutes = tier × 15.</div>
 </section>
 
         <section class="full">
@@ -1387,8 +1386,7 @@ function buildLineCSV() {
   if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
   if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
   const COL_PAYOUT = (typeof window.COL_PAYOUT !== 'undefined') ? window.COL_PAYOUT : 8;  // "Act Payout $" (9th col)
-  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11;  // Sell Price
-  const COL_QC     = (typeof window.COL_QC     !== 'undefined') ? window.COL_QC     : 15;  // Quoted Cost
+  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Sell Price" (12th col)
 
   // Robust getters for payout & price
   function getPayout(tr) {
@@ -1411,15 +1409,7 @@ function buildLineCSV() {
     const el = tr?.querySelectorAll('td')[COL_SELL]?.querySelector('input,textarea,select');
     return (el?.value || '').toString().trim();
   }
-  // ✅ define the Quoted Cost getter
-  function getQuotedCost(tr) {
-    let v = getField(tr, 'quotedCost');
-    if (v) return v;
-    v = getField(tr, 'cost'); // fallback key
-    if (v) return v;
-    const el = tr?.querySelectorAll('td')[COL_QC]?.querySelector('input,textarea,select');
-    return (el?.value || '').toString().trim();
-  }
+
   const rows = [];
   if (body) {
     [...body.querySelectorAll('tr')].forEach(tr => {
@@ -1431,7 +1421,6 @@ function buildLineCSV() {
       if (!sku) return; // skip incomplete rows
 
       const price     = getSellPrice(tr);                      // 👈 robust Sell Price → Price
-      const qcost     = getQuotedCost(tr);                     // ✅ actual Quoted Cost value
       const actPayout = getPayout(tr);                         // 👈 Act Payout $
 
       rows.push([
@@ -1443,14 +1432,13 @@ function buildLineCSV() {
         instr,               // Line Instruction
         qty,                 // Quantity
         price,               // Price (Sell Price)
-        qcost,               // ✅ Quoted Cost
         actPayout,           // 👈 Act Payout $
         tranType             // Tran Type
       ]);
     });
   }
 
-  const headers = ['id','No.','Customer','Item','ItemType','Line Instruction','Quantity','Price','Quoted Cost','Act Payout $','Tran Type']; // 👈 NEW header
+  const headers = ['id','No.','Customer','Item','ItemType','Line Instruction','Quantity','Price','Act Payout $','Tran Type']; // 👈 NEW header
   const lines = rows.map(r => r.map(csvEscape).join(',')).join('\n');
   return headers.join(',') + '\n' + lines;
 }
@@ -1701,7 +1689,6 @@ const PAIRING_OPTIONS = [
   'SIM PAIR w/ STATIC IP & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE',
   'CUSTOM CONFIG DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE / SOW REQUIRED',
   'INTERNAL CUC SIM PAIR & ACTIVATION',
-  'N/A'
 ];
 
 
@@ -1731,14 +1718,10 @@ const PAIRING_SKU_MAP = {
   },
   'iNTERNAL cuc sIM pAIR & ACTIVATION': {
     sku: 'INT DEVICE ACTIVATE/SIM PAIR',
-    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION',
-   
+    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION'
   }
   // Add more mappings here as you add more pairing options/SKUs.
-  'N/A': {
-    sku: '',
-    desc: ''
-  }
+  
 };
 
   // A lowercase set of all pairing SKUs so we can identify & remove them
