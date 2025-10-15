@@ -1299,6 +1299,15 @@ if (insSel){
   // Initialize on load to reflect current selection:
   onInsurancePlanChange();
 }
+    // Reveal wizard Step 5 once Step 4 (Scope) has a selection
+  const scopeRadios = document.querySelectorAll('input[name="wizScope"]');
+  if (scopeRadios && scopeRadios.length){
+    scopeRadios.forEach(r => r.addEventListener('change', () => {
+      const s5 = document.getElementById('wizStep4');
+      if (s5) s5.style.display = '';
+    }));
+  }
+
 
 });
   
@@ -1368,6 +1377,8 @@ function buildHeaderCSV() {
 
   // Internal Notes
   const notesVal = (document.getElementById('notes')?.value || '').trim();
+  const oiType = getSelText('oiType');
+
 
   const row = [
     docNo, cust, po, tran,
@@ -1375,7 +1386,7 @@ function buildHeaderCSV() {
     terms, payMeth, bobo, shipMethod, freight, otShip, fedexAcct, upsAcct,
     allowPartial, blindShip, rep1, rep2, crep, crepEmail, crepPhone,
     shipCompany, shipContact, shipPhone, shipEmail, shipAddr1, shipAddr2, shipCity, shipState, shipZip,
-    notesVal
+    notesVal, oiType
   ];
 
   return headers.join(',') + '\n' + row.map(csvEscape).join(',');
