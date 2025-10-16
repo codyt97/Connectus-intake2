@@ -1110,13 +1110,8 @@ function updateThirdPartyUI(){
 // ===== Ship Method catalog (from your screenshots) =====
 const SHIP_METHOD_OPTIONS = [
   '3PL KOP',
-  'Amazon Fulfillment',
-  'AmazonJP-FreeEcon',
-  'AmazonJP-NextDay',
-  'AmazonJP-SecondDay',
   'CUSTOMER PICKING UP AT WAREHOUSE',
   'Customer Provided Label or TRUCK/LTL (SEE ROUTING GUIDE) - RTG',
-  'EbayJP',
   'FedEx 2 Day - FED2',
   'FedEx Express Saver (Three Day) - FEES',
   'FedEx First Overnight 8:30AM - FED0',
@@ -1357,9 +1352,6 @@ function buildHeaderCSV() {
   const freight      = get('freightType');
   const allowPartial = checked('allowPartial') ? 'TRUE' : 'FALSE';
   const blindShip    = checked('blindShip') ? 'TRUE' : 'FALSE';
-    // Order Instruction (Step 5)
-  const oiType = getSelText('oiType');
-
 
   const rep1      = getSelText('rep1');
   const rep2      = getSelText('rep2');
