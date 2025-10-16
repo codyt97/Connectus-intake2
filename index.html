@@ -886,6 +886,7 @@ function openGmailWithCSV() {
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
   const csv     = document.getElementById('csvPreview')?.value || buildCSV();
+  const oiText  = getSelText('oiType') || 'Standard Order';
 
   const header = `Hello Order Management,\n\nPlease find the intake details below in CSV format.\n\n`;
   const footer = `\n\n— ConnectUS Intake`;
@@ -1381,7 +1382,7 @@ function buildHeaderCSV() {
     terms, payMeth, bobo, shipMethod, freight, otShip, fedexAcct, upsAcct,
     allowPartial, blindShip, rep1, rep2, crep, crepEmail, crepPhone,
     shipCompany, shipContact, shipPhone, shipEmail, shipAddr1, shipAddr2, shipCity, shipState, shipZip,
-    notesVal, oiType
+    notesVal, getSelText('oiType')
   ];
 
   return headers.join(',') + '\n' + row.map(csvEscape).join(',');
@@ -4067,9 +4068,10 @@ function composeOMEmailNoCSV(){
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — Summary';
 
+  const oiText  = getSelText('oiType') || 'Standard Order'
   const summaryText = (document.getElementById('summary')?.textContent || '').trim() || '(no summary available)';
   const company = (document.getElementById('billCompany')?.value || '').trim();
-
+   
   const header  = `Hello Order Management,\n\n${company ? `Company: ${company}\n` : ''}Below is the intake summary:\n\n`;
   const footer  = `\n\n— ConnectUS Intake`;
   const bodyText = header + summaryText + footer;
