@@ -1342,7 +1342,7 @@ if (insSel){
 // - TranType: Quote=13, Sales Order=7 (getDocTypeCode should map this)
 // - DocNo shared with Lines via getOrSeedDocNo()
 function buildHeaderCSV() {
-  // Columns (now includes Ship Method and Internal Notes)
+  // Columns (now includes Ship Method, Internal Notes, and Order Instruction Type)
   const headers = [
     'DocNo','Customer','CustomerPO','TranType','Ship To','Is New','Customer Requested Ship Date',
     'Terms','Payment Method','BOBO Acct #','Ship Method','Freight Type','Shipping Payment Method','FedEx Account #','UPS Account #',
@@ -1350,6 +1350,7 @@ function buildHeaderCSV() {
     'Company Name / Care Of','Contact Name','Contact Phone','Email','Street Address','Floor / Suite','City','State','Zip Code',
     'Internal Notes','Order Instruction Type'
   ];
+
 
   const get = (id)=> (document.getElementById(id)?.value || '').trim();
   const checked = (id)=> !!document.getElementById(id)?.checked;
