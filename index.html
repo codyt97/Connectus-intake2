@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>ConnectUS — Sales Reps • Intake</title>
 
-<style> 
+<style>
   /* ===== White + Green theme ===== */
   .error { border-color: var(--danger) !important; box-shadow: 0 0 0 3px #dc262633 !important; }
 .warnbox { background:#fff7ed; border:1px solid #fed7aa; color:#9a3412; padding:10px; border-radius:10px; font-size:12px; margin-top:8px; }
@@ -306,14 +306,13 @@
     <div class="wiz-label">5) Order Instruction</div>
     <div class="wiz-opts" style="min-width:260px">
       <select id="oiType" style="min-width:240px;padding:8px;border:1px solid var(--line);border-radius:10px">
-  <option value="">Select Order Instruction…</option>
-  <option>Standard Order</option>
-  <option>Ship to 3PL</option>
-  <option>CUSTOM-Order and shipping instructions</option>
-  <option>CUSTOM-Order Instructions</option>
-  <option>CUSTOM-Shipping Instruction</option>
-</select>
-
+        <option value="">Select Order Instruction…</option>
+        <option>Standard Order</option>
+        <option>Ship to 3PL</option>
+        <option>CUSTOM-Order and shipping instructions</option>
+        <option>CUSTOM-Order Instructions</option>
+        <option>CUSTOM-Shipping Instruction</option>
+      </select>
     </div>
   </div>
 
@@ -867,14 +866,9 @@ City, State ZIP"></textarea>
   <button class="ok" onclick="copyCSVToClipboard()">Copy CSV</button>
   <button class="ghost" onclick="downloadHeaderCSVFile()">Download Sales Order Header (CSV)</button>
   <button class="ghost" onclick="downloadLineCSVFile()">Download Sales Order Line (CSV)</button>
-
-  <!-- Conditionally shown -->
-  <button id="btnDownloadNewDevice" class="ghost" style="display:none" onclick="downloadNewDeviceCSVFile()">Download New Device Details (CSV)</button>
-  <button id="btnDownloadLicenses"  class="ghost" style="display:none" onclick="downloadLicensesCSVFile()">Download Licenses (CSV)</button>
-
   <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
-</div>
 
+</div>
 
     <div class="tiny" style="margin-top:8px">
       Or use a direct mailto link:
@@ -891,40 +885,15 @@ function openGmailWithCSV() {
 
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
+  const csv     = document.getElementById('csvPreview')?.value || buildCSV();
+  const oiText  = getSelText('oiType') || 'Standard Order';
 
-  // Base CSV in preview (document/sales/shipping/items)
-  const baseCsv = document.getElementById('csvPreview')?.value || buildCSV();
-
-  // Optional sections: only include if they return non-empty CSV
-  const newDeviceCsv = (typeof buildNewDeviceCSV === 'function' ? (buildNewDeviceCSV() || '') : '');
-  const licensesCsv  = (typeof buildLicensesCSV  === 'function' ? (buildLicensesCSV()  || '') : '');
-
-  // Toggle the two download buttons based on presence
-  const btnNew = document.getElementById('btnDownloadNewDevice');
-  if (btnNew) btnNew.style.display = newDeviceCsv ? '' : 'none';
-  const btnLic = document.getElementById('btnDownloadLicenses');
-  if (btnLic) btnLic.style.display = licensesCsv ? '' : 'none';
-
-  // Merge preview text conditionally
-  let merged = baseCsv;
-  if (newDeviceCsv) merged += `\n\nNEW DEVICE DETAILS\n${newDeviceCsv}`;
-  if (licensesCsv)  merged += `\n\nLICENSES\n${licensesCsv}`;
-
-  // Quick summary line with Order Instruction + extras
-  const oiText = getSelText('oiType') || 'Standard Order';
-  const extras = [
-    newDeviceCsv ? 'New Device Details' : null,
-    licensesCsv  ? 'Licenses' : null
-  ].filter(Boolean).join(' & ');
-  const quick = `Quick summary:\n• Order Instruction: ${oiText}${extras ? `\n• Extra sections: ${extras}` : ''}\n\n`;
-
-  const header = `Hello Order Management,\n\n${quick}Please find the intake details below in CSV format.\n\n`;
+  const header = `Hello Order Management,\n\nPlease find the intake details below in CSV format.\n\n`;
   const footer = `\n\n— ConnectUS Intake`;
-  const body   = `${header}${merged}${footer}`;
+  const body   = `${header}${csv}${footer}`;
 
   openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
-
 
 /* ===== Small helpers ===== */
 function isMissingSelectOrEmpty(el){
@@ -1159,14 +1128,21 @@ const SHIP_METHOD_OPTIONS = [
   'NextDay Next US D2D Dom',
   'SecondDay Second US D2D Dom',
   'Standard Std US D2D Dom',
-  'UPS 2nd Day Air A.M.',
-  'UPS 2nd Day Air',
-  'UPS Next Day Air Saver',
-  'UPS Next Day Air',
-  'UPS 3 Day Select',
-  'UPS Ground'
+  'UPS 2nd Day Air A.M. - UPA2',
+  'UPS 2nd Day Air - UPA2',
+  'UPS 3 Day (Commercial) - UPS3',
+  'UPS Canada Standard - UPCG',
+  'UPS Ground (Commercial) - UPSC',
+  'UPS Ground (Residential) - UPSR',
+  'UPS Next Day Air - UPS1',
+  'UPS Next Day Air Early A.M. - UPSE',
+  'UPS Next Day Air Saver - UPSA',
+  'USPS 1st Class Large Envelope (Machine Processable) - PP1E',
+  'USPS First-class Mail - PP1',
+  'USPS Priority Express Mail (1-Day) - PPA',
+  'USPS Priority Mail (3-Day) - PPPR',
+  'USPSParcel'
 ];
-
 
  // ===== Insurance: auto "Decline of Protection" line =====
 const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
@@ -1343,7 +1319,7 @@ if (insSel){
 // - TranType: Quote=13, Sales Order=7 (getDocTypeCode should map this)
 // - DocNo shared with Lines via getOrSeedDocNo()
 function buildHeaderCSV() {
-  // Columns (now includes Ship Method, Internal Notes, and Order Instruction Type)
+  // Columns (now includes Ship Method and Internal Notes)
   const headers = [
     'DocNo','Customer','CustomerPO','TranType','Ship To','Is New','Customer Requested Ship Date',
     'Terms','Payment Method','BOBO Acct #','Ship Method','Freight Type','Shipping Payment Method','FedEx Account #','UPS Account #',
@@ -1351,7 +1327,6 @@ function buildHeaderCSV() {
     'Company Name / Care Of','Contact Name','Contact Phone','Email','Street Address','Floor / Suite','City','State','Zip Code',
     'Internal Notes','Order Instruction Type'
   ];
-
 
   const get = (id)=> (document.getElementById(id)?.value || '').trim();
   const checked = (id)=> !!document.getElementById(id)?.checked;
@@ -1610,21 +1585,6 @@ function downloadLineCSVFile() {
   const name  = `sales-order-lines_${docNo}.csv`;
   downloadBlobCSV(name, csv);
 }
-
-function downloadNewDeviceCSVFile(){
-  const csv = (typeof buildNewDeviceCSV === 'function' ? (buildNewDeviceCSV() || '') : '');
-  if (!csv) { alert('No New Device Details to export.'); return; }
-  const docNo = getOrSeedDocNo?.() || 'NA';
-  downloadBlobCSV(`new-device-details_${docNo}.csv`, csv);
-}
-
-function downloadLicensesCSVFile(){
-  const csv = (typeof buildLicensesCSV === 'function' ? (buildLicensesCSV() || '') : '');
-  if (!csv) { alert('No Licenses to export.'); return; }
-  const docNo = getOrSeedDocNo?.() || 'NA';
-  downloadBlobCSV(`licenses_${docNo}.csv`, csv);
-}
-
 
 
 
@@ -3043,7 +3003,7 @@ function onWizardComplete(scope){
     showMDM(true);
   }
 
-  // Step 5 shows, BUT DO NOT unlock yet
+  // Only reveal Step 5 and update the hint; do NOT unlock tabs yet
   const s5 = document.getElementById('wizStep4');
   if (s5) s5.style.display = '';
   setWizardDone(false);
@@ -3055,12 +3015,33 @@ function onWizardComplete(scope){
 
 
 
-
 /* Wire listeners */
 (function wireWizard(){
-  // existing listeners for steps 1–4 stay as-is …
+  // Step 1 (Rep)
+  const wizRep = document.getElementById('wizRepPick');
+  if(wizRep){
+    wizRep.addEventListener('change', e=>{
+      const v = (e.target.value || '').trim();
+      if(!v) { resetWizardBelow(1); return; }
+      onWizardStepRep(v);
+      // Default: hide MDM until wizard scope = hardware+pro
+     showMDM(false);
 
-  // Step 5 (Order Instruction) — unlock when selected
+    });
+  }
+  // Step 2 (Customer Type)
+  document.querySelectorAll('input[name="wizCustomerType"]').forEach(i=>{
+    i.addEventListener('change', e => onWizardStep1(e.target.value));
+  });
+  // Step 3 (Doc Type)
+  document.querySelectorAll('input[name="wizDocType"]').forEach(i=>{
+    i.addEventListener('change', e => onWizardStep2(e.target.value));
+  });
+  // Step 4 (Scope)
+  document.querySelectorAll('input[name="wizScope"]').forEach(i=>{
+    i.addEventListener('change', e => onWizardComplete(e.target.value));
+  });
+    // Step 5 (Order Instruction) — unlock when selected
   const oi = document.getElementById('oiType');
   if (oi){
     oi.addEventListener('change', e => {
@@ -3068,18 +3049,16 @@ function onWizardComplete(scope){
       if (!picked) {
         setWizardDone(false);
         showIntakeWork(false);
-        document.getElementById('wizHint').textContent =
-          'Pick Order Instruction (Step 5) to unlock the intake tabs.';
+        document.getElementById('wizHint').textContent = 'Pick Order Instruction (Step 5) to unlock the intake tabs.';
         return;
       }
       setWizardDone(true);
       showIntakeWork(true);
-      document.getElementById('wizHint').textContent =
-        'Wizard complete — tabs unlocked.';
+      document.getElementById('wizHint').textContent = 'Wizard complete — tabs unlocked.';
     });
   }
-})();
 
+})();
 
 
 
@@ -4111,43 +4090,9 @@ function composeOMEmailNoCSV(){
   const summaryText = (document.getElementById('summary')?.textContent || '').trim() || '(no summary available)';
   const company = (document.getElementById('billCompany')?.value || '').trim();
    
-  // Base sections (Document + Sales/Partner + Shipping + Items already inside buildCSV())
-const baseCsv = document.getElementById('csvPreview')?.value || buildCSV();
-
-// Build optional sections (return ""/null if none)
-const newDeviceCsv = (typeof buildNewDeviceCSV === 'function' ? (buildNewDeviceCSV() || '') : '');
-const licensesCsv  = (typeof buildLicensesCSV  === 'function' ? (buildLicensesCSV()  || '') : '');
-
-// Toggle buttons based on availability
-const btnNew = document.getElementById('btnDownloadNewDevice');
-if (btnNew) btnNew.style.display = newDeviceCsv ? '' : 'none';
-
-const btnLic = document.getElementById('btnDownloadLicenses');
-if (btnLic) btnLic.style.display = licensesCsv ? '' : 'none';
-
-// Compose preview/body with only the sections that exist
-let merged = baseCsv;
-if (newDeviceCsv) merged += `\n\nNEW DEVICE DETAILS\n${newDeviceCsv}`;
-if (licensesCsv)  merged += `\n\nLICENSES\n${licensesCsv}`;
-
-// Optional summary line (keeps email scannable)
-const flags = [
-  newDeviceCsv ? 'New Device Details' : null,
-  licensesCsv  ? 'Licenses' : null
-].filter(Boolean).join(' & ');
-
-const quick = flags ? `Quick summary:\n• Extra sections: ${flags}\n\n` : '';
-
-// Final email body
-const header = `Hello Order Management,\n\n${quick}Please find the intake details below in CSV format.\n\n`;
-const footer = `\n\n— ConnectUS Intake`;
-const body   = `${header}${merged}${footer}`;
-
-// Write to preview textarea if you maintain it, and/or pass to Gmail compose
-const preview = document.getElementById('csvPreview');
-if (preview) preview.value = merged;
-// store 'body' somewhere or pass when opening Gmail (your existing code)
-
+  const header  = `Hello Order Management,\n\n${company ? `Company: ${company}\n` : ''}Below is the intake summary:\n\n`;
+  const footer  = `\n\n— ConnectUS Intake`;
+  const bodyText = header + summaryText + footer;
 
   const to   = encodeURIComponent(toRaw);
   const subj = encodeURIComponent(subjRaw);
