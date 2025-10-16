@@ -890,15 +890,40 @@ function openGmailWithCSV() {
 
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
-  const csv     = document.getElementById('csvPreview')?.value || buildCSV();
-  const oiText  = getSelText('oiType') || 'Standard Order';
 
-  const header = `Hello Order Management,\n\nPlease find the intake details below in CSV format.\n\n`;
+  // Base CSV in preview (document/sales/shipping/items)
+  const baseCsv = document.getElementById('csvPreview')?.value || buildCSV();
+
+  // Optional sections: only include if they return non-empty CSV
+  const newDeviceCsv = (typeof buildNewDeviceCSV === 'function' ? (buildNewDeviceCSV() || '') : '');
+  const licensesCsv  = (typeof buildLicensesCSV  === 'function' ? (buildLicensesCSV()  || '') : '');
+
+  // Toggle the two download buttons based on presence
+  const btnNew = document.getElementById('btnDownloadNewDevice');
+  if (btnNew) btnNew.style.display = newDeviceCsv ? '' : 'none';
+  const btnLic = document.getElementById('btnDownloadLicenses');
+  if (btnLic) btnLic.style.display = licensesCsv ? '' : 'none';
+
+  // Merge preview text conditionally
+  let merged = baseCsv;
+  if (newDeviceCsv) merged += `\n\nNEW DEVICE DETAILS\n${newDeviceCsv}`;
+  if (licensesCsv)  merged += `\n\nLICENSES\n${licensesCsv}`;
+
+  // Quick summary line with Order Instruction + extras
+  const oiText = getSelText('oiType') || 'Standard Order';
+  const extras = [
+    newDeviceCsv ? 'New Device Details' : null,
+    licensesCsv  ? 'Licenses' : null
+  ].filter(Boolean).join(' & ');
+  const quick = `Quick summary:\n• Order Instruction: ${oiText}${extras ? `\n• Extra sections: ${extras}` : ''}\n\n`;
+
+  const header = `Hello Order Management,\n\n${quick}Please find the intake details below in CSV format.\n\n`;
   const footer = `\n\n— ConnectUS Intake`;
-  const body   = `${header}${csv}${footer}`;
+  const body   = `${header}${merged}${footer}`;
 
   openGmailCompose({ to: toRaw, subject: subjRaw, body });
 }
+
 
 /* ===== Small helpers ===== */
 function isMissingSelectOrEmpty(el){
