@@ -1591,7 +1591,7 @@ function downloadLineCSVFile() {
   downloadBlobCSV(name, csv);
 }
 
-  function downloadNewDeviceCSVFile(){
+function downloadNewDeviceCSVFile(){
   const csv = (typeof buildNewDeviceCSV === 'function' ? (buildNewDeviceCSV() || '') : '');
   if (!csv) { alert('No New Device Details to export.'); return; }
   const docNo = getOrSeedDocNo?.() || 'NA';
@@ -3023,7 +3023,7 @@ function onWizardComplete(scope){
     showMDM(true);
   }
 
-  // Only reveal Step 5 and update the hint; do NOT unlock tabs yet
+  // Step 5 shows, BUT DO NOT unlock yet
   const s5 = document.getElementById('wizStep4');
   if (s5) s5.style.display = '';
   setWizardDone(false);
@@ -3035,33 +3035,12 @@ function onWizardComplete(scope){
 
 
 
+
 /* Wire listeners */
 (function wireWizard(){
-  // Step 1 (Rep)
-  const wizRep = document.getElementById('wizRepPick');
-  if(wizRep){
-    wizRep.addEventListener('change', e=>{
-      const v = (e.target.value || '').trim();
-      if(!v) { resetWizardBelow(1); return; }
-      onWizardStepRep(v);
-      // Default: hide MDM until wizard scope = hardware+pro
-     showMDM(false);
+  // existing listeners for steps 1–4 stay as-is …
 
-    });
-  }
-  // Step 2 (Customer Type)
-  document.querySelectorAll('input[name="wizCustomerType"]').forEach(i=>{
-    i.addEventListener('change', e => onWizardStep1(e.target.value));
-  });
-  // Step 3 (Doc Type)
-  document.querySelectorAll('input[name="wizDocType"]').forEach(i=>{
-    i.addEventListener('change', e => onWizardStep2(e.target.value));
-  });
-  // Step 4 (Scope)
-  document.querySelectorAll('input[name="wizScope"]').forEach(i=>{
-    i.addEventListener('change', e => onWizardComplete(e.target.value));
-  });
-    // Step 5 (Order Instruction) — unlock when selected
+  // Step 5 (Order Instruction) — unlock when selected
   const oi = document.getElementById('oiType');
   if (oi){
     oi.addEventListener('change', e => {
@@ -3069,16 +3048,18 @@ function onWizardComplete(scope){
       if (!picked) {
         setWizardDone(false);
         showIntakeWork(false);
-        document.getElementById('wizHint').textContent = 'Pick Order Instruction (Step 5) to unlock the intake tabs.';
+        document.getElementById('wizHint').textContent =
+          'Pick Order Instruction (Step 5) to unlock the intake tabs.';
         return;
       }
       setWizardDone(true);
       showIntakeWork(true);
-      document.getElementById('wizHint').textContent = 'Wizard complete — tabs unlocked.';
+      document.getElementById('wizHint').textContent =
+        'Wizard complete — tabs unlocked.';
     });
   }
-
 })();
+
 
 
 
