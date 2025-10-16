@@ -866,9 +866,14 @@ City, State ZIP"></textarea>
   <button class="ok" onclick="copyCSVToClipboard()">Copy CSV</button>
   <button class="ghost" onclick="downloadHeaderCSVFile()">Download Sales Order Header (CSV)</button>
   <button class="ghost" onclick="downloadLineCSVFile()">Download Sales Order Line (CSV)</button>
-  <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
 
+  <!-- Conditionally shown -->
+  <button id="btnDownloadNewDevice" class="ghost" style="display:none" onclick="downloadNewDeviceCSVFile()">Download New Device Details (CSV)</button>
+  <button id="btnDownloadLicenses"  class="ghost" style="display:none" onclick="downloadLicensesCSVFile()">Download Licenses (CSV)</button>
+
+  <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
 </div>
+
 
     <div class="tiny" style="margin-top:8px">
       Or use a direct mailto link:
@@ -1585,6 +1590,21 @@ function downloadLineCSVFile() {
   const name  = `sales-order-lines_${docNo}.csv`;
   downloadBlobCSV(name, csv);
 }
+
+  function downloadNewDeviceCSVFile(){
+  const csv = (typeof buildNewDeviceCSV === 'function' ? (buildNewDeviceCSV() || '') : '');
+  if (!csv) { alert('No New Device Details to export.'); return; }
+  const docNo = getOrSeedDocNo?.() || 'NA';
+  downloadBlobCSV(`new-device-details_${docNo}.csv`, csv);
+}
+
+function downloadLicensesCSVFile(){
+  const csv = (typeof buildLicensesCSV === 'function' ? (buildLicensesCSV() || '') : '');
+  if (!csv) { alert('No Licenses to export.'); return; }
+  const docNo = getOrSeedDocNo?.() || 'NA';
+  downloadBlobCSV(`licenses_${docNo}.csv`, csv);
+}
+
 
 
 
@@ -4090,9 +4110,43 @@ function composeOMEmailNoCSV(){
   const summaryText = (document.getElementById('summary')?.textContent || '').trim() || '(no summary available)';
   const company = (document.getElementById('billCompany')?.value || '').trim();
    
-  const header  = `Hello Order Management,\n\n${company ? `Company: ${company}\n` : ''}Below is the intake summary:\n\n`;
-  const footer  = `\n\n— ConnectUS Intake`;
-  const bodyText = header + summaryText + footer;
+  // Base sections (Document + Sales/Partner + Shipping + Items already inside buildCSV())
+const baseCsv = document.getElementById('csvPreview')?.value || buildCSV();
+
+// Build optional sections (return ""/null if none)
+const newDeviceCsv = (typeof buildNewDeviceCSV === 'function' ? (buildNewDeviceCSV() || '') : '');
+const licensesCsv  = (typeof buildLicensesCSV  === 'function' ? (buildLicensesCSV()  || '') : '');
+
+// Toggle buttons based on availability
+const btnNew = document.getElementById('btnDownloadNewDevice');
+if (btnNew) btnNew.style.display = newDeviceCsv ? '' : 'none';
+
+const btnLic = document.getElementById('btnDownloadLicenses');
+if (btnLic) btnLic.style.display = licensesCsv ? '' : 'none';
+
+// Compose preview/body with only the sections that exist
+let merged = baseCsv;
+if (newDeviceCsv) merged += `\n\nNEW DEVICE DETAILS\n${newDeviceCsv}`;
+if (licensesCsv)  merged += `\n\nLICENSES\n${licensesCsv}`;
+
+// Optional summary line (keeps email scannable)
+const flags = [
+  newDeviceCsv ? 'New Device Details' : null,
+  licensesCsv  ? 'Licenses' : null
+].filter(Boolean).join(' & ');
+
+const quick = flags ? `Quick summary:\n• Extra sections: ${flags}\n\n` : '';
+
+// Final email body
+const header = `Hello Order Management,\n\n${quick}Please find the intake details below in CSV format.\n\n`;
+const footer = `\n\n— ConnectUS Intake`;
+const body   = `${header}${merged}${footer}`;
+
+// Write to preview textarea if you maintain it, and/or pass to Gmail compose
+const preview = document.getElementById('csvPreview');
+if (preview) preview.value = merged;
+// store 'body' somewhere or pass when opening Gmail (your existing code)
+
 
   const to   = encodeURIComponent(toRaw);
   const subj = encodeURIComponent(subjRaw);
