@@ -196,9 +196,29 @@
 
   <!-- ===== MAIN TABS ===== -->
   <nav class="maintabs" id="maintabs">
-    <button class="mtab active" data-main="reps">Sales Rep Management</button>
-    <button class="mtab" data-main="intake">Quote / Sales Order Intake</button>
-  </nav>
+  <button
+    class="mtab active"
+    data-main="reps"
+    onclick="
+      document.querySelectorAll('.mtab').forEach(b => b.classList.toggle('active', b.dataset.main === 'reps'));
+      document.querySelectorAll('[data-mainpanel]').forEach(p => p.classList.toggle('active', p.getAttribute('data-mainpanel') === 'reps'));
+    "
+  >
+    Sales Rep Management
+  </button>
+
+  <button
+    class="mtab"
+    data-main="intake"
+    onclick="
+      document.querySelectorAll('.mtab').forEach(b => b.classList.toggle('active', b.dataset.main === 'intake'));
+      document.querySelectorAll('[data-mainpanel]').forEach(p => p.classList.toggle('active', p.getAttribute('data-mainpanel') === 'intake'));
+    "
+  >
+    Quote / Sales Order Intake
+  </button>
+</nav>
+
 
   <!-- ========== PANEL: SALES REPS ========== -->
   <section data-mainpanel="reps" class="active">
