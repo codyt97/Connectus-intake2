@@ -300,10 +300,25 @@
       <label class="chip"><input type="radio" name="wizScope" value="hardware+pro"> Hardware + Pro services</label>
     </div>
   </div>
+   
+  <!-- Step 5 -->
+  <div class="wiz-row" id="wizStep4" style="display:none">
+    <div class="wiz-label">5) Order Instruction</div>
+    <div class="wiz-opts" style="min-width:260px">
+      <select id="oiType" style="min-width:240px;padding:8px;border:1px solid var(--line);border-radius:10px">
+        <option value="">Select Order Instruction…</option>
+        <option>Standard Order</option>
+        <option>Ship to 3PL</option>
+        <option>CUSTOM-Order and shipping instructions</option>
+        <option>CUSTOM-Order Instructions</option>
+        <option>CUSTOM-Shipping Instruction</option>
+      </select>
+    </div>
+  </div>
 
   <div class="wiz-hint" id="wizHint">Complete steps 1–4 to unlock the intake tabs.</div>
 </section>
-
+ 
 
     <!-- toggles -->
     <div class="bar" id="toggleBar" style="display:none" aria-hidden="true">
@@ -871,6 +886,7 @@ function openGmailWithCSV() {
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — CSV Summary';
   const csv     = document.getElementById('csvPreview')?.value || buildCSV();
+  const oiText  = getSelText('oiType') || 'Standard Order';
 
   const header = `Hello Order Management,\n\nPlease find the intake details below in CSV format.\n\n`;
   const footer = `\n\n— ConnectUS Intake`;
@@ -1095,13 +1111,8 @@ function updateThirdPartyUI(){
 // ===== Ship Method catalog (from your screenshots) =====
 const SHIP_METHOD_OPTIONS = [
   '3PL KOP',
-  'Amazon Fulfillment',
-  'AmazonJP-FreeEcon',
-  'AmazonJP-NextDay',
-  'AmazonJP-SecondDay',
   'CUSTOMER PICKING UP AT WAREHOUSE',
   'Customer Provided Label or TRUCK/LTL (SEE ROUTING GUIDE) - RTG',
-  'EbayJP',
   'FedEx 2 Day - FED2',
   'FedEx Express Saver (Three Day) - FEES',
   'FedEx First Overnight 8:30AM - FED0',
@@ -1134,7 +1145,7 @@ const SHIP_METHOD_OPTIONS = [
 ];
 
  // ===== Insurance: auto "Decline of Protection" line =====
-const DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
+const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
 const DECLINE_DESC = 'Customer has declined device protection/insurance';
 const DECLINE_PRICE = '0.00';
 
@@ -1284,6 +1295,15 @@ if (insSel){
   // Initialize on load to reflect current selection:
   onInsurancePlanChange();
 }
+    // Reveal wizard Step 5 once Step 4 (Scope) has a selection
+  const scopeRadios = document.querySelectorAll('input[name="wizScope"]');
+  if (scopeRadios && scopeRadios.length){
+    scopeRadios.forEach(r => r.addEventListener('change', () => {
+      const s5 = document.getElementById('wizStep4');
+      if (s5) s5.style.display = '';
+    }));
+  }
+
 
 });
   
@@ -1305,7 +1325,7 @@ function buildHeaderCSV() {
     'Terms','Payment Method','BOBO Acct #','Ship Method','Freight Type','Shipping Payment Method','FedEx Account #','UPS Account #',
     'Allow Ship Partial','Blind Ship','Primary Sales Rep','Secondary Sales Rep','Carrier Rep','Carrier Rep Email','Carrier Rep Phone',
     'Company Name / Care Of','Contact Name','Contact Phone','Email','Street Address','Floor / Suite','City','State','Zip Code',
-    'Internal Notes'
+    'Internal Notes','Order Instruction Type'
   ];
 
   const get = (id)=> (document.getElementById(id)?.value || '').trim();
@@ -1353,6 +1373,8 @@ function buildHeaderCSV() {
 
   // Internal Notes
   const notesVal = (document.getElementById('notes')?.value || '').trim();
+  const oiType = getSelText('oiType');
+
 
   const row = [
     docNo, cust, po, tran,
@@ -1360,7 +1382,7 @@ function buildHeaderCSV() {
     terms, payMeth, bobo, shipMethod, freight, otShip, fedexAcct, upsAcct,
     allowPartial, blindShip, rep1, rep2, crep, crepEmail, crepPhone,
     shipCompany, shipContact, shipPhone, shipEmail, shipAddr1, shipAddr2, shipCity, shipState, shipZip,
-    notesVal
+    notesVal, getSelText('oiType')
   ];
 
   return headers.join(',') + '\n' + row.map(csvEscape).join(',');
@@ -1664,6 +1686,7 @@ const SIM_CARD_SKU_MAP = {
     sku: 'ESIM-EMBED',
     desc: 'eSIM embedded in the phone'
   },
+  
 };
 
 // Set of SKUs we consider “SIM lines” — used for delete/replace enforcement.
@@ -2283,7 +2306,7 @@ function ensureInsuranceLineForRow(baseTr){
 
   const planVal = planSel.value || INS_PLAN_NONE_VAL;
     // When Insurance = None -> ensure a $0 "decline" line on the current row
-  const DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
+  const DECLINE_SKU  = 'Item - CUSTOMER DECLINE OF PROTECTION';
   const DECLINE_DESC = 'Customer has declined device protection/insurance';
 
   const skuEl   = baseTr.querySelector('[data-key="sku"]')   || baseTr.querySelectorAll('td')[3]?.querySelector('input,textarea,select');
@@ -2967,25 +2990,28 @@ function onWizardStep2(val){ // Document Type (Step 3)
 
 
 function onWizardComplete(scope){ // Scope (Step 4)
-  // Mirror services toggle to scope
+function onWizardComplete(scope){
+  // Mirror services toggle to scope (unchanged)
   if (scope === 'hardware') {
     document.getElementById('svcEnabled').checked = false;
-    tierToMinutes();
-    recalcServices();
-    showMDM(false);                 // HIDE MDM for hardware-only
+    tierToMinutes(); recalcServices();
+    showMDM(false);
   } else {
     document.getElementById('svcEnabled').checked = true;
     document.getElementById('svcTier').value = '1';
-    tierToMinutes();
-    recalcServices();
+    tierToMinutes(); recalcServices();
     showSubtabs();
-    showMDM(true);                  // SHOW MDM for hardware + pro
+    showMDM(true);
   }
 
-  setWizardDone(true);
-  showIntakeWork(true);
-  document.getElementById('wizHint').textContent = 'Wizard complete — tabs unlocked.';
+  // ⬇️ Only reveal Step 5 and update the hint; do NOT unlock tabs yet
+  const s5 = document.getElementById('wizStep4');
+  if (s5) s5.style.display = '';
+  setWizardDone(false);
+  showIntakeWork(false);
+  document.getElementById('wizHint').textContent = 'Pick Order Instruction (Step 5) to unlock the intake tabs.';
 }
+
 
 
 /* Wire listeners */
@@ -3014,6 +3040,23 @@ function onWizardComplete(scope){ // Scope (Step 4)
   document.querySelectorAll('input[name="wizScope"]').forEach(i=>{
     i.addEventListener('change', e => onWizardComplete(e.target.value));
   });
+    // Step 5 (Order Instruction) — unlock when selected
+  const oi = document.getElementById('oiType');
+  if (oi){
+    oi.addEventListener('change', e => {
+      const picked = (e.target.value || '').trim();
+      if (!picked) {
+        setWizardDone(false);
+        showIntakeWork(false);
+        document.getElementById('wizHint').textContent = 'Pick Order Instruction (Step 5) to unlock the intake tabs.';
+        return;
+      }
+      setWizardDone(true);
+      showIntakeWork(true);
+      document.getElementById('wizHint').textContent = 'Wizard complete — tabs unlocked.';
+    });
+  }
+
 })();
 
 
@@ -4042,9 +4085,10 @@ function composeOMEmailNoCSV(){
   const toRaw   = document.getElementById('emailTo')?.value || 'service@connectuscorp.com';
   const subjRaw = document.getElementById('emailSubject')?.value || 'New Intake — Summary';
 
+  const oiText  = getSelText('oiType') || 'Standard Order'
   const summaryText = (document.getElementById('summary')?.textContent || '').trim() || '(no summary available)';
   const company = (document.getElementById('billCompany')?.value || '').trim();
-
+   
   const header  = `Hello Order Management,\n\n${company ? `Company: ${company}\n` : ''}Below is the intake summary:\n\n`;
   const footer  = `\n\n— ConnectUS Intake`;
   const bodyText = header + summaryText + footer;
