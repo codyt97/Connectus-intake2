@@ -2989,7 +2989,6 @@ function onWizardStep2(val){ // Document Type (Step 3)
 }
 
 
-function onWizardComplete(scope){ // Scope (Step 4)
 function onWizardComplete(scope){
   // Mirror services toggle to scope (unchanged)
   if (scope === 'hardware') {
@@ -3004,13 +3003,15 @@ function onWizardComplete(scope){
     showMDM(true);
   }
 
-  // ⬇️ Only reveal Step 5 and update the hint; do NOT unlock tabs yet
+  // Only reveal Step 5 and update the hint; do NOT unlock tabs yet
   const s5 = document.getElementById('wizStep4');
   if (s5) s5.style.display = '';
   setWizardDone(false);
   showIntakeWork(false);
-  document.getElementById('wizHint').textContent = 'Pick Order Instruction (Step 5) to unlock the intake tabs.';
+  document.getElementById('wizHint').textContent =
+    'Pick Order Instruction (Step 5) to unlock the intake tabs.';
 }
+
 
 
 
