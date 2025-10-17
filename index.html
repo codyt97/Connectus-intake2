@@ -340,7 +340,7 @@
     </div>
     <!-- Global action: keep original format/logic, always visible -->
 <div class="actions">
-  <button class="ghost" id="btnOpenEmail" onclick="openEmailDrawerGuarded()">Email Order Management</button>
+  <button class="ghost" id="btnOpenEmail" data-open-email onclick="openEmailDrawerGuarded()">Email Order Management</button>
   <!-- <button class="ok" id="btnSubmitIntake">Submit Intake</button> -->
   <span id="submitStatus" class="tiny" style="margin-left:10px"></span>
 </div>
@@ -350,6 +350,54 @@
   if (!ok){ showValidationWarning(missing); return; }
   openDrawer('drawerEmail');
 }
+</script>
+<script>
+// === Auto-close "Email Order Management" drawer on outside click / Esc ===
+// === Auto-close "Email Order Management" drawer on outside click / Esc ===
+window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
+  const drawer = document.getElementById('drawerEmail');
+  if (!drawer) return;
+
+  // Treat as visible when .active is present (matches your CSS)
+  const isVisible = () => drawer.classList.contains('active');
+
+  // Close helper (reuse your global close fn if present)
+  function closeEmailDrawer(){
+    if (typeof closeDrawer === 'function') closeDrawer('drawerEmail');
+    else drawer.classList.remove('active');
+  }
+
+  // Ignore clicks that occur inside the drawer or on openers
+  function shouldIgnore(target){
+    if (!target) return false;
+    if (drawer.contains(target)) return true;
+    if (target.closest('[data-open-email]')) return true;
+    // Optional: ignore common floating UI bits
+    if (target.closest('.datepicker, .flatpickr-calendar, .dropdown-menu, .select-menu')) return true;
+    return false;
+  }
+
+  // Close on outside click/tap (capture to beat stopPropagation)
+  document.addEventListener('pointerdown', function(e){
+    if (!isVisible()) return;
+    if (shouldIgnore(e.target)) return;
+    closeEmailDrawer();
+  }, true);
+
+  // Close on Escape
+  document.addEventListener('keydown', function(e){
+    if (!isVisible()) return;
+    if (e.key === 'Escape') closeEmailDrawer();
+  });
+
+  // Also close when switching main tabs or subtabs (prevents stale views)
+  const tabSelectors = '[data-main], .tab, .subtab, [data-tab]';
+  document.querySelectorAll(tabSelectors).forEach(btn => {
+    // Skip the email opener
+    if (btn.matches('[data-open-email]')) return;
+    btn.addEventListener('click', () => { if (isVisible()) closeEmailDrawer(); });
+  });
+});
 </script>
 
     <!-- CUSTOMER -->
@@ -2502,7 +2550,7 @@ View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Si
 
 Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=lucas-currin 
 
-{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
 This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
 
@@ -2527,7 +2575,7 @@ View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Si
 
 Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=anthony.liace 
 
-{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
 This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
 
@@ -2554,7 +2602,7 @@ View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Si
 
 Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=john-tropeano 
 
-{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
 This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
 
@@ -2581,7 +2629,7 @@ View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Si
 
 Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=greg-flannigan 
 
-{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
 This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
 
@@ -2608,7 +2656,7 @@ View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Si
 
 Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=suliman-mohmand 
 
-{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
 This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
 
@@ -2635,7 +2683,7 @@ View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Si
 
 Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=orlando-calderon 
 
-{{Current Email}} will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
 This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
 
