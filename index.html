@@ -353,7 +353,8 @@
 </script>
 <script>
 // === Auto-close "Email Order Management" drawer on outside click / Esc ===
-(function initEmailDrawerAutoClose(){
+// === Auto-close "Email Order Management" drawer on outside click / Esc ===
+window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
   const drawer = document.getElementById('drawerEmail');
   if (!drawer) return;
 
@@ -396,7 +397,7 @@
     if (btn.matches('[data-open-email]')) return;
     btn.addEventListener('click', () => { if (isVisible()) closeEmailDrawer(); });
   });
-})();
+});
 </script>
 
     <!-- CUSTOMER -->
