@@ -348,8 +348,13 @@
   function openEmailDrawerGuarded(){
   const { ok, missing } = validateRequiredForEmail();
   if (!ok){ showValidationWarning(missing); return; }
-  openDrawer('drawerEmail');
+
+  // (you may rebuild CSV preview here)
+
+  updateEmailDrawerButtons();   // <-- ensure buttons match active panels
+  updateEmailDrawerButtons();
 }
+
 </script>
 <script>
 // === Auto-close "Email Order Management" drawer on outside click / Esc ===
@@ -915,6 +920,8 @@ City, State ZIP"></textarea>
   <button class="ghost" onclick="downloadHeaderCSVFile()">Download Sales Order Header (CSV)</button>
   <button class="ghost" onclick="downloadLineCSVFile()">Download Sales Order Line (CSV)</button>
   <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
+  <button class="ghost" id="btnLicCSV" onclick="downloadLicensesCSV()" style="display:none">Download Licenses (CSV)</button>
+  <button class="ghost" id="btnNewDevCSV" onclick="downloadNewDeviceCSV()" style="display:none">Download New Device Details (CSV)</button>
 
 </div>
 
@@ -4742,6 +4749,66 @@ function setCellInput(td, val) {
   const el = td.querySelector('input,textarea,select');
   if (el) el.value = (val ?? '').toString();
 }
+</script>
+<script>
+function isSubpanelActive(name){
+  const panel = document.querySelector(`[data-subpanel="${name}"]`);
+  if (!panel) return false;
+  const styleShown   = panel.style.display !== 'none';
+  const notHiddenCls = !panel.classList.contains('hidden');
+  const activeByCls  = panel.classList.contains('active') || panel.classList.contains('open');
+  return (styleShown && notHiddenCls) || activeByCls;
+}
+
+function updateEmailDrawerButtons(){
+  const licBtn = document.getElementById('btnLicCSV');
+  const ndBtn  = document.getElementById('btnNewDevCSV');
+  if (!licBtn || !ndBtn) return;
+  const licOn = isSubpanelActive('licenses');
+  const ndOn  = isSubpanelActive('newdevice');
+  licBtn.style.display = licOn ? '' : 'none';
+  ndBtn.style.display  = ndOn  ? '' : 'none';
+  licBtn.disabled = !licOn;
+  ndBtn.disabled  = !ndOn;
+}
+
+// (optional hard guard inside builders; harmless if builders already exist)
+function buildLicensesCSV(){ if(!isSubpanelActive('licenses')) return 'Line #,OrderTime SKU,Qty\n'; /* ...fill your existing builder... */ }
+function buildNewDeviceCSV(){ if(!isSubpanelActive('newdevice')) return 'Line #,OrderTime SKU,Qty\n'; /* ...fill your existing builder... */ }
+
+function downloadLicensesCSV(){
+  const csv = (typeof buildLicensesCSV==='function') ? buildLicensesCSV() : '';
+  if (!csv || csv.trim()==='') return alert('Licenses panel is not active or empty.');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'licenses.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+
+function downloadNewDeviceCSV(){
+  const csv = (typeof buildNewDeviceCSV==='function') ? buildNewDeviceCSV() : '';
+  if (!csv || csv.trim()==='') return alert('New Device Details panel is not active or empty.');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+  a.download = 'new_device_details.csv'; document.body.appendChild(a); a.click(); a.remove();
+}
+</script>
+<script>
+(function watchSubpanelChanges(){
+  const drawer = document.getElementById('drawerEmail');
+  if (!drawer) return;
+
+  const mo = new MutationObserver(() => {
+    if (drawer.classList.contains('active')) updateEmailDrawerButtons();
+  });
+  mo.observe(document.documentElement, {
+    attributes:true, attributeFilter:['class','style'],
+    childList:true, subtree:true
+  });
+
+  document.addEventListener('click', () => {
+    if (drawer.classList.contains('active')) updateEmailDrawerButtons();
+  }, true);
+})();
 </script>
 
 </body>
