@@ -346,16 +346,17 @@
 </div>
 <script>
   function openEmailDrawerGuarded(){
-  const { ok, missing } = validateRequiredForEmail();
-  if (!ok){ showValidationWarning(missing); return; }
+    const { ok, missing } = validateRequiredForEmail();
+    if (!ok){ showValidationWarning(missing); return; }
 
-  // (you may rebuild CSV preview here)
+    // (optional) rebuild CSV preview here before opening
+    // const csv = buildCSV(); const ta = document.getElementById('csvPreview'); if (ta) ta.value = csv;
 
-  updateEmailDrawerButtons();   // <-- ensure buttons match active panels
-  updateEmailDrawerButtons();
-}
-
+    updateEmailDrawerButtons();      // ensure buttons match active panels
+    openDrawer('drawerEmail');       // <-- actually open the drawer
+  }
 </script>
+
 <script>
 // === Auto-close "Email Order Management" drawer on outside click / Esc ===
 // === Auto-close "Email Order Management" drawer on outside click / Esc ===
