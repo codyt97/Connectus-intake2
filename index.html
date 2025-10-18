@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -920,10 +921,10 @@ City, State ZIP"></textarea>
   <button class="ok" onclick="copyCSVToClipboard()">Copy CSV</button>
   <button class="ghost" onclick="downloadHeaderCSVFile()">Download Sales Order Header (CSV)</button>
   <button class="ghost" onclick="downloadLineCSVFile()">Download Sales Order Line (CSV)</button>
+  <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
   <button class="ghost" id="btnLicCSV" onclick="downloadLicensesCSV()" style="display:none">Download Licenses (CSV)</button>
   <button class="ghost" id="btnNewDevCSV" onclick="downloadNewDeviceCSV()" style="display:none">Download New Device Details (CSV)</button>
-  <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
-  
+
 </div>
 
     <div class="tiny" style="margin-top:8px">
@@ -2000,23 +2001,6 @@ function toggleNdDependents(){
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', ()=>{ toggleNdDependents(); saveNdPanelToRow(); });
 });
-
-// If not already declared, define your full ND field list once:
-window.ND_IDS = window.ND_IDS || [
-  'ndVendor','ndDealReg','ndDealExp','ndHoldNo','ndEOL','ndStockOK',
-  'ndLeadDate','ndExpShipBy','ndQtyRequired','ndSameShip','ndAltShip',
-  'ndSvcSame','ndSvcSKU'
-];
-
-// Persist ND panel changes to the selected row
-ND_IDS.forEach(id=>{
-  const el = document.getElementById(id);
-  if (!el) return;
-  const handler = () => { if (typeof saveNdPanelToRow === 'function') saveNdPanelToRow(); };
-  el.addEventListener('input', handler);
-  el.addEventListener('change', handler);
-});
-
 
 // Generic subtab activator (uses your existing subtabs DOM)
 function activateSubtab(key){
@@ -4770,21 +4754,13 @@ function setCellInput(td, val) {
 </script>
 <script>
 function isSubpanelActive(name){
-  // Prefer the active subtab button if your UI marks it
-  const btn = document.querySelector(
-    `.subtabs [data-sub="${name}"].active, [role="tab"][data-sub="${name}"][aria-selected="true"]`
-  );
-  if (btn) return true;
-
-  // Fallback to panel visibility
   const panel = document.querySelector(`[data-subpanel="${name}"]`);
   if (!panel) return false;
-  const cs = getComputedStyle(panel);
-  const styleShown = cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0';
-  const activeByCls = panel.classList.contains('active') || panel.classList.contains('open');
-  return styleShown || activeByCls;
+  const styleShown   = panel.style.display !== 'none';
+  const notHiddenCls = !panel.classList.contains('hidden');
+  const activeByCls  = panel.classList.contains('active') || panel.classList.contains('open');
+  return (styleShown && notHiddenCls) || activeByCls;
 }
-
 
 function updateEmailDrawerButtons(){
   const licBtn = document.getElementById('btnLicCSV');
@@ -4804,7 +4780,7 @@ function buildNewDeviceCSV(){ if(!isSubpanelActive('newdevice')) return 'Line #,
 
 function downloadLicensesCSV(){
   const csv = (typeof buildLicensesCSV==='function') ? buildLicensesCSV() : '';
-  if (!csv || csv.trim()==='') return; // silent no-op if truly empty
+  if (!csv || csv.trim()==='') return alert('Licenses panel is not active or empty.');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'licenses.csv'; document.body.appendChild(a); a.click(); a.remove();
@@ -4812,12 +4788,11 @@ function downloadLicensesCSV(){
 
 function downloadNewDeviceCSV(){
   const csv = (typeof buildNewDeviceCSV==='function') ? buildNewDeviceCSV() : '';
-  if (!csv || csv.trim()==='') return; // silent no-op if truly empty
+  if (!csv || csv.trim()==='') return alert('New Device Details panel is not active or empty.');
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'new_device_details.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
-
 </script>
 <script>
 (function watchSubpanelChanges(){
