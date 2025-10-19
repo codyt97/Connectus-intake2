@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -347,17 +346,11 @@
 </div>
 <script>
   function openEmailDrawerGuarded(){
-    const { ok, missing } = validateRequiredForEmail();
-    if (!ok){ showValidationWarning(missing); return; }
-
-    // (optional) rebuild CSV preview here before opening
-    // const csv = buildCSV(); const ta = document.getElementById('csvPreview'); if (ta) ta.value = csv;
-
-    updateEmailDrawerButtons();      // ensure buttons match active panels
-    openDrawer('drawerEmail');       // <-- actually open the drawer
-  }
+  const { ok, missing } = validateRequiredForEmail();
+  if (!ok){ showValidationWarning(missing); return; }
+  openDrawer('drawerEmail');
+}
 </script>
-
 <script>
 // === Auto-close "Email Order Management" drawer on outside click / Esc ===
 // === Auto-close "Email Order Management" drawer on outside click / Esc ===
@@ -921,9 +914,8 @@ City, State ZIP"></textarea>
   <button class="ok" onclick="copyCSVToClipboard()">Copy CSV</button>
   <button class="ghost" onclick="downloadHeaderCSVFile()">Download Sales Order Header (CSV)</button>
   <button class="ghost" onclick="downloadLineCSVFile()">Download Sales Order Line (CSV)</button>
-  <button class="ghost" id="btnLicCSV" onclick="downloadLicensesCSV()" style="display:none">Download Licenses (CSV)</button>
-  <button class="ghost" id="btnNewDevCSV" onclick="downloadNewDeviceCSV()" style="display:none">Download New Device Details (CSV)</button>
   <button type="button" class="ok" onclick="openGmailWithCSV()">Open in Gmail (CSV in body)</button>
+
 </div>
 
     <div class="tiny" style="margin-top:8px">
@@ -1793,7 +1785,7 @@ const PAIRING_SKU_MAP = {
     sku: 'STATIC IP SIMPAIR+DEVICE ACTIV',
     desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE W/ STATIC IP'
   },
-  'iNTERNAL cuc sIM pAIR & ACTIVATION': {
+  'iNTERNAL cuc SIM PAIR & ACTIVATION': {
     sku: 'INT DEVICE ACTIVATE/SIM PAIR',
     desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION'
   }
@@ -2000,21 +1992,6 @@ function toggleNdDependents(){
   const el = document.getElementById(id);
   if (el) el.addEventListener('change', ()=>{ toggleNdDependents(); saveNdPanelToRow(); });
 });
-window.ND_IDS = window.ND_IDS || [
-  'ndVendor','ndDealReg','ndDealExp','ndHoldNo','ndEOL','ndStockOK',
-  'ndLeadDate','ndExpShipBy','ndQtyRequired','ndSameShip','ndAltShip',
-  'ndSvcSame','ndSvcSKU'
-];
-
-(function wireNdInputs(){
-  ND_IDS.forEach(id=>{
-    const el = document.getElementById(id);
-    if (!el) return;
-    const handler = () => { if (typeof saveNdPanelToRow === 'function') saveNdPanelToRow(); };
-    el.addEventListener('input', handler);
-    el.addEventListener('change', handler);
-  });
-})();
 
 // Generic subtab activator (uses your existing subtabs DOM)
 function activateSubtab(key){
@@ -4765,114 +4742,6 @@ function setCellInput(td, val) {
   const el = td.querySelector('input,textarea,select');
   if (el) el.value = (val ?? '').toString();
 }
-</script>
-<script>
-function isSubpanelActive(name){
-  // Prefer the active tab button if your UI marks it
-  const btn = document.querySelector(
-    `.subtabs [data-sub="${name}"].active, [role="tab"][data-sub="${name}"][aria-selected="true"]`
-  );
-  if (btn) return true;
-
-  // Fallback: panel visibility / classes
-  const panel = document.querySelector(`[data-subpanel="${name}"]`);
-  if (!panel) return false;
-  const cs = getComputedStyle(panel);
-  const shown = cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0';
-  return shown || panel.classList.contains('active') || panel.classList.contains('open');
-}
-
-
-
-function updateEmailDrawerButtons(){
-  const licBtn = document.getElementById('btnLicCSV');
-  const ndBtn  = document.getElementById('btnNewDevCSV');
-  if (!licBtn || !ndBtn) return;
-  const licOn = isSubpanelActive('licenses');
-  const ndOn  = isSubpanelActive('newdevice');
-  licBtn.style.display = licOn ? '' : 'none';
-  ndBtn.style.display  = ndOn  ? '' : 'none';
-  licBtn.disabled = !licOn;
-  ndBtn.disabled  = !ndOn;
-}
-
-// (optional hard guard inside builders; harmless if builders already exist)
-// escape helper (idempotent: safe to keep even if already defined above)
-function csvEscape(v){ const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
-
-function buildLicensesCSV(){
-  // Only export if Licenses tab is active
-  if (!isSubpanelActive('licenses')) return '';
-
-  const body = document.getElementById('itemsBody');
-  if (!body) return '';
-
-  const headers = [
-    'Line #','OrderTime SKU','Qty',
-    'License Vendor','License Duration','Prorated Price',
-    'License Key / Simba Code','New SKU Contact'
-  ];
-  const rows = [];
-
-  // one row per line item that has any license fields filled
-  [...body.querySelectorAll('tr')].forEach((tr, i) => {
-    const sku = tr.querySelector('[data-key="sku"]')?.value?.trim() || '';
-    const qty = tr.querySelector('[data-key="qty"]')?.value?.trim() || '';
-    if (!sku) return;
-
-    // panel-scoped inputs
-    const vendor   = document.getElementById('licVendor')  ?.value?.trim() || '';
-    const duration = document.getElementById('licDuration')?.value?.trim() || '';
-    const prorated = document.getElementById('licProrated')?.value?.trim() || '';
-    const key      = document.getElementById('licKey')     ?.value?.trim() || '';
-    const contact  = document.getElementById('licContact') ?.value?.trim() || '';
-
-    if (vendor || duration || prorated || key || contact){
-      rows.push([i+1, sku, qty, vendor, duration, prorated, key, contact]);
-    }
-  });
-
-  if (!rows.length) return '';
-  return [headers.join(','), ...rows.map(r => r.map(csvEscape).join(','))].join('\n');
-}
- /* ...fill your existing builder... */ }
-function buildNewDeviceCSV(){ if(!isSubpanelActive('newdevice')) return 'Line #,OrderTime SKU,Qty\n'; /* ...fill your existing builder... */ }
-
-function downloadLicensesCSV(){
-  const csv = (typeof buildLicensesCSV==='function') ? buildLicensesCSV() : '';
-  if (!csv || csv.trim()==='') return; // silent no-op
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'licenses.csv'; document.body.appendChild(a); a.click(); a.remove();
-}
-
-function downloadNewDeviceCSV(){
-  const csv = (typeof buildNewDeviceCSV==='function') ? buildNewDeviceCSV() : '';
-  if (!csv || csv.trim()==='') return; // silent no-op
-  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
-  a.download = 'new_device_details.csv'; document.body.appendChild(a); a.click(); a.remove();
-}
-
-
-</script>
-<script>
-(function watchSubpanelChanges(){
-  const drawer = document.getElementById('drawerEmail');
-  if (!drawer) return;
-
-  const mo = new MutationObserver(() => {
-    if (drawer.classList.contains('active')) updateEmailDrawerButtons();
-  });
-  mo.observe(document.documentElement, {
-    attributes:true, attributeFilter:['class','style'],
-    childList:true, subtree:true
-  });
-
-  document.addEventListener('click', () => {
-    if (drawer.classList.contains('active')) updateEmailDrawerButtons();
-  }, true);
-})();
 </script>
 
 </body>
