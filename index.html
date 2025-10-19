@@ -4768,20 +4768,20 @@ function setCellInput(td, val) {
 </script>
 <script>
 function isSubpanelActive(name){
-  // Prefer the active subtab button if your UI marks it
+  // Prefer the active tab button if your UI marks it
   const btn = document.querySelector(
     `.subtabs [data-sub="${name}"].active, [role="tab"][data-sub="${name}"][aria-selected="true"]`
   );
   if (btn) return true;
 
-  // Fallback: panel visibility
+  // Fallback: panel visibility / classes
   const panel = document.querySelector(`[data-subpanel="${name}"]`);
   if (!panel) return false;
   const cs = getComputedStyle(panel);
-  const styleShown = cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0';
-  const activeByCls = panel.classList.contains('active') || panel.classList.contains('open');
-  return styleShown || activeByCls;
+  const shown = cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0';
+  return shown || panel.classList.contains('active') || panel.classList.contains('open');
 }
+
 
 
 function updateEmailDrawerButtons(){
@@ -4797,7 +4797,45 @@ function updateEmailDrawerButtons(){
 }
 
 // (optional hard guard inside builders; harmless if builders already exist)
-function buildLicensesCSV(){ if(!isSubpanelActive('licenses')) return 'Line #,OrderTime SKU,Qty\n'; /* ...fill your existing builder... */ }
+// escape helper (idempotent: safe to keep even if already defined above)
+function csvEscape(v){ const s = String(v ?? ''); return /[",\n]/.test(s) ? `"${s.replace(/"/g,'""')}"` : s; }
+
+function buildLicensesCSV(){
+  // Only export if Licenses tab is active
+  if (!isSubpanelActive('licenses')) return '';
+
+  const body = document.getElementById('itemsBody');
+  if (!body) return '';
+
+  const headers = [
+    'Line #','OrderTime SKU','Qty',
+    'License Vendor','License Duration','Prorated Price',
+    'License Key / Simba Code','New SKU Contact'
+  ];
+  const rows = [];
+
+  // one row per line item that has any license fields filled
+  [...body.querySelectorAll('tr')].forEach((tr, i) => {
+    const sku = tr.querySelector('[data-key="sku"]')?.value?.trim() || '';
+    const qty = tr.querySelector('[data-key="qty"]')?.value?.trim() || '';
+    if (!sku) return;
+
+    // panel-scoped inputs
+    const vendor   = document.getElementById('licVendor')  ?.value?.trim() || '';
+    const duration = document.getElementById('licDuration')?.value?.trim() || '';
+    const prorated = document.getElementById('licProrated')?.value?.trim() || '';
+    const key      = document.getElementById('licKey')     ?.value?.trim() || '';
+    const contact  = document.getElementById('licContact') ?.value?.trim() || '';
+
+    if (vendor || duration || prorated || key || contact){
+      rows.push([i+1, sku, qty, vendor, duration, prorated, key, contact]);
+    }
+  });
+
+  if (!rows.length) return '';
+  return [headers.join(','), ...rows.map(r => r.map(csvEscape).join(','))].join('\n');
+}
+ /* ...fill your existing builder... */ }
 function buildNewDeviceCSV(){ if(!isSubpanelActive('newdevice')) return 'Line #,OrderTime SKU,Qty\n'; /* ...fill your existing builder... */ }
 
 function downloadLicensesCSV(){
@@ -4808,7 +4846,6 @@ function downloadLicensesCSV(){
   a.download = 'licenses.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
 
-
 function downloadNewDeviceCSV(){
   const csv = (typeof buildNewDeviceCSV==='function') ? buildNewDeviceCSV() : '';
   if (!csv || csv.trim()==='') return; // silent no-op
@@ -4816,6 +4853,7 @@ function downloadNewDeviceCSV(){
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
   a.download = 'new_device_details.csv'; document.body.appendChild(a); a.click(); a.remove();
 }
+
 
 </script>
 <script>
