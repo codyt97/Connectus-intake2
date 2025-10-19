@@ -469,7 +469,7 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
           <label>Email</label><input id="shipEmail" type="email" />
           <div class="row"><div><label>Street Address</label><input id="shipStreet" /></div><div><label>Floor / Suite</label><input id="shipSuite" /></div></div>
           <div class="row"><div><label>City</label><input id="shipCity" /></div><div><label>State</label><input id="shipState" /></div><div><label>Zip Code</label><input id="shipZip" /></div></div>
-          <div class="row"><div><label>Customer Requested Ship Date</label><input id="reqShipDate" type="date" /></div><div><label>Expected Ship Date (Ops/Purchasing)</label><input id="expShipDate" type="date" /></div></div>
+          <div class="row"><div><label>Customer Requested Ship Date</label><input id="reqShipDate" type="date" /></div></div>
         </section>
 
         <section class="three">
@@ -4017,7 +4017,7 @@ function buildCSV(){
     ['Ship Street', val('shipStreet')], ['Ship Suite', val('shipSuite')], ['Ship City', val('shipCity')], ['Ship State', val('shipState')], ['Ship Zip', val('shipZip')],
     ['Residence', bool('resShip') ? 'Yes' : 'No'],
     ['Ship Pay Method', val('shipPay')], ['Ship Speed', val('shipSpeed')], ['Short Ship', val('shortShip')],
-    ['Requested Ship Date', val('reqShipDate')], ['Expected Ship Date', val('expShipDate')],
+    ['Requested Ship Date', val('reqShipDate')],
     ['Internal Notes', document.getElementById('notes')?.value || '']
   ];
 
