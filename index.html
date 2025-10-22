@@ -578,7 +578,22 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
 
           <!-- Subtab panels -->
           <div id="subtabPanels" style="margin-top:8px;display:none">
-        
+            <!-- Accessory -->
+            <div data-subpanel="accessory">
+              <div class="grid">
+                <section class="three">
+                  <label>Accessory SKU</label><input id="accSku" />
+                  <label style="margin-top:8px">Accessory Description</label><input id="accDesc" />
+                  <label class="chip" style="margin-top:10px"><input type="checkbox" id="bcInclude"> Include Brick + Cable kit</label>
+                </section>
+                <section class="three">
+                  <label>Accessory Qty (per unit)</label><input id="accQty" type="number" min="0" value="0" />
+                  <label style="margin-top:8px">Accessory Sell Price</label><input id="accSell" type="number" step="0.01" />
+                </section>
+              </div>
+            </div>
+
+    
 
             <!-- Insurance -->
             <div data-subpanel="insurance" style="display:none">
