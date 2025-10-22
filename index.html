@@ -1198,10 +1198,7 @@ const SHIP_METHOD_OPTIONS = [
   'USPSParcel'
 ];
 
- // ===== Insurance: auto "Decline of Protection" line =====
-const DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
-const DECLINE_DESC = 'Customer has declined device protection/insurance';
-const DECLINE_PRICE = '0.00';
+
 
 // Try to get a field by data-key, else fallback by column index
 function _getCellInput(tr, key, fallbackColIdx){
@@ -1257,14 +1254,12 @@ function removeDeclineInsuranceLine(){
 }
 
 
+// Do NOT auto-insert anything for insurance.
+// Only remove any legacy "decline of protection" lines if present.
 function onInsurancePlanChange(){
-  const val = (document.getElementById('insPlan')?.value || '').trim().toLowerCase();
-  if (val === 'none'){
-    upsertDeclineInsuranceLine();
-  } else {
-    removeDeclineInsuranceLine();
-  }
+  purgeDeclineRows();
 }
+
  
 function populateShipMethod(){
   const sel = document.getElementById('shipMethod');
@@ -1328,9 +1323,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const insSel = document.getElementById('insPlan');
 if (insSel){
   insSel.addEventListener('change', onInsurancePlanChange);
-  // Initialize on load to reflect current selection:
-  onInsurancePlanChange();
 }
+// Always purge any legacy decline rows on boot
+purgeDeclineRows();
+
     // Reveal wizard Step 5 once Step 4 (Scope) has a selection
   const scopeRadios = document.querySelectorAll('input[name="wizScope"]');
   if (scopeRadios && scopeRadios.length){
@@ -2342,8 +2338,7 @@ function ensureInsuranceLineForRow(baseTr){
 
   const planVal = planSel.value || INS_PLAN_NONE_VAL;
     // When Insurance = None -> ensure a $0 "decline" line on the current row
-  const DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
-  const DECLINE_DESC = 'Customer has declined device protection/insurance';
+  
 
   const skuEl   = baseTr.querySelector('[data-key="sku"]')   || baseTr.querySelectorAll('td')[3]?.querySelector('input,textarea,select');
   const descEl  = baseTr.querySelector('[data-key="desc"]')  || baseTr.querySelectorAll('td')[0]?.querySelector('input,textarea,select');
