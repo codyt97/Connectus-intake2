@@ -578,22 +578,6 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
 
           <!-- Subtab panels -->
           <div id="subtabPanels" style="margin-top:8px;display:none">
-            <!-- Accessory -->
-            <div data-subpanel="accessory">
-              <div class="grid">
-                <section class="three">
-                  <label>Accessory SKU</label><input id="accSku" />
-                  <label style="margin-top:8px">Accessory Description</label><input id="accDesc" />
-                  <label class="chip" style="margin-top:10px"><input type="checkbox" id="bcInclude"> Include Brick + Cable kit</label>
-                </section>
-                <section class="three">
-                  <label>Accessory Qty (per unit)</label><input id="accQty" type="number" min="0" value="0" />
-                  <label style="margin-top:8px">Accessory Sell Price</label><input id="accSell" type="number" step="0.01" />
-                </section>
-              </div>
-            </div>
-
-    
 
             <!-- Insurance -->
             <div data-subpanel="insurance" style="display:none">
@@ -723,7 +707,6 @@ City, State ZIP"></textarea>
           <div class="totals" id="totalsBox" style="display:none">
             <h4>Totals (current document)</h4>
             <div class="rowline"><span>Lines Subtotal</span><strong id="tLines">$0.00</strong></div>
-            <div class="rowline"><span>Accessories</span><strong id="tAcc">$0.00</strong></div>
             <div class="rowline"><span>Services</span><strong id="tSvc">$0.00</strong></div>
             <div class="rowline"><span>Insurance</span><strong id="tIns">$0.00</strong></div>
             <div class="rowline"><span>Tax</span><strong id="tTax">$0.00</strong></div>
@@ -3408,7 +3391,6 @@ function applyClonedOrder(){
     addRow(prefill);
 
     // Accessory / Insurance / Services / SIM / Licences → most-recent item panels
-    if(l.accessory){ setVal('accSku', l.accessory.sku || ''); setVal('accDesc', l.accessory.desc || ''); setVal('accQty', l.accessory.qty || 0); setVal('accSell', l.accessory.sell || ''); }
     if(l.insurance){ selectByTextExact('insPlan', l.insurance.plan || 'None'); selectByTextExact('insDed', l.insurance.ded || '$0'); selectByTextExact('insTerm', l.insurance.term || '1 year'); setVal('insSell', l.insurance.sell || ''); }
 
     if(l.services){
