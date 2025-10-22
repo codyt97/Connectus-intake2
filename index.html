@@ -1376,11 +1376,18 @@ function buildHeaderCSV() {
   const otShip     = getSelText('shipPayMethod'); // exact OT string
 
   // Third-party account routing (UPS/FedEx keyword)
+    // Third-party account routing (UPS/FedEx keyword)
   let fedexAcct = '', upsAcct = '';
   const acct = get('thirdPartyAcct');
   const selLower = (otShip || '').toLowerCase();
   if (selLower.includes('ups'))   upsAcct = acct;
   if (selLower.includes('fedex')) fedexAcct = acct;
+
+  // If only one carrier account is present, set the other to "N/A" for clarity in the header export
+  if (fedexAcct && !upsAcct) upsAcct = 'N/A';
+  else if (upsAcct && !fedexAcct) fedexAcct = 'N/A';
+  // (If both are blank or both are filled, leave as-is)
+
 
   const freight      = get('freightType');
   const allowPartial = checked('allowPartial') ? 'TRUE' : 'FALSE';
