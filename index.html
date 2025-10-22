@@ -1215,11 +1215,11 @@ function _getCellInput(tr, key, fallbackColIdx){
 }
 
 function findDeclineRow(){
-  function findDeclineRow(){
   const body = document.getElementById('itemsBody');
   if (!body) return null;
   return [...body.querySelectorAll('tr')].find(tr => tr.dataset.decline === 'true') || null;
 }
+
 
 
 function createDeclineRow(){
