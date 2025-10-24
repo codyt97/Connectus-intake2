@@ -506,8 +506,14 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
   <option>N/A</option>
 </select>
 
+<!-- Tech Zone requirement (new) -->
 <div style="margin-top:10px">
-  <label class="chip"><input type="checkbox" id="allowPartial"> Allow Ship Partial</label>
+  <label class="chip"><input type="checkbox" id="techZoneReq"> Tech Zone Required</label>
+</div>
+
+
+<div style="margin-top:10px">
+  <label class="chip"><input type="checkbox" id="allowPartial"> Allow Partial Ship</label>
   <label class="chip" style="margin-left:10px"><input type="checkbox" id="blindShip"> Blind Ship</label>
 </div>
   
@@ -561,13 +567,13 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
 
           <!-- Subtabs -->
           <div id="subtabsArea" class="subtabs" style="display:none">
-            <button class="subtab active" data-sub="accessory">Accessory</button>
-            <button class="subtab" data-sub="insurance">Insurance</button>
-            <button class="subtab" data-sub="sim">SIM / Pairing</button>
-            <button class="subtab" data-sub="licenses">Licenses</button>
-            <!-- NEW: visible only when needed -->
-            <button class="subtab" data-sub="newdevice" id="tabNewDevice" style="display:none">New Device Details</button>
-          </div>
+  <button class="subtab active" data-sub="sim">SIM / Pairing</button>
+  <button class="subtab" data-sub="insurance">Insurance</button>
+  <button class="subtab" data-sub="licenses">Licenses</button>
+  <!-- NEW: visible only when needed -->
+  <button class="subtab" data-sub="newdevice" id="tabNewDevice" style="display:none">New Device Details</button>
+</div>
+
 
 
           <!-- Subtab panels -->
@@ -608,7 +614,7 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
             </div>
 
             <!-- SIM / Pairing -->
-<div data-subpanel="sim" style="display:none">
+<div data-subpanel="sim">
   <div class="grid">
     <section class="three">
       <label>SIM Card</label>
@@ -1192,10 +1198,7 @@ const SHIP_METHOD_OPTIONS = [
   'USPSParcel'
 ];
 
- // ===== Insurance: auto "Decline of Protection" line =====
-const DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
-const DECLINE_DESC = 'Customer has declined device protection/insurance';
-const DECLINE_PRICE = '0.00';
+
 
 // Try to get a field by data-key, else fallback by column index
 function _getCellInput(tr, key, fallbackColIdx){
@@ -1211,72 +1214,52 @@ function _getCellInput(tr, key, fallbackColIdx){
 function findDeclineRow(){
   const body = document.getElementById('itemsBody');
   if (!body) return null;
-  const rows = [...body.querySelectorAll('tr')];
-  return rows.find(tr => {
-    const skuEl = _getCellInput(tr, 'sku', 3);
-    const sku = (skuEl?.value || '').trim();
-    return sku === DECLINE_SKU || tr.dataset.decline === 'true';
-  }) || null;
+  return [...body.querySelectorAll('tr')].find(tr => tr.dataset.decline === 'true') || null;
 }
 
-function ensureItemsTableVisible(){
-  // If there are no rows, add one so we can insert the decline line
+
+
+function createDeclineRow(){
   const body = document.getElementById('itemsBody');
   if (!body) return null;
-  if (!body.querySelector('tr') && typeof window.addRow === 'function'){
-    addRow();
-  }
-  // Prefer a blank row; otherwise, reuse the first row
-  let target = [...body.querySelectorAll('tr')].find(tr => {
-    const skuEl = _getCellInput(tr, 'sku', 3);
-    const priceEl = _getCellInput(tr, 'price', 11) || _getCellInput(tr, 'sell', 11);
-    const hasAny = [...tr.querySelectorAll('input,select,textarea')].some(i => (i.value||'').trim());
-    return !hasAny || (!(skuEl?.value||'').trim() && !(priceEl?.value||'').trim());
-  });
-  if (!target){
-    if (typeof window.addRow === 'function') addRow();
-    target = [...body.querySelectorAll('tr')].slice(-1)[0] || null;
-  }
-  return target;
+  if (typeof window.addRow === 'function') addRow();
+  const tr = [...body.querySelectorAll('tr')].slice(-1)[0] || null;
+  if (tr) tr.dataset.decline = 'true';
+  return tr;
 }
+
 
 function upsertDeclineInsuranceLine(){
   let tr = findDeclineRow();
   if (!tr){
-    tr = ensureItemsTableVisible();
-    if (!tr) return; // nothing we can do
+    tr = createDeclineRow();
+    if (!tr) return;
   }
-  // Fill fields
   const descEl  = _getCellInput(tr, 'desc', 0);
   const skuEl   = _getCellInput(tr, 'sku', 3);
   const priceEl = _getCellInput(tr, 'price', 11) || _getCellInput(tr, 'sell', 11);
+
   if (descEl)  descEl.value  = DECLINE_DESC;
   if (skuEl)   skuEl.value   = DECLINE_SKU;
   if (priceEl) priceEl.value = DECLINE_PRICE;
 
-  // Make it identifiable so we can remove it later if plan changes
   tr.dataset.decline = 'true';
 }
+
 
 function removeDeclineInsuranceLine(){
   const tr = findDeclineRow();
   if (!tr) return;
-  // If the decline row is the only content on that line, clear it; else, delete the row
-  const inputs = [...tr.querySelectorAll('input,select,textarea')];
-  inputs.forEach(i => { i.value = ''; });
-  delete tr.dataset.decline;
-  // Optionally, you could fully remove the row:
-  // tr.parentElement?.removeChild(tr);
+  tr.parentElement?.removeChild(tr); // remove the dedicated decline row entirely
 }
 
+
+// Do NOT auto-insert anything for insurance.
+// Only remove any legacy "decline of protection" lines if present.
 function onInsurancePlanChange(){
-  const val = (document.getElementById('insPlan')?.value || '').trim().toLowerCase();
-  if (val === 'none'){
-    upsertDeclineInsuranceLine();
-  } else {
-    removeDeclineInsuranceLine();
-  }
+  purgeDeclineRows();
 }
+
  
 function populateShipMethod(){
   const sel = document.getElementById('shipMethod');
@@ -1340,9 +1323,10 @@ window.addEventListener('DOMContentLoaded', () => {
   const insSel = document.getElementById('insPlan');
 if (insSel){
   insSel.addEventListener('change', onInsurancePlanChange);
-  // Initialize on load to reflect current selection:
-  onInsurancePlanChange();
 }
+// Always purge any legacy decline rows on boot
+purgeDeclineRows();
+
     // Reveal wizard Step 5 once Step 4 (Scope) has a selection
   const scopeRadios = document.querySelectorAll('input[name="wizScope"]');
   if (scopeRadios && scopeRadios.length){
@@ -1371,7 +1355,7 @@ function buildHeaderCSV() {
   const headers = [
     'DocNo','Customer','CustomerPO','TranType','Ship To','Is New','Customer Requested Ship Date',
     'Terms','Payment Method','BOBO Acct #','Ship Method','Freight Type','Shipping Payment Method','FedEx Account #','UPS Account #',
-    'Allow Ship Partial','Blind Ship','Primary Sales Rep','Secondary Sales Rep','Carrier Rep','Carrier Rep Email','Carrier Rep Phone',
+    'Allow Partial Ship','Blind Ship','Primary Sales Rep','Secondary Sales Rep','Carrier Rep','Carrier Rep Email','Carrier Rep Phone',
     'Company Name / Care Of','Contact Name','Contact Phone','Email','Street Address','Floor / Suite','City','State','Zip Code',
     'Internal Notes','Order Instruction Type'
   ];
@@ -1392,11 +1376,18 @@ function buildHeaderCSV() {
   const otShip     = getSelText('shipPayMethod'); // exact OT string
 
   // Third-party account routing (UPS/FedEx keyword)
+    // Third-party account routing (UPS/FedEx keyword)
   let fedexAcct = '', upsAcct = '';
   const acct = get('thirdPartyAcct');
   const selLower = (otShip || '').toLowerCase();
   if (selLower.includes('ups'))   upsAcct = acct;
   if (selLower.includes('fedex')) fedexAcct = acct;
+
+  // If only one carrier account is present, set the other to "N/A" for clarity in the header export
+  if (fedexAcct && !upsAcct) upsAcct = 'N/A';
+  else if (upsAcct && !fedexAcct) fedexAcct = 'N/A';
+  // (If both are blank or both are filled, leave as-is)
+
 
   const freight      = get('freightType');
   const allowPartial = checked('allowPartial') ? 'TRUE' : 'FALSE';
@@ -2354,8 +2345,7 @@ function ensureInsuranceLineForRow(baseTr){
 
   const planVal = planSel.value || INS_PLAN_NONE_VAL;
     // When Insurance = None -> ensure a $0 "decline" line on the current row
-  const DECLINE_SKU  = 'CUSTOMER DECLINE OF PROTECTION';
-  const DECLINE_DESC = 'Customer has declined device protection/insurance';
+  
 
   const skuEl   = baseTr.querySelector('[data-key="sku"]')   || baseTr.querySelectorAll('td')[3]?.querySelector('input,textarea,select');
   const descEl  = baseTr.querySelector('[data-key="desc"]')  || baseTr.querySelectorAll('td')[0]?.querySelector('input,textarea,select');
@@ -4017,7 +4007,7 @@ function buildCSV(){
     ['Ship Street', val('shipStreet')], ['Ship Suite', val('shipSuite')], ['Ship City', val('shipCity')], ['Ship State', val('shipState')], ['Ship Zip', val('shipZip')],
     ['Residence', bool('resShip') ? 'Yes' : 'No'],
     ['Ship Pay Method', val('shipPay')], ['Ship Speed', val('shipSpeed')], ['Short Ship', val('shortShip')],
-    ['Requested Ship Date', val('reqShipDate')],
+    ['Requested Ship Date', val('reqShipDate')], ['Expected Ship Date', val('expShipDate')],
     ['Internal Notes', document.getElementById('notes')?.value || '']
   ];
 
