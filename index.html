@@ -773,9 +773,9 @@ City, State ZIP"></textarea>
       <label>Minutes (per device)</label>
       <input id="svcMinutes" type="number" min="1" value="5" />
       <label style="margin-top:10px">Cost per device ($0.80/min)</label>
-      <input id="svcCostPer" type="number" step="0.01" readonly />
+      <input id="svcCostPer" type="number" step="0.01" />
       <label style="margin-top:10px">Total Services Cost</label>
-      <input id="svcCostTotal" type="number" step="0.01" readonly />
+      <input id="svcCostTotal" type="number" step="0.01" />
     </section>
   </div>
   <div class="tiny">Tier 0 defaults to 5 minutes. Tiers 1–4 auto-set minutes = tier × 15.</div>
@@ -3778,9 +3778,9 @@ function recalcServices(){
   const enabled = document.getElementById('svcEnabled').checked;
   const minutes = parseFloat(document.getElementById('svcMinutes').value||'0');
   const per = enabled ? minutes * RATE_PER_MIN : 0;
-  setVal('svcCostPer', per.toFixed(2));
+  if (!isUserEdited('svcCostPer')) setVal('svcCostPer', per.toFixed(2));;
   const qty = getCurrentRowQty();
-  setVal('svcCostTotal', (per*qty).toFixed(2));
+  if (!isUserEdited('svcCostTotal')) setVal('svcCostTotal', (per*qty).toFixed(2));
   if(enabled && !document.getElementById('svcSKU').value){
     document.getElementById('svcSKU').value=`PROSERV-TIER-${parseInt(document.getElementById('svcTier').value||'0',10)}`;
   }
