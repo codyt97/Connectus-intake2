@@ -2349,7 +2349,10 @@ function ensureInsuranceLineForRow(baseTr){
 
   const skuEl   = baseTr.querySelector('[data-key="sku"]')   || baseTr.querySelectorAll('td')[3]?.querySelector('input,textarea,select');
   const descEl  = baseTr.querySelector('[data-key="desc"]')  || baseTr.querySelectorAll('td')[0]?.querySelector('input,textarea,select');
-  const priceEl = baseTr.querySelector('[data-key="price"]') || baseTr.querySelector('[data-key="sell"]') || baseTr.querySelectorAll('td')[11]?.querySelector('input,textarea,select');
+  const priceEl = baseTr.querySelector('[data-key="price"]')
+  || baseTr.querySelector('[data-key="sell"]')
+  || baseTr.querySelectorAll('td')[10]?.querySelector('input,textarea,select'); // Sell Price = col 10
+
 
   if (String(planVal) === String(INS_PLAN_NONE_VAL)) {
     if (descEl)  descEl.value  = DECLINE_DESC;
