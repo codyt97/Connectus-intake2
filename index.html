@@ -4676,33 +4676,62 @@ async function replaceItemsWithOrderLines(lines){
 
     const tds = tr.querySelectorAll('td');
 
-    // Your columns (adjust if your table differs):
-    // 0:Desc, 1:Model, 2:Color, 3:OrderTime SKU, 4:Qty, 5:LTE/Wi-Fi/Both, 6:Carrier,
-    // 7:Act Payout, 8:MSRP, 9:Disc %, 10:Sell Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
-    // 14:Quoted Cost, 15:DLL/SPA/DealReg, 16:Hold/Res, 17:Delivery Lead, 18:EOL Confirm, 19:Remove
+ // Your columns (adjust if your table differs):
+// 0:Desc, 1:Model, 2:Color, 3:OrderTime SKU, 4:Qty, 5:LTE/Wi-Fi/Both, 6:Carrier,
+// 7:Act Payout, 8:MSRP, 9:Disc %, 10:Sell Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
+// 14:Quoted Cost, 15:DLL/SPA/DealReg, 16:Hold/Res, 17:Delivery Lead, 18:EOL Confirm, 19:Remove
 
-    // Description
-    setCellInput(tds[0], L.description || L.item || '');
-    // SKU
-    setCellInput(tds[3], L.sku || '');
-    // Qty
-    setCellInput(tds[4], (L.qty ?? '').toString());
-    // LTE / Wi-Fi / Both
-    setCellInput(tds[5], L.attributes?.lteWifiBoth || '');
-    // Carrier
-    setCellInput(tds[6], L.attributes?.carrier || '');
-    // Sell Price
-    setCellInput(tds[11], (L.unitPrice ?? '').toString());
-    // New/CPO
-    setCellInput(tds[12], L.attributes?.condition || '');
+// Description
+setCellInput(tds[0], L.description || L.item || '');
 
-    // Optional: keep Line Item ID (hidden) if your CSV needs it
-    const hidden = document.createElement('input');
-    hidden.type  = 'hidden';
-    hidden.name  = 'lineItemId';
-    hidden.value = (L.lineId ?? '').toString();
-    tr.appendChild(hidden);
+// SKU (hardened so it always copies through)
+setCellInput(
+  tds[3],
+  (L.sku ?? L.orderTimeSku ?? L.otSku ?? L.Sku ?? L.ItemCode ?? L.itemCode ?? L.itemNumber ?? '')
+    .toString()
+    .trim()
+);
+
+// Qty
+setCellInput(tds[4], (L.qty ?? '').toString());
+
+// LTE / Wi-Fi / Both
+setCellInput(tds[5], L.attributes?.lteWifiBoth || '');
+
+// Carrier
+setCellInput(tds[6], L.attributes?.carrier || '');
+
+// Sell Price (col 10) — correct index + business rules:
+//  - SIM cards & Pairing options default to 0.00
+//  - Pro Services remain editable (we do not force a catalog price here)
+(function setSellPrice() {
+  const desc = (L.description || '').toLowerCase();
+  const sku  = (L.sku || '').toLowerCase();
+  const isSimOrPairing =
+    /sim|pairing|activation/.test(desc) || /^sim|pair/.test(sku);
+  const isProService =
+    (L.category || '').toLowerCase().includes('pro service') ||
+    (L.attributes?.category || '').toLowerCase().includes('pro service');
+
+  let val = (L.unitPrice ?? '').toString();
+
+  if (isSimOrPairing) {
+    val = '0.00';
   }
+  // For pro services: don't override user price later; here we just seed whatever came in.
+  setCellInput(tds[10], val);
+})();
+
+// New/CPO (col 11) — corrected index
+setCellInput(tds[11], L.attributes?.condition || '');
+
+// Optional: keep Line Item ID (hidden) if your CSV needs it
+const hidden = document.createElement('input');
+hidden.type  = 'hidden';
+hidden.name  = 'lineItemId';
+hidden.value = (L.lineId ?? '').toString();
+tr.appendChild(hidden);
+
 
   // Reveal subtabs area if you hide it when empty
   document.getElementById('subtabsArea')?.removeAttribute('style');
