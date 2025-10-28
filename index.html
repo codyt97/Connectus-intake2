@@ -578,6 +578,22 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
 
           <!-- Subtab panels -->
           <div id="subtabPanels" style="margin-top:8px;display:none">
+            <!-- Accessory -->
+            <div data-subpanel="accessory">
+              <div class="grid">
+                <section class="three">
+                  <label>Accessory SKU</label><input id="accSku" />
+                  <label style="margin-top:8px">Accessory Description</label><input id="accDesc" />
+                  <label class="chip" style="margin-top:10px"><input type="checkbox" id="bcInclude"> Include Brick + Cable kit</label>
+                </section>
+                <section class="three">
+                  <label>Accessory Qty (per unit)</label><input id="accQty" type="number" min="0" value="0" />
+                  <label style="margin-top:8px">Accessory Sell Price</label><input id="accSell" type="number" step="0.01" />
+                </section>
+              </div>
+            </div>
+
+    
 
             <!-- Insurance -->
             <div data-subpanel="insurance" style="display:none">
@@ -707,6 +723,7 @@ City, State ZIP"></textarea>
           <div class="totals" id="totalsBox" style="display:none">
             <h4>Totals (current document)</h4>
             <div class="rowline"><span>Lines Subtotal</span><strong id="tLines">$0.00</strong></div>
+            <div class="rowline"><span>Accessories</span><strong id="tAcc">$0.00</strong></div>
             <div class="rowline"><span>Services</span><strong id="tSvc">$0.00</strong></div>
             <div class="rowline"><span>Insurance</span><strong id="tIns">$0.00</strong></div>
             <div class="rowline"><span>Tax</span><strong id="tTax">$0.00</strong></div>
@@ -3391,6 +3408,7 @@ function applyClonedOrder(){
     addRow(prefill);
 
     // Accessory / Insurance / Services / SIM / Licences → most-recent item panels
+    if(l.accessory){ setVal('accSku', l.accessory.sku || ''); setVal('accDesc', l.accessory.desc || ''); setVal('accQty', l.accessory.qty || 0); setVal('accSell', l.accessory.sell || ''); }
     if(l.insurance){ selectByTextExact('insPlan', l.insurance.plan || 'None'); selectByTextExact('insDed', l.insurance.ded || '$0'); selectByTextExact('insTerm', l.insurance.term || '1 year'); setVal('insSell', l.insurance.sell || ''); }
 
     if(l.services){
@@ -4676,62 +4694,33 @@ async function replaceItemsWithOrderLines(lines){
 
     const tds = tr.querySelectorAll('td');
 
- // Your columns (adjust if your table differs):
-// 0:Desc, 1:Model, 2:Color, 3:OrderTime SKU, 4:Qty, 5:LTE/Wi-Fi/Both, 6:Carrier,
-// 7:Act Payout, 8:MSRP, 9:Disc %, 10:Sell Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
-// 14:Quoted Cost, 15:DLL/SPA/DealReg, 16:Hold/Res, 17:Delivery Lead, 18:EOL Confirm, 19:Remove
+    // Your columns (adjust if your table differs):
+    // 0:Desc, 1:Model, 2:Color, 3:OrderTime SKU, 4:Qty, 5:LTE/Wi-Fi/Both, 6:Carrier,
+    // 7:Act Payout, 8:MSRP, 9:Disc %, 10:Sell Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
+    // 14:Quoted Cost, 15:DLL/SPA/DealReg, 16:Hold/Res, 17:Delivery Lead, 18:EOL Confirm, 19:Remove
 
-// Description
-setCellInput(tds[0], L.description || L.item || '');
+    // Description
+    setCellInput(tds[0], L.description || L.item || '');
+    // SKU
+    setCellInput(tds[3], L.sku || '');
+    // Qty
+    setCellInput(tds[4], (L.qty ?? '').toString());
+    // LTE / Wi-Fi / Both
+    setCellInput(tds[5], L.attributes?.lteWifiBoth || '');
+    // Carrier
+    setCellInput(tds[6], L.attributes?.carrier || '');
+    // Sell Price
+    setCellInput(tds[11], (L.unitPrice ?? '').toString());
+    // New/CPO
+    setCellInput(tds[12], L.attributes?.condition || '');
 
-// SKU (hardened so it always copies through)
-setCellInput(
-  tds[3],
-  (L.sku ?? L.orderTimeSku ?? L.otSku ?? L.Sku ?? L.ItemCode ?? L.itemCode ?? L.itemNumber ?? '')
-    .toString()
-    .trim()
-);
-
-// Qty
-setCellInput(tds[4], (L.qty ?? '').toString());
-
-// LTE / Wi-Fi / Both
-setCellInput(tds[5], L.attributes?.lteWifiBoth || '');
-
-// Carrier
-setCellInput(tds[6], L.attributes?.carrier || '');
-
-// Sell Price (col 10) — correct index + business rules:
-//  - SIM cards & Pairing options default to 0.00
-//  - Pro Services remain editable (we do not force a catalog price here)
-(function setSellPrice() {
-  const desc = (L.description || '').toLowerCase();
-  const sku  = (L.sku || '').toLowerCase();
-  const isSimOrPairing =
-    /sim|pairing|activation/.test(desc) || /^sim|pair/.test(sku);
-  const isProService =
-    (L.category || '').toLowerCase().includes('pro service') ||
-    (L.attributes?.category || '').toLowerCase().includes('pro service');
-
-  let val = (L.unitPrice ?? '').toString();
-
-  if (isSimOrPairing) {
-    val = '0.00';
+    // Optional: keep Line Item ID (hidden) if your CSV needs it
+    const hidden = document.createElement('input');
+    hidden.type  = 'hidden';
+    hidden.name  = 'lineItemId';
+    hidden.value = (L.lineId ?? '').toString();
+    tr.appendChild(hidden);
   }
-  // For pro services: don't override user price later; here we just seed whatever came in.
-  setCellInput(tds[10], val);
-})();
-
-// New/CPO (col 11) — corrected index
-setCellInput(tds[11], L.attributes?.condition || '');
-
-// Optional: keep Line Item ID (hidden) if your CSV needs it
-const hidden = document.createElement('input');
-hidden.type  = 'hidden';
-hidden.name  = 'lineItemId';
-hidden.value = (L.lineId ?? '').toString();
-tr.appendChild(hidden);
-
 
   // Reveal subtabs area if you hide it when empty
   document.getElementById('subtabsArea')?.removeAttribute('style');
