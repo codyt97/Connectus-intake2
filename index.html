@@ -4736,6 +4736,77 @@ function setCellInput(td, val) {
   if (el) el.value = (val ?? '').toString();
 }
 </script>
+<script>
+// Normalize a dropdown label to match map keys case-insensitively
+const norm = s => (s ?? '').toString().trim().replace(/\s+/g,' ').toUpperCase();
+
+function mapLookup(map, label) {
+  const k = norm(label);
+  // try exact first
+  if (map[label]) return map[label];
+  // then case-insensitive scan
+  for (const key of Object.keys(map)) {
+    if (norm(key) === k) return map[key];
+  }
+  return null;
+}
+
+function setVal(el, v){ if (el) el.value = v; }
+function qRow(el, sel){ return el?.closest("[data-line-row], .so-line, .line-row, tr")?.querySelector(sel); }
+
+function applySkuMapToRow(triggerEl, mapped){
+  if (!mapped) return;
+  const skuEl   = qRow(triggerEl,'[name="sku"], [data-field="sku"], .sku');
+  const descEl  = qRow(triggerEl,'[name="description"], [data-field="description"], .description');
+  const priceEl = qRow(triggerEl,'[name="unitPrice"], [data-field="unitPrice"], [name="sellPrice"], .sell-price, .unit-price');
+
+  setVal(skuEl,  mapped.sku || '');
+  setVal(descEl, mapped.desc || '');
+
+  // Force UI to 0.00 and lock it; prevents retyping
+  if (priceEl) {
+    priceEl.value = '0.00';
+    priceEl.readOnly = true;
+    priceEl.setAttribute('data-forced-zero','true');
+  }
+
+  // Stash flags for your payload builder (if you keep an in-memory model)
+  const row = priceEl?.closest("[data-line-row], .so-line, .line-row, tr");
+  if (row) {
+    row.dataset.simForceZero = '1';
+    row.dataset.simSku = (mapped.sku || '').toUpperCase();
+  }
+}
+
+// Hook up SIM CARD dropdown
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.matches('#simCardSelect, [data-sim-card-select]')) {
+    const mapped = mapLookup(SIM_CARD_SKU_MAP, t.value);
+    applySkuMapToRow(t, mapped);
+  }
+});
+
+// Hook up PAIRING dropdown
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.matches('#pairingSelect, [data-pairing-select]')) {
+    const mapped = mapLookup(PAIRING_SKU_MAP, t.value);
+    applySkuMapToRow(t, mapped);
+  }
+});
+
+// Safety net: if price input changes later, re-zero when it's a SIM line
+document.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!t.matches('[name="unitPrice"], [data-field="unitPrice"], [name="sellPrice"], .sell-price, .unit-price')) return;
+  const row = t.closest("[data-line-row], .so-line, .line-row, tr");
+  if (row?.dataset.simForceZero === '1') {
+    t.value = '0.00';
+    t.readOnly = true;
+  }
+});
+</script>
 
 </body>
 </html>
