@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8" />
@@ -216,7 +216,7 @@
           <select id="repTemplatePick">
             <option value="custom">Custom (use editor below)</option>
             <option>Lucas Currin</option>
-            <option>Anthony Liace</option>
+            <option>Max Mann</option>
             <option>John Tropeano</option>
             <option>Greg Flannigan</option>
             <option>Suliman Mohmand</option>
@@ -552,7 +552,7 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
               <th>Act Payout $</th>
               <th>MSRP</th>
               <th>Disc %</th>
-              <th>Price</th>
+              <th>Sell Price</th>
               <th>New / CPO</th>
               <th>In Stock?</th>
               <th>Vendor</th>
@@ -1448,7 +1448,7 @@ function buildLineCSV() {
   if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
   if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
   const COL_PAYOUT = (typeof window.COL_PAYOUT !== 'undefined') ? window.COL_PAYOUT : 8;  // "Act Payout $" (9th col)
-  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Price" (12th col)
+  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Sell Price" (12th col)
 
   // Robust getters for payout & price
   function getPayout(tr) {
@@ -1687,53 +1687,43 @@ const SIM_CARD_OPTIONS = [
 const SIM_CARD_SKU_MAP = {
   'VZ-SIM3IN1': {
     sku: 'VZ-SIM3IN1',
-    desc: '3IN1 Verizon Locked 5G SIM Card (Black)',
-    Price: 0
+    desc: '3IN1 Verizon Locked 5G SIM Card (Black)'
   },
   'AT-SIM3IN1': {
     sku: 'AT-SIM3IN1',
-    desc: '3 in 1 AT&T SIM Card',
-    Price: 0
+    desc: '3 in 1 AT&T SIM Card'
   },
   'AT-FIRSTSIMA00': {
     sku: 'AT-FIRSTSIMA00',
-    desc: '3 in 1 FirstNet AT&T Locked 5G SIM Card (Black)',
-    Price: 0
+    desc: '3 in 1 FirstNet AT&T Locked 5G SIM Card (Black)'
   },
   'TM-SIM3IN14G': {
     sku: 'TM-SIM3IN14G',
-    desc: '3 in 1 T-Mobile Locked 4G SIM Card',
-    Price: 0
+    desc: '3 in 1 T-Mobile Locked 4G SIM Card'
   },
   'HE-HELIXTRIAA00': {
     sku: 'HE-HELIXTRIAA00',
-    desc: 'Helix Wireless Tri A SIM Card',
-    Price: 0
+    desc: 'Helix Wireless Tri A SIM Card'
   },
   'Helix eSIM(TriA)': {
     sku: 'HE-eSIM-TRIA',
-    desc: 'Helix Wireless eSIM (TriA)',
-    Price: 0
+    desc: 'Helix Wireless eSIM (TriA)'
   },
   'HE TRI-B Static IP Helix': {
     sku: 'HE-0007SFFB00',
-    desc: 'Helix Wireless SIM Card TRI-B for Static IP (EID required)',
-    Price: 0
+    desc: 'Helix Wireless SIM Card TRI-B for Static IP (EID required)'
   },
   'MW-SIMVZTMATT-E': {
     sku: 'MW-SIMVZTMATT-E',
-    desc: 'ConnectUs Dynamic IP Multi-Carrier Access 3in1 SIM Card – VZ/ATT/TMO',
-    Price: 0
+    desc: 'ConnectUs Dynamic IP Multi-Carrier Access 3in1 SIM Card – VZ/ATT/TMO'
   },
   'US-SIM3IN15G': {
     sku: 'US-SIM3IN15G',
-    desc: '3 in 1 US Cellular Locked 5G SIM Card',
-    Price: 0
+    desc: '3 in 1 US Cellular Locked 5G SIM Card'
   },
   'eSIM Embendded in the phone': {
     sku: 'ESIM-EMBED',
-    desc: 'eSIM embedded in the phone',
-    Price: 0
+    desc: 'eSIM embedded in the phone'
   },
   
 };
@@ -1768,33 +1758,27 @@ const PAIRING_SKU_MAP = {
   // Use the exact visible text options in your dropdown.
   'SIM PAIR ONLY': {
     sku: 'SIM PAIRING',
-    desc: 'SIM PAIRING',
-    Price: 0
+    desc: 'SIM PAIRING'
   },
   'SIM PAIR & CARRIER ACTIVATION': {
     sku: 'DEVICE ACTIVATION & SIM PAIR',
-    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE',
-    Price: 0
+    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE'
   },
   'VERIZON eSIM PAIRING': {
     sku: 'VERIZON eSIM PAIRING',
-    desc: 'VERIZON eSIM PAIRING — Please send IMEI listing to Verizon Rep to activate eSIM',
-    Price: 0
+    desc: 'VERIZON eSIM PAIRING — Please send IMEI listing to Verizon Rep to activate eSIM'
   },
   'SIM PAIR, BENCH TEST / ACTIVE TO ENSURE OPTIMAL PERFORMANCE': {
     sku: 'CUSTCONFIG, DEV ACTIV&SIMPAIR',
-    desc: 'SIM PAIRING, DEVICE ACTIVATION, & CUSTOM CONFIGURATION SERVICES, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE/SOW REQUIRED',
-    Price: 0
+    desc: 'SIM PAIRING, DEVICE ACTIVATION, & CUSTOM CONFIGURATION SERVICES, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE/SOW REQUIRED'
   },
   'SIM PAIR w/ STATIC IP & DEVICE ACTIVATIO< BENCH TEST TO ENSURE OPTIOMAL PERFORMANCE': {
     sku: 'STATIC IP SIMPAIR+DEVICE ACTIV',
-    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE W/ STATIC IP',
-    Price: 0
+    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE W/ STATIC IP'
   },
   'iNTERNAL cuc SIM PAIR & ACTIVATION': {
     sku: 'INT DEVICE ACTIVATE/SIM PAIR',
-    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION',
-  /...;./  Price: 0
+    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION'
   }
   // Add more mappings here as you add more pairing options/SKUs.
   
@@ -2572,7 +2556,7 @@ Your business is greatly appreciated!
 
 With Warmest Regards,
  Lucas Currin `,
-  "Anthony Liace": ` Hello {{ Customer First Name}}, 
+  "Max Mann": ` Hello {{ Customer First Name}}, 
 
 We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
 
@@ -2596,7 +2580,7 @@ If we can help in any way, please do not hesitate to reach out.
 Your business is greatly appreciated!
 
 With Warmest Regards,
-Anthony Liace
+Max Mann
 
  `,
   "John Tropeano": `  Hello {{ Customer First Name}}, 
@@ -2840,7 +2824,7 @@ function loadReps(){
     // Seed with reps
     reps = [
       {name:"Lucas Currin", email:"lucas.currin@connectuscorp.com", slug:"lucas-currin", template:BASE_TEMPLATES["Lucas Currin"]},
-      {name:"Anthony Liace", email:"anthony.liace@connectuscorp.com", slug:"anthony.liace", template:BASE_TEMPLATES["Anthony Liace"]},
+      {name:"Max Mann", email:"max.mann@connectuscorp.com", slug:"max.mann", template:BASE_TEMPLATES["Max Mann"]},
       {name:"John Tropeano", email:"john.tropeano@connectuscorp.com", slug:"john-tropeano", template:BASE_TEMPLATES["John Tropeano"]},
       {name:"Greg Flannigan", email:"greg.flannigan@connectuscorp.com", slug:"greg-flannigan", template:BASE_TEMPLATES["Greg Flannigan"]},
       {name:"Suliman Mohmand", email:"suliman.mohmand@connectuscorp.com", slug:"suliman-mohmand", template:BASE_TEMPLATES["Suliman Mohmand"]},
@@ -4028,7 +4012,7 @@ function buildCSV(){
   ];
 
   const itemsHeader = [
-    'Line','Description','Model / Part #','Color','SKU','Qty','Network','Carrier','Act Payout $','MSRP','Disc %','Price','Condition','In Stock','Vendor','Quoted Cost','DLL/SPA / Deal Reg #','Hold/Reservation #','Delivery Lead Time','EOL Confirm'
+    'Line','Description','Model / Part #','Color','SKU','Qty','Network','Carrier','Act Payout $','MSRP','Disc %','Sell Price','Condition','In Stock','Vendor','Quoted Cost','DLL/SPA / Deal Reg #','Hold/Reservation #','Delivery Lead Time','EOL Confirm'
   ];
   const itemsRows = lines.length ? lines.map((l,i)=>[
     i+1, l.desc, l.model, l.color, l.sku, l.qty, l.net, l.carrier, l.payout, l.msrp, l.disc, l.sell, l.cond, l.stock, l.vendor, l.cost, l.deal, l.hold, l.leadtime, l.eol
@@ -4712,7 +4696,7 @@ async function replaceItemsWithOrderLines(lines){
 
     // Your columns (adjust if your table differs):
     // 0:Desc, 1:Model, 2:Color, 3:OrderTime SKU, 4:Qty, 5:LTE/Wi-Fi/Both, 6:Carrier,
-    // 7:Act Payout, 8:MSRP, 9:Disc %, 10:Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
+    // 7:Act Payout, 8:MSRP, 9:Disc %, 10:Sell Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
     // 14:Quoted Cost, 15:DLL/SPA/DealReg, 16:Hold/Res, 17:Delivery Lead, 18:EOL Confirm, 19:Remove
 
     // Description
