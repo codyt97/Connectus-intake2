@@ -552,7 +552,7 @@ window.addEventListener('DOMContentLoaded', function initEmailDrawerAutoClose(){
               <th>Act Payout $</th>
               <th>MSRP</th>
               <th>Disc %</th>
-              <th>Sell Price</th>
+              <th>Price</th>
               <th>New / CPO</th>
               <th>In Stock?</th>
               <th>Vendor</th>
@@ -1448,7 +1448,7 @@ function buildLineCSV() {
   if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
   if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
   const COL_PAYOUT = (typeof window.COL_PAYOUT !== 'undefined') ? window.COL_PAYOUT : 8;  // "Act Payout $" (9th col)
-  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Sell Price" (12th col)
+  const COL_SELL   = (typeof window.COL_SELL   !== 'undefined') ? window.COL_SELL   : 11; // "Price" (12th col)
 
   // Robust getters for payout & price
   function getPayout(tr) {
@@ -4028,7 +4028,7 @@ function buildCSV(){
   ];
 
   const itemsHeader = [
-    'Line','Description','Model / Part #','Color','SKU','Qty','Network','Carrier','Act Payout $','MSRP','Disc %','Sell Price','Condition','In Stock','Vendor','Quoted Cost','DLL/SPA / Deal Reg #','Hold/Reservation #','Delivery Lead Time','EOL Confirm'
+    'Line','Description','Model / Part #','Color','SKU','Qty','Network','Carrier','Act Payout $','MSRP','Disc %','Price','Condition','In Stock','Vendor','Quoted Cost','DLL/SPA / Deal Reg #','Hold/Reservation #','Delivery Lead Time','EOL Confirm'
   ];
   const itemsRows = lines.length ? lines.map((l,i)=>[
     i+1, l.desc, l.model, l.color, l.sku, l.qty, l.net, l.carrier, l.payout, l.msrp, l.disc, l.sell, l.cond, l.stock, l.vendor, l.cost, l.deal, l.hold, l.leadtime, l.eol
@@ -4712,7 +4712,7 @@ async function replaceItemsWithOrderLines(lines){
 
     // Your columns (adjust if your table differs):
     // 0:Desc, 1:Model, 2:Color, 3:OrderTime SKU, 4:Qty, 5:LTE/Wi-Fi/Both, 6:Carrier,
-    // 7:Act Payout, 8:MSRP, 9:Disc %, 10:Sell Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
+    // 7:Act Payout, 8:MSRP, 9:Disc %, 10:Price, 11:New/CPO, 12:In Stock?, 13:Vendor,
     // 14:Quoted Cost, 15:DLL/SPA/DealReg, 16:Hold/Res, 17:Delivery Lead, 18:EOL Confirm, 19:Remove
 
     // Description
