@@ -3142,9 +3142,45 @@ function applyPastedCustomer(textareaId){
   const tax = document.getElementById('taxExempt');    if (tax) tax.checked = !!data.payment?.taxExempt;
   const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!data.payment?.agreement;
 
-  if (data.shippingOptions?.pay)   selectByTextExact('shipPay',   data.shippingOptions.pay);
-  if (data.shippingOptions?.speed) selectByTextExact('shipSpeed', data.shippingOptions.speed);
-  if (data.shippingOptions?.shortShip) selectByTextExact('shortShip', data.shippingOptions.shortShip);
+    // Shipping Options → new controls (Ship Method, Pay Method, Freight, flags)
+  if (data.shippingOptions) {
+    const so = data.shippingOptions;
+
+    // Ship Method (carrier)
+    if (so.shipMethod) {
+      selectByTextExact('shipMethod', so.shipMethod);
+    } else if (so.pay) {
+      // legacy JSON sometimes stored method in .pay
+      selectByTextExact('shipMethod', so.pay);
+    }
+
+    // Shipping Payment Method
+    if (so.payMethod) {
+      selectByTextExact('shipPayMethod', so.payMethod);
+    } else if (!document.getElementById('shipPayMethod')?.value && so.pay) {
+      // fallback: treat .pay as the payment method if nothing else
+      selectByTextExact('shipPayMethod', so.pay);
+    }
+
+    // Freight Type
+    if (so.freightType) {
+      selectByTextExact('freightType', so.freightType);
+    }
+
+    // Allow Partial Ship from OT "ShortShip" value
+    if (so.shortShip) {
+      const allow = /may\s*ship\s*partial/i.test(so.shortShip);
+      const el = document.getElementById('allowPartial');
+      if (el) el.checked = allow;
+    }
+
+    // Blind Ship flag
+    if (typeof so.blindShip === 'boolean') {
+      const el = document.getElementById('blindShip');
+      if (el) el.checked = so.blindShip;
+    }
+  }
+
 
   // Reps / carrier
   if (pick(data.rep?.primary))   selectByTextExact('rep1', pick(data.rep?.primary));
@@ -3303,10 +3339,33 @@ function applyClonedOrder(){
   document.getElementById('taxExempt').checked = !!p.taxExempt;
   document.getElementById('hasAgreement').checked = !!p.agreement;
 
-  const so = data.shippingOptions || {};
-  if(so.pay) selectByTextExact('shipPay', so.pay);
-  if(so.speed) selectByTextExact('shipSpeed', so.speed);
-  if(so.shortShip) selectByTextExact('shortShip', so.shortShip);
+    const so = data.shippingOptions || {};
+
+  if (so.shipMethod) {
+    selectByTextExact('shipMethod', so.shipMethod);
+  } else if (so.pay) {
+    selectByTextExact('shipMethod', so.pay);
+  }
+
+  if (so.payMethod) {
+    selectByTextExact('shipPayMethod', so.payMethod);
+  } else if (!document.getElementById('shipPayMethod')?.value && so.pay) {
+    selectByTextExact('shipPayMethod', so.pay);
+  }
+
+  if (so.freightType) {
+    selectByTextExact('freightType', so.freightType);
+  }
+
+  if (so.shortShip) {
+    const allow = /may\s*ship\s*partial/i.test(so.shortShip);
+    document.getElementById('allowPartial').checked = allow;
+  }
+
+  if (typeof so.blindShip === 'boolean') {
+    document.getElementById('blindShip').checked = so.blindShip;
+  }
+
 
   // ----- Items (replace current rows with cloned items)
   document.getElementById('itemsBody').innerHTML = '';
@@ -3444,8 +3503,18 @@ async function loadSO(id){
       shipping,
       items,
       payment: { method: get(base,'PaymentMethod') || '', terms: get(base,'Terms') || '' },
-      shippingOptions: { pay: get(base,'ShipPayMethod') || '', speed: get(base,'ShipSpeed') || '', shortShip: get(base,'ShortShip') || '' }
-    };
+            shippingOptions: {
+        shipMethod:  get(base,'ShipMethodRef.Name') || get(base,'ShipMethod') || '',
+        payMethod:   get(base,'ShipPayMethod') || '',
+        freightType: get(base,'FreightTypeRef.Name') || get(base,'FreightType') || '',
+        shortShip:   get(base,'ShortShip') || '',
+        blindShip:   !!get(base,'BlindShip', false),
+
+        // legacy fields
+        pay:   get(base,'ShipPayMethod') || '',
+        speed: get(base,'ShipSpeed') || '',
+      }
+
 
     document.getElementById('clonePaste').value = JSON.stringify(shaped, null, 2);
   }catch(err){
