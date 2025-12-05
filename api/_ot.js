@@ -293,11 +293,28 @@ return {
     agreement: false
   },
 
+    // Shipping tab defaults from the OT Customer record
   shippingOptions: {
-    pay:   x.ShipMethodRef?.Name || '',
-    speed: '',
-    shortShip: ''
+    // Carrier method, e.g. "FedEx Ground Home Delivery - RPHD"
+    shipMethod:  x.ShipMethodRef?.Name || '',
+
+    // How freight is paid, e.g. "Customer FedEx Account"
+    payMethod:   x.ShipPayMethod || '',
+
+    // Freight type, e.g. "[TPB] Third Party Billing, to the account number supplied below"
+    freightType: x.FreightTypeRef?.Name || x.FreightType || '',
+
+    // OT "ShortShip" usually holds "MustShipComplete"/"MayShipPartial"
+    shortShip:   x.ShortShip || '',
+
+    // Blind Ship flag if your tenant exposes it
+    blindShip:   !!x.BlindShip,
+
+    // Legacy fields kept so older JSON doesn’t explode
+    pay:   x.ShipPayMethod || '',
+    speed: ''
   },
+
 
   rep: {
     primary:   x.SalesRepRef?.Name || '',
