@@ -218,7 +218,9 @@
             <option>Lucas Currin</option>
             <option>Max Mann</option>
             <option>John Tropeano</option>
-            <option>Chris Samaras</option>
+            <option>Greg Flannigan</option>
+            <option>Suliman Mohmand</option>
+            <option>Orlando</option>
           </select>
           <label style="margin-top:10px">Template Editor</label>
           <textarea id="repTemplateText" rows="12" placeholder="Template text with {{ Customer First Name }} and {{Current Email}} placeholders"></textarea>
@@ -2562,7 +2564,7 @@ We are excited to share that we have created a self service customer portal to m
 From this portal you will be able to: 
 View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
 
-Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=max-mann 
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=anthony.liace 
 
 Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
 
@@ -2607,6 +2609,87 @@ Your business is greatly appreciated!
 
 With Warmest Regards,
 John Tropeano
+
+ `,
+  "Greg Flannigan": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=greg-flannigan 
+
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+Greg Flannigan
+
+ `,
+  "Suliman Mohmand": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=suliman-mohmand 
+
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+Suliman Mohmand
+
+ `,
+  "Orlando": ` Hello {{ Customer First Name}}, 
+
+We are excited to share that we have created a self service customer portal to make engaging with ConnectUs an easier and more seamless experience. 
+
+From this portal you will be able to: 
+View Order Statuses See order historyView Tracking InformationRetrieve IMEI & Sim Information (When applicable)Manage Billing & Shipping AddressesView & download invoicesAnd More! 
+
+Click here to create your user name and password:  https://connectuscorp.com/my-account/?salep-rep=orlando-calderon 
+
+Your email will serve as the admin for this account. You can add additional users once you register. If you would like to change the admin email, please email me. 
+
+This is only the beginning! In the not so distant future, you will be able to place orders directly  from the portal which will save you time and provide you information you need in real time. 
+
+Our goal is to save you time and provide you the information you need on-demand. 
+
+We welcome you to provide any feedback you would like to see for future improvements or features. We will continually strive to improve your interactions with ConnectUs to make doing business with us an enjoyable experience. 
+
+Further instructions to follow once your account is created. 
+
+If we can help in any way, please do not hesitate to reach out. 
+
+Your business is greatly appreciated!
+
+With Warmest Regards,
+Orlando
 
  `
 };
@@ -2742,8 +2825,11 @@ function loadReps(){
     // Seed with reps
     reps = [
       {name:"Lucas Currin", email:"lucas.currin@connectuscorp.com", slug:"lucas-currin", template:BASE_TEMPLATES["Lucas Currin"]},
-      {name:"Max Mann", email:"max.mann@connectuscorp.com", slug:"max-mann", template:BASE_TEMPLATES["Max Mann"]},
+      {name:"Max Mann", email:"max.mann@connectuscorp.com", slug:"max.mann", template:BASE_TEMPLATES["Max Mann"]},
       {name:"John Tropeano", email:"john.tropeano@connectuscorp.com", slug:"john-tropeano", template:BASE_TEMPLATES["John Tropeano"]},
+      {name:"Greg Flannigan", email:"greg.flannigan@connectuscorp.com", slug:"greg-flannigan", template:BASE_TEMPLATES["Greg Flannigan"]},
+      {name:"Suliman Mohmand", email:"suliman.mohmand@connectuscorp.com", slug:"suliman-mohmand", template:BASE_TEMPLATES["Suliman Mohmand"]},
+      {name:"Orlando Calderon", email:"orlando.calderon@connectuscorp.com", slug:"orlando-calderon", template:BASE_TEMPLATES["Orlando Calderon"]},
       {name:"Greg Weichert", email:"greg.weichert@connectuscorp.com", slug:"Greg Weichert", template:BASE_TEMPLATES["Greg Weichert"]}
     ];
     localStorage.setItem(LS_REPS_KEY, JSON.stringify(reps));
@@ -3142,45 +3228,9 @@ function applyPastedCustomer(textareaId){
   const tax = document.getElementById('taxExempt');    if (tax) tax.checked = !!data.payment?.taxExempt;
   const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!data.payment?.agreement;
 
-    // Shipping Options → new controls (Ship Method, Pay Method, Freight, flags)
-  if (data.shippingOptions) {
-    const so = data.shippingOptions;
-
-    // Ship Method (carrier)
-    if (so.shipMethod) {
-      selectByTextExact('shipMethod', so.shipMethod);
-    } else if (so.pay) {
-      // legacy JSON sometimes stored method in .pay
-      selectByTextExact('shipMethod', so.pay);
-    }
-
-    // Shipping Payment Method
-    if (so.payMethod) {
-      selectByTextExact('shipPayMethod', so.payMethod);
-    } else if (!document.getElementById('shipPayMethod')?.value && so.pay) {
-      // fallback: treat .pay as the payment method if nothing else
-      selectByTextExact('shipPayMethod', so.pay);
-    }
-
-    // Freight Type
-    if (so.freightType) {
-      selectByTextExact('freightType', so.freightType);
-    }
-
-    // Allow Partial Ship from OT "ShortShip" value
-    if (so.shortShip) {
-      const allow = /may\s*ship\s*partial/i.test(so.shortShip);
-      const el = document.getElementById('allowPartial');
-      if (el) el.checked = allow;
-    }
-
-    // Blind Ship flag
-    if (typeof so.blindShip === 'boolean') {
-      const el = document.getElementById('blindShip');
-      if (el) el.checked = so.blindShip;
-    }
-  }
-
+  if (data.shippingOptions?.pay)   selectByTextExact('shipPay',   data.shippingOptions.pay);
+  if (data.shippingOptions?.speed) selectByTextExact('shipSpeed', data.shippingOptions.speed);
+  if (data.shippingOptions?.shortShip) selectByTextExact('shortShip', data.shippingOptions.shortShip);
 
   // Reps / carrier
   if (pick(data.rep?.primary))   selectByTextExact('rep1', pick(data.rep?.primary));
@@ -3339,33 +3389,10 @@ function applyClonedOrder(){
   document.getElementById('taxExempt').checked = !!p.taxExempt;
   document.getElementById('hasAgreement').checked = !!p.agreement;
 
-    const so = data.shippingOptions || {};
-
-  if (so.shipMethod) {
-    selectByTextExact('shipMethod', so.shipMethod);
-  } else if (so.pay) {
-    selectByTextExact('shipMethod', so.pay);
-  }
-
-  if (so.payMethod) {
-    selectByTextExact('shipPayMethod', so.payMethod);
-  } else if (!document.getElementById('shipPayMethod')?.value && so.pay) {
-    selectByTextExact('shipPayMethod', so.pay);
-  }
-
-  if (so.freightType) {
-    selectByTextExact('freightType', so.freightType);
-  }
-
-  if (so.shortShip) {
-    const allow = /may\s*ship\s*partial/i.test(so.shortShip);
-    document.getElementById('allowPartial').checked = allow;
-  }
-
-  if (typeof so.blindShip === 'boolean') {
-    document.getElementById('blindShip').checked = so.blindShip;
-  }
-
+  const so = data.shippingOptions || {};
+  if(so.pay) selectByTextExact('shipPay', so.pay);
+  if(so.speed) selectByTextExact('shipSpeed', so.speed);
+  if(so.shortShip) selectByTextExact('shortShip', so.shortShip);
 
   // ----- Items (replace current rows with cloned items)
   document.getElementById('itemsBody').innerHTML = '';
@@ -3503,18 +3530,8 @@ async function loadSO(id){
       shipping,
       items,
       payment: { method: get(base,'PaymentMethod') || '', terms: get(base,'Terms') || '' },
-            shippingOptions: {
-        shipMethod:  get(base,'ShipMethodRef.Name') || get(base,'ShipMethod') || '',
-        payMethod:   get(base,'ShipPayMethod') || '',
-        freightType: get(base,'FreightTypeRef.Name') || get(base,'FreightType') || '',
-        shortShip:   get(base,'ShortShip') || '',
-        blindShip:   !!get(base,'BlindShip', false),
-
-        // legacy fields
-        pay:   get(base,'ShipPayMethod') || '',
-        speed: get(base,'ShipSpeed') || '',
-      }
-
+      shippingOptions: { pay: get(base,'ShipPayMethod') || '', speed: get(base,'ShipSpeed') || '', shortShip: get(base,'ShortShip') || '' }
+    };
 
     document.getElementById('clonePaste').value = JSON.stringify(shaped, null, 2);
   }catch(err){
