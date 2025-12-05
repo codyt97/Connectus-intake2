@@ -2036,26 +2036,28 @@ function applyCondForRow(tr){
 }
 
 // 1) React when the SKU cell is edited
+// 🔐 Capture Items table body HTML (all lines, QR IDs, SKUs, Qty, etc.)
 const itemsBody = document.getElementById('itemsBody');
-if (itemsBody){
-  itemsBody.addEventListener('input', (e)=>{
-    const td = e.target.closest('td');
-    if (!td) return;
-    const tr = e.target.closest('tr');
-    const idx = [...tr.children].indexOf(td);
-    if (idx === window.COL_SKU) applyCondForRow(tr);
-  });
+if (itemsBody) {
+  // Keep structure (rows, columns, buttons, etc.)
+  data.itemsHTML = itemsBody.innerHTML;
 
-  // 2) Also react when rows are added (from addRow/clone/etc.)
-  const mo = new MutationObserver((muts)=>{
-    for (const m of muts){
-      m.addedNodes.forEach(n=>{
-        if (n.nodeType === 1 && n.tagName === 'TR') applyCondForRow(n);
-      });
-    }
+  // Explicitly capture values for every input/select/textarea in each row
+  const rows = Array.from(itemsBody.querySelectorAll('tr'));
+  data.itemsData = rows.map(tr => {
+    const cells = Array.from(tr.querySelectorAll('td'));
+    return cells.map(td => {
+      const el = td.querySelector('input,select,textarea');
+      if (!el) return null;
+
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        return { type: el.type, checked: el.checked };
+      }
+      return { type: 'value', value: el.value };
+    });
   });
-  mo.observe(itemsBody, { childList:true });
 }
+
 
 // 3) One-time sweep in case SKUs already exist (e.g., after paste/clone/load)
 (function initialSweep(){
@@ -4812,10 +4814,39 @@ function setCellInput(td, val) {
     }
 
     // Restore Items table HTML
-    const itemsBody = document.getElementById('itemsBody');
-    if (itemsBody && typeof draft.itemsHTML === 'string') {
-      itemsBody.innerHTML = draft.itemsHTML;
+      // Restore Items table HTML + values
+  const itemsBody = document.getElementById('itemsBody');
+  if (itemsBody && typeof draft.itemsHTML === 'string') {
+    // First restore the structure (rows/columns/buttons)
+    itemsBody.innerHTML = draft.itemsHTML;
+
+    // Then restore actual cell values
+    if (Array.isArray(draft.itemsData)) {
+      const rows = Array.from(itemsBody.querySelectorAll('tr'));
+      draft.itemsData.forEach((rowData, rIndex) => {
+        if (!Array.isArray(rowData)) return;
+        const tr = rows[rIndex];
+        if (!tr) return;
+
+        const cells = Array.from(tr.querySelectorAll('td'));
+        rowData.forEach((cellData, cIndex) => {
+          if (!cellData) return;
+          const td = cells[cIndex];
+          if (!td) return;
+
+          const el = td.querySelector('input,select,textarea');
+          if (!el) return;
+
+          if (cellData.type === 'checkbox' || cellData.type === 'radio') {
+            el.checked = !!cellData.checked;
+          } else {
+            el.value = cellData.value ?? '';
+          }
+        });
+      });
     }
+  }
+
 
     // Ensure intake UI is visible
     if (typeof openIntakeTabs === 'function') {
