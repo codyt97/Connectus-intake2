@@ -340,8 +340,14 @@
 <div class="actions">
   <button class="ghost" id="btnOpenEmail" data-open-email onclick="openEmailDrawerGuarded()">Email Order Management</button>
   <!-- <button class="ok" id="btnSubmitIntake">Submit Intake</button> -->
+
+  <!-- NEW: Save / Clear draft buttons -->
+  <button class="ghost" id="btnSaveDraft" type="button">Save Draft</button>
+  <button class="ghost" id="btnClearDraft" type="button">Clear Saved Draft</button>
+
   <span id="submitStatus" class="tiny" style="margin-left:10px"></span>
 </div>
+
 <script>
   function openEmailDrawerGuarded(){
   const { ok, missing } = validateRequiredForEmail();
@@ -4649,5 +4655,214 @@ function setCellInput(td, val) {
 }
 </script>
 
+<!-- ===== Draft Save / Resume Logic (Per Sales Rep) ===== -->
+<script>
+  const INTAKE_DRAFT_PREFIX = 'connectus_intake_draft_v1::';
+
+  function getCurrentRepContext() {
+    const sel = document.getElementById('wizRepPick');
+    if (!sel) return null;
+
+    const name = sel.value || '';
+    // Don't create separate drafts for "blank" or "Other"
+    if (!name || name === 'Other') return null;
+
+    // If getRepByName exists, use slug; otherwise fall back to name
+    let slug = name;
+    try {
+      if (typeof getRepByName === 'function') {
+        const rep = getRepByName(name);
+        if (rep && rep.slug) slug = rep.slug;
+      }
+    } catch (_) {}
+
+    return { name, slug };
+  }
+
+  function draftKeyForContext(ctx) {
+    if (!ctx) return null;
+    return INTAKE_DRAFT_PREFIX + ctx.slug;
+  }
+
+  function collectIntakeDraftState() {
+    const panel = document.querySelector('[data-mainpanel="intake"]');
+    if (!panel) return null;
+
+    const data = {
+      ts: Date.now(),
+      fields: {},
+      itemsHTML: null
+    };
+
+    // Save all inputs/selects/textareas that have an ID inside the Intake panel
+    panel.querySelectorAll('input[id], select[id], textarea[id]').forEach(el => {
+      const id = el.id;
+      if (!id) return;
+
+      if (el.type === 'checkbox' || el.type === 'radio') {
+        data.fields[id] = { type: el.type, checked: el.checked };
+      } else {
+        data.fields[id] = { type: 'value', value: el.value };
+      }
+    });
+
+    // Save the Items table body as raw HTML so line items are preserved
+    const itemsBody = document.getElementById('itemsBody');
+    if (itemsBody) {
+      data.itemsHTML = itemsBody.innerHTML;
+    }
+
+    return data;
+  }
+
+  function saveIntakeDraft() {
+    const ctx = getCurrentRepContext();
+    if (!ctx) {
+      alert('Select a Sales Rep in Step 1 before saving a draft.');
+      return;
+    }
+
+    const key = draftKeyForContext(ctx);
+    if (!key) {
+      alert('Could not determine draft key for this rep.');
+      return;
+    }
+
+    try {
+      const draft = collectIntakeDraftState();
+      if (!draft) {
+        alert('Nothing to save right now.');
+        return;
+      }
+
+      localStorage.setItem(key, JSON.stringify(draft));
+
+      const status = document.getElementById('submitStatus');
+      if (status) {
+        const dt = new Date(draft.ts);
+        status.textContent = `Draft saved for ${ctx.name} at ` + dt.toLocaleString();
+      }
+
+      alert(`Draft saved for ${ctx.name}. You can close this tab and resume later from the same browser.`);
+    } catch (err) {
+      console.error('Failed to save draft', err);
+      alert('Failed to save draft: ' + (err.message || err));
+    }
+  }
+
+  function applyIntakeDraft(draft) {
+    if (!draft || !draft.fields) return false;
+
+    // Restore all field values by ID
+    for (const [id, meta] of Object.entries(draft.fields)) {
+      const el = document.getElementById(id);
+      if (!el) continue;
+
+      if (meta.type === 'checkbox' || meta.type === 'radio') {
+        el.checked = !!meta.checked;
+      } else {
+        el.value = meta.value ?? '';
+      }
+    }
+
+    // Restore items table
+    const itemsBody = document.getElementById('itemsBody');
+    if (itemsBody && draft.itemsHTML) {
+      itemsBody.innerHTML = draft.itemsHTML;
+      // Event delegation on #itemsBody will keep working
+    }
+
+    const status = document.getElementById('submitStatus');
+    if (status) {
+      if (draft.ts) {
+        const dt = new Date(draft.ts);
+        status.textContent = 'Resumed draft from ' + dt.toLocaleString();
+      } else {
+        status.textContent = 'Resumed saved draft.';
+      }
+    }
+
+    // Make sure Intake tabs/stepper are visible
+    if (typeof openIntakeTabs === 'function') {
+      openIntakeTabs();
+    }
+
+    return true;
+  }
+
+  function getDraftForCurrentRep() {
+    const ctx = getCurrentRepContext();
+    if (!ctx) return null;
+
+    const key = draftKeyForContext(ctx);
+    if (!key) return null;
+
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+
+    try {
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error('Failed to parse draft JSON', err);
+      return null;
+    }
+  }
+
+  function clearIntakeDraft() {
+    const ctx = getCurrentRepContext();
+    if (!ctx) {
+      alert('Select a Sales Rep in Step 1 to clear their saved draft.');
+      return;
+    }
+
+    const key = draftKeyForContext(ctx);
+    if (!key) return;
+
+    localStorage.removeItem(key);
+
+    const status = document.getElementById('submitStatus');
+    if (status) status.textContent = `Saved draft cleared for ${ctx.name}.`;
+
+    alert(`Saved draft cleared for ${ctx.name} on this browser.`);
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const saveBtn  = document.getElementById('btnSaveDraft');
+    const clearBtn = document.getElementById('btnClearDraft');
+    const repSel   = document.getElementById('wizRepPick');
+
+    if (saveBtn)  saveBtn.addEventListener('click', saveIntakeDraft);
+    if (clearBtn) clearBtn.addEventListener('click', clearIntakeDraft);
+
+    // When a rep is selected in Step 1, offer to resume their draft (if any)
+    if (repSel) {
+      repSel.addEventListener('change', () => {
+        const ctx = getCurrentRepContext();
+        if (!ctx) return;
+
+        const draft = getDraftForCurrentRep();
+        if (!draft) return;
+
+        // Prevent spamming the confirm if they flip back and forth
+        if (repSel.dataset.draftPrompted === ctx.slug) return;
+        repSel.dataset.draftPrompted = ctx.slug;
+
+        const dt = draft.ts ? new Date(draft.ts).toLocaleString() : null;
+        const msg = dt
+          ? `A saved draft for ${ctx.name} from ${dt} was found. Do you want to load it?`
+          : `A saved draft for ${ctx.name} was found. Do you want to load it?`;
+
+        if (confirm(msg)) {
+          const ok = applyIntakeDraft(draft);
+          if (!ok) {
+            alert('Saved draft could not be loaded (it may be corrupted).');
+          }
+        }
+      });
+    }
+  });
+</script>
+
 </body>
 </html>
+
