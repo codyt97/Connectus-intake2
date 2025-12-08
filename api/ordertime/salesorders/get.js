@@ -70,6 +70,13 @@ function normalizeSalesOrder(raw) {
     city:    get(raw,'ShipAddress.City'),
     state:   get(raw,'ShipAddress.State'),
     zip:     get(raw,'ShipAddress.Zip'),
+     // NEW: shipping options pulled from OT (adjust property paths to your schema)
+    method:      get(raw,'ShipMethodRef.Name') || get(raw,'ShipMethod') || '',
+    payMethod:   get(raw,'ShipPaymentMethod')  || '',
+    freightType: get(raw,'FreightType')        || '',
+    upsAccount:  get(raw,'UPSAccountNo')       || '',
+    fedexAccount:get(raw,'FedExAccountNo')     || '',
+  
   };
 
   const customer = {
