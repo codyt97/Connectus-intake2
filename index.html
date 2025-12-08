@@ -1302,12 +1302,15 @@ function populateShipMethod(){
   const ph = document.createElement('option');
   ph.value = ''; ph.textContent = 'Select Ship Method';
   sel.appendChild(ph);
+
   SHIP_METHOD_OPTIONS.forEach(txt => {
     const o = document.createElement('option');
     o.textContent = txt;
+    o.value = txt;              // make value match the visible text
     sel.appendChild(o);
   });
 }
+
 function initMainTabs(){
   const tabs = document.querySelectorAll('.mtab');
   const panels = document.querySelectorAll('[data-mainpanel]');
