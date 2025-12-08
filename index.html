@@ -4640,6 +4640,36 @@ async function soApplyByDocNo(docNo){
     const resBox = document.getElementById('resShip');
     if (resBox) resBox.checked = !!order.shipping.residence;
 
+        // NEW: Shipping options from OrderTime
+
+    // Ship Method (matches against the visible text in the drop-down)
+    if (order.shipping.method) {
+      setVal('shipMethod', order.shipping.method);
+    }
+
+    // Shipping Payment Method (drives UPS/FedEx / 3rd party logic)
+    if (order.shipping.payMethod) {
+      setVal('shipPayMethod', order.shipping.payMethod);
+      // Ensure auto-fill logic for 3rd party account re-runs
+      try { updateThirdPartyAccountUI?.(); } catch (e) { console.warn(e); }
+    }
+
+    // Freight Type
+    if (order.shipping.freightType) {
+      setVal('freightType', order.shipping.freightType);
+    }
+
+    // UPS / FedEx account from the order (only fills if field is empty so we
+    // don't blow away something the user already typed)
+    if (order.shipping.upsAccount || order.shipping.fedexAccount) {
+      const acct  = order.shipping.upsAccount || order.shipping.fedexAccount;
+      const input = document.getElementById('thirdPartyAcct');
+      if (input && !input.value) {
+        input.value = acct;
+        input.dataset.autofill = 'true';
+      }
+    }
+
     // Optional: customer PO / terms if you expose them
     setVal('customerPO', order.customer?.po);
     setVal('payTerms',   order.customer?.terms);
