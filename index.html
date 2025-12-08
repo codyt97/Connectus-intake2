@@ -4610,6 +4610,18 @@ async function soApplyByDocNo(docNo){
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     const payload = await res.json();
     const order   = payload?.order || payload; // normalized here
+        // TEMP DEBUG: inspect shipping + raw header
+    console.log('OT shipping normalized:', order.shipping);
+    console.log('OT raw header shipping-ish fields:', {
+      ShipMethodRef: payload.raw?.ShipMethodRef,
+      ShipMethod:    payload.raw?.ShipMethod,
+      ShipViaRef:    payload.raw?.ShipViaRef,
+      ShipVia:       payload.raw?.ShipVia,
+      ShipPaymentMethod: payload.raw?.ShipPaymentMethod,
+      FreightType:       payload.raw?.FreightType,
+      UPSAccountNo:      payload.raw?.UPSAccountNo,
+      FedExAccountNo:    payload.raw?.FedExAccountNo,
+    });
 
     if (!order || !order.billing) throw new Error('No order data');
 
