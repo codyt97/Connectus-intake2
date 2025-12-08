@@ -48,9 +48,24 @@ async function otGet(pathWithQuery) {
 function normalizeSalesOrder(raw) {
   const get = (o,p,d='') => { try { return p.split('.').reduce((x,k)=>x?.[k], o) ?? d; } catch { return d; } };
 
+  // Helper: pull a value from header CustomFields by Caption or Name
+  const getCF = (o, captionOrName) => {
+    try {
+      const list = o?.CustomFields || o?.customFields || [];
+      const row = list.find(cf =>
+        cf?.Caption === captionOrName ||
+        cf?.Name === captionOrName
+      );
+      return row?.Value ?? '';
+    } catch {
+      return '';
+    }
+  };
+
   const billing = {
     company: get(raw,'CustomerRef.Name') || get(raw,'CustomerName') || '',
     contact: get(raw,'BillAddress.Contact'),
+
     phone:   get(raw,'BillAddress.Phone'),
     email:   get(raw,'BillAddress.Email'),
     street:  get(raw,'BillAddress.Addr1'),
@@ -60,7 +75,7 @@ function normalizeSalesOrder(raw) {
     zip:     get(raw,'BillAddress.Zip'),
   };
 
-    const shipping = {
+      const shipping = {
     company: get(raw,'CustomerRef.Name') || billing.company || '',
     contact: get(raw,'ShipAddress.Contact'),
     phone:   get(raw,'ShipAddress.Phone'),
@@ -70,6 +85,35 @@ function normalizeSalesOrder(raw) {
     city:    get(raw,'ShipAddress.City'),
     state:   get(raw,'ShipAddress.State'),
     zip:     get(raw,'ShipAddress.Zip'),
+
+    // Shipping options – try header fields first, then Custom Fields
+    method:
+      get(raw,'ShipMethodRef.Name') ||
+      get(raw,'ShipMethod') ||
+      getCF(raw,'Ship Method') ||
+      '',
+
+    payMethod:
+      getCF(raw,'Shipping Payment Method') ||
+      get(raw,'ShipPaymentMethod') ||
+      '',
+
+    freightType:
+      getCF(raw,'Freight Type') ||
+      get(raw,'FreightType') ||
+      '',
+
+    upsAccount:
+      getCF(raw,'UPS Account #') ||
+      get(raw,'UPSAccountNo') ||
+      '',
+
+    fedexAccount:
+      getCF(raw,'FedEx Account #') ||
+      get(raw,'FedExAccountNo') ||
+      '',
+  };
+
 
     // NEW: shipping options pulled from OT (with extra fallbacks)
     // Adjust these once you see the exact field names in the debug payload.
