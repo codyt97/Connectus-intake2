@@ -60,7 +60,7 @@ function normalizeSalesOrder(raw) {
     zip:     get(raw,'BillAddress.Zip'),
   };
 
-  const shipping = {
+    const shipping = {
     company: get(raw,'CustomerRef.Name') || billing.company || '',
     contact: get(raw,'ShipAddress.Contact'),
     phone:   get(raw,'ShipAddress.Phone'),
@@ -70,14 +70,37 @@ function normalizeSalesOrder(raw) {
     city:    get(raw,'ShipAddress.City'),
     state:   get(raw,'ShipAddress.State'),
     zip:     get(raw,'ShipAddress.Zip'),
-     // NEW: shipping options pulled from OT (adjust property paths to your schema)
-    method:      get(raw,'ShipMethodRef.Name') || get(raw,'ShipMethod') || '',
-    payMethod:   get(raw,'ShipPaymentMethod')  || '',
-    freightType: get(raw,'FreightType')        || '',
-    upsAccount:  get(raw,'UPSAccountNo')       || '',
-    fedexAccount:get(raw,'FedExAccountNo')     || '',
-  
+
+    // NEW: shipping options pulled from OT (with extra fallbacks)
+    // Adjust these once you see the exact field names in the debug payload.
+    method:
+      get(raw,'ShipMethodRef.Name') ||
+      get(raw,'ShipViaRef.Name')    ||   // common alternate
+      get(raw,'ShipVia')            ||
+      get(raw,'ShipMethod')         ||
+      '',
+
+    payMethod:
+      get(raw,'ShipPaymentMethod')  ||
+      get(raw,'ShipPmtMethod')      ||   // if your tenant uses a shorter name
+      '',
+
+    freightType:
+      get(raw,'FreightType')        ||
+      get(raw,'ShipFreightType')    ||   // alternate guess
+      '',
+
+    upsAccount:
+      get(raw,'UPSAccountNo')       ||
+      get(raw,'UPSAcctNo')          ||
+      '',
+
+    fedexAccount:
+      get(raw,'FedExAccountNo')     ||
+      get(raw,'FedexAccountNo')     ||
+      '',
   };
+
 
   const customer = {
     id:   get(raw,'CustomerRef.Id') || get(raw,'CustomerId'),
