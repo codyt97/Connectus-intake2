@@ -1302,15 +1302,12 @@ function populateShipMethod(){
   const ph = document.createElement('option');
   ph.value = ''; ph.textContent = 'Select Ship Method';
   sel.appendChild(ph);
-
   SHIP_METHOD_OPTIONS.forEach(txt => {
     const o = document.createElement('option');
     o.textContent = txt;
-    o.value = txt;              // make value match the visible text
     sel.appendChild(o);
   });
 }
-
 function initMainTabs(){
   const tabs = document.querySelectorAll('.mtab');
   const panels = document.querySelectorAll('[data-mainpanel]');
@@ -1827,7 +1824,7 @@ const PAIRING_SKU_MAP = {
 const PAIRING_SKUS = new Set(Object.values(PAIRING_SKU_MAP).map(x => String(x.sku || '').toLowerCase()));
 // === Column safeguards (align with your table header) ===
 if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
-if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 3;
+if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 1;
 // ===== Row-scoped "New Device Details" with License override =====
 
 // Read inputs from a row
@@ -4613,18 +4610,6 @@ async function soApplyByDocNo(docNo){
     if (!res.ok) throw new Error(`${res.status} ${await res.text()}`);
     const payload = await res.json();
     const order   = payload?.order || payload; // normalized here
-        // TEMP DEBUG: inspect shipping + raw header
-    console.log('OT shipping normalized:', order.shipping);
-    console.log('OT raw header shipping-ish fields:', {
-      ShipMethodRef: payload.raw?.ShipMethodRef,
-      ShipMethod:    payload.raw?.ShipMethod,
-      ShipViaRef:    payload.raw?.ShipViaRef,
-      ShipVia:       payload.raw?.ShipVia,
-      ShipPaymentMethod: payload.raw?.ShipPaymentMethod,
-      FreightType:       payload.raw?.FreightType,
-      UPSAccountNo:      payload.raw?.UPSAccountNo,
-      FedExAccountNo:    payload.raw?.FedExAccountNo,
-    });
 
     if (!order || !order.billing) throw new Error('No order data');
 
@@ -4654,36 +4639,6 @@ async function soApplyByDocNo(docNo){
     setVal('shipZip',     order.shipping.zip);
     const resBox = document.getElementById('resShip');
     if (resBox) resBox.checked = !!order.shipping.residence;
-
-        // NEW: Shipping options from OrderTime
-
-    // Ship Method (matches against the visible text in the drop-down)
-    if (order.shipping.method) {
-      setVal('shipMethod', order.shipping.method);
-    }
-
-    // Shipping Payment Method (drives UPS/FedEx / 3rd party logic)
-    if (order.shipping.payMethod) {
-      setVal('shipPayMethod', order.shipping.payMethod);
-      // Ensure auto-fill logic for 3rd party account re-runs
-      try { updateThirdPartyAccountUI?.(); } catch (e) { console.warn(e); }
-    }
-
-    // Freight Type
-    if (order.shipping.freightType) {
-      setVal('freightType', order.shipping.freightType);
-    }
-
-    // UPS / FedEx account from the order (only fills if field is empty so we
-    // don't blow away something the user already typed)
-    if (order.shipping.upsAccount || order.shipping.fedexAccount) {
-      const acct  = order.shipping.upsAccount || order.shipping.fedexAccount;
-      const input = document.getElementById('thirdPartyAcct');
-      if (input && !input.value) {
-        input.value = acct;
-        input.dataset.autofill = 'true';
-      }
-    }
 
     // Optional: customer PO / terms if you expose them
     setVal('customerPO', order.customer?.po);
