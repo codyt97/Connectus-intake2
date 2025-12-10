@@ -1722,44 +1722,54 @@ const SIM_CARD_OPTIONS = [
 const SIM_CARD_SKU_MAP = {
   'VZ-SIM3IN1': {
     sku: 'VZ-SIM3IN1',
-    desc: '3IN1 Verizon Locked 5G SIM Card (Black)'
+    desc: '3IN1 Verizon Locked 5G SIM Card (Black)',
+    price: '0'
 
   },
   'AT-SIM3IN1': {
     sku: 'AT-SIM3IN1',
-    desc: '3 in 1 AT&T SIM Card'
+    desc: '3 in 1 AT&T SIM Card',
+    price: '0'
   },
   'AT-FIRSTSIMA00': {
     sku: 'AT-FIRSTSIMA00',
-    desc: '3 in 1 FirstNet AT&T Locked 5G SIM Card (Black)'
+    desc: '3 in 1 FirstNet AT&T Locked 5G SIM Card (Black)',
+    price: '0'
   },
   'TM-SIM3IN14G': {
     sku: 'TM-SIM3IN14G',
-    desc: '3 in 1 T-Mobile Locked 4G SIM Card'
+    desc: '3 in 1 T-Mobile Locked 4G SIM Card',
+    price: '0'
   },
   'HE-HELIXTRIAA00': {
     sku: 'HE-HELIXTRIAA00',
-    desc: 'Helix Wireless Tri A SIM Card'
+    desc: 'Helix Wireless Tri A SIM Card',
+    price: '0'
   },
   'Helix eSIM(TriA)': {
     sku: 'HE-eSIM-TRIA',
-    desc: 'Helix Wireless eSIM (TriA)'
+    desc: 'Helix Wireless eSIM (TriA)',
+    price: '0'
   },
   'HE TRI-B Static IP Helix': {
     sku: 'HE-0007SFFB00',
-    desc: 'Helix Wireless SIM Card TRI-B for Static IP (EID required)'
+    desc: 'Helix Wireless SIM Card TRI-B for Static IP (EID required)',
+    price: '0'
   },
   'MW-SIMVZTMATT-E': {
     sku: 'MW-SIMVZTMATT-E',
-    desc: 'ConnectUs Dynamic IP Multi-Carrier Access 3in1 SIM Card – VZ/ATT/TMO'
+    desc: 'ConnectUs Dynamic IP Multi-Carrier Access 3in1 SIM Card – VZ/ATT/TMO',
+    price: '0'
   },
   'US-SIM3IN15G': {
     sku: 'US-SIM3IN15G',
-    desc: '3 in 1 US Cellular Locked 5G SIM Card'
+    desc: '3 in 1 US Cellular Locked 5G SIM Card',
+    price: '0'
   },
   'eSIM Embendded in the phone': {
     sku: 'ESIM-EMBED',
-    desc: 'eSIM embedded in the phone'
+    desc: 'eSIM embedded in the phone',
+    price: '0'
   },
   
 };
@@ -1794,27 +1804,33 @@ const PAIRING_SKU_MAP = {
   // Use the exact visible text options in your dropdown.
   'SIM PAIR ONLY': {
     sku: 'SIM PAIRING',
-    desc: 'SIM PAIRING'
+    desc: 'SIM PAIRING',
+    price: '0'
   },
   'SIM PAIR & CARRIER ACTIVATION': {
     sku: 'DEVICE ACTIVATION & SIM PAIR',
-    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE'
+    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE',
+    price: '0'
   },
   'VERIZON eSIM PAIRING': {
     sku: 'VERIZON eSIM PAIRING',
-    desc: 'VERIZON eSIM PAIRING — Please send IMEI listing to Verizon Rep to activate eSIM'
+    desc: 'VERIZON eSIM PAIRING — Please send IMEI listing to Verizon Rep to activate eSIM',
+    price: '0'
   },
   'SIM PAIR, BENCH TEST / ACTIVE TO ENSURE OPTIMAL PERFORMANCE': {
     sku: 'CUSTCONFIG, DEV ACTIV&SIMPAIR',
-    desc: 'SIM PAIRING, DEVICE ACTIVATION, & CUSTOM CONFIGURATION SERVICES, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE/SOW REQUIRED'
+    desc: 'SIM PAIRING, DEVICE ACTIVATION, & CUSTOM CONFIGURATION SERVICES, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE/SOW REQUIRED',
+    price: '0'
   },
   'SIM PAIR w/ STATIC IP & DEVICE ACTIVATIO< BENCH TEST TO ENSURE OPTIOMAL PERFORMANCE': {
     sku: 'STATIC IP SIMPAIR+DEVICE ACTIV',
-    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE W/ STATIC IP'
+    desc: 'SIM PAIRING & DEVICE ACTIVATION, BENCH TEST TO ENSURE OPTIMAL PERFORMANCE W/ STATIC IP',
+    price: '0'
   },
   'iNTERNAL cuc SIM PAIR & ACTIVATION': {
     sku: 'INT DEVICE ACTIVATE/SIM PAIR',
-    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION'
+    desc: 'NON-CARRIER SIM PAIRING & DEVICE ACTIVATION',
+    price: '0'
   }
   // Add more mappings here as you add more pairing options/SKUs.
   
@@ -1825,6 +1841,7 @@ const PAIRING_SKUS = new Set(Object.values(PAIRING_SKU_MAP).map(x => String(x.sk
 // === Column safeguards (align with your table header) ===
 if (typeof window.COL_DESC === 'undefined') window.COL_DESC = 0;
 if (typeof window.COL_SKU  === 'undefined') window.COL_SKU  = 1;
+if (typeof window.COL_price  === 'undefined') window.COL_price  = 2;
 // ===== Row-scoped "New Device Details" with License override =====
 
 // Read inputs from a row
