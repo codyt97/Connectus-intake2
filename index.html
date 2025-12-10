@@ -2464,6 +2464,7 @@ function ensureInsuranceLineForRow(baseTr){
 function addOrUpdatePairingLineFromSelect() {
   const sel = document.getElementById('pairingOption');
   if (!sel) return;
+
   const chosen = (sel.value || '').trim();
   const map = PAIRING_SKU_MAP[chosen];
   if (!map) return;
@@ -2476,11 +2477,9 @@ function addOrUpdatePairingLineFromSelect() {
 
   // Find all existing "pairing" lines (any whose SKU is in PAIRING_SKUS)
   let pairingRows = [];
-  let hasDesiredOnly = false;
 
   rows.forEach(tr => {
-    const tds = tr.querySelectorAll('td');
-    const skuEl = tds[window.COL_SKU]?.querySelector('input,textarea,select');
+    const skuEl = tr.querySelector('input[data-key="sku"]');
     const skuValL = String(skuEl?.value || '').trim().toLowerCase();
     if (PAIRING_SKUS.has(skuValL)) {
       pairingRows.push(tr);
@@ -2489,8 +2488,7 @@ function addOrUpdatePairingLineFromSelect() {
 
   // If exactly one pairing row exists and it's already the desired SKU, do nothing
   if (pairingRows.length === 1) {
-    const tds = pairingRows[0].querySelectorAll('td');
-    const skuEl = tds[window.COL_SKU]?.querySelector('input,textarea,select');
+    const skuEl = pairingRows[0].querySelector('input[data-key="sku"]');
     const existingSkuL = String(skuEl?.value || '').trim().toLowerCase();
     if (existingSkuL === desiredSkuL) {
       return; // already the correct single line
@@ -2506,11 +2504,11 @@ function addOrUpdatePairingLineFromSelect() {
   } else {
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td><input class="autosize" /></td>
-      <td><input class="autosize" /></td>
-      <td><input class="autosize" /></td>
-      <td><input class="autosize" /></td>
-      <td><input type="number" min="1" value="1" /></td>
+      <td><input class="autosize" data-key="desc" /></td>
+      <td><input class="autosize" data-key="sku" /></td>
+      <td><input class="autosize" data-key="qty" /></td>
+      <td><input class="autosize" data-key="sell" /></td>
+      <td><input class="autosize" data-key="lineInstr" /></td>
       <td><input class="autosize" /></td>
       <td><input class="autosize" /></td>
       <td><input class="autosize" /></td>
@@ -2530,19 +2528,27 @@ function addOrUpdatePairingLineFromSelect() {
     body.appendChild(tr);
   }
 
-  // Populate the newest row
-  const last = body.querySelectorAll('tr')[body.querySelectorAll('tr').length - 1];
-  const tds = last.querySelectorAll('td');
-  const descEl = tds[window.COL_DESC]?.querySelector('input,textarea');
-  const skuEl  = tds[window.COL_SKU ]?.querySelector('input,textarea');
-  const qtyEl  = tds[4]?.querySelector('input'); // Qty col index = 4
+  // Populate the newly added pairing row from the map
+  const newRow   = body.lastElementChild;
+  if (!newRow) return;
 
-  if (descEl) descEl.value = map.desc;
-  if (skuEl)  skuEl.value  = map.sku;
-  if (qtyEl && !qtyEl.value) qtyEl.value = 1;
+  const descEl  = newRow.querySelector('input[data-key="desc"]');
+  const skuEl   = newRow.querySelector('input[data-key="sku"]');
+  const qtyEl   = newRow.querySelector('input[data-key="qty"]');
+  const priceEl = newRow.querySelector('input[data-key="sell"]');
 
-  [descEl, skuEl, qtyEl].forEach(el => el && el.dispatchEvent(new Event('input', { bubbles: true })));
+  if (descEl)  descEl.value  = map.desc || '';
+  if (skuEl)   skuEl.value   = map.sku  || '';
+  if (qtyEl && !qtyEl.value) qtyEl.value = '1';
+
+  // Pairing line should always be $0 (or whatever you set in PAIRING_SKU_MAP)
+  if (priceEl) priceEl.value = map.price ?? '0';
+
+  [descEl, skuEl, qtyEl, priceEl].forEach(el => {
+    if (el) el.dispatchEvent(new Event('input', { bubbles:true }));
+  });
 }
+
   
 /* Build the three selects and keep prior values (if any) */
 function populateSimDropdowns(){
@@ -2760,16 +2766,25 @@ if (simSel) {
   }
 
   // 3) field-map desc + sku + qty=1
-  const tds = tr.querySelectorAll('td');
-  const descEl = tds[window.COL_DESC]?.querySelector('input,textarea');
-  const skuEl  = tds[window.COL_SKU ]?.querySelector('input,textarea');
-  const qtyEl  = tds[4]?.querySelector('input'); // adjust if your Qty index differs
+    // 3) field-map desc + sku + qty=1 + Sell Price = 0
+  const descEl  = tr.querySelector('input[data-key="desc"]');
+  const skuEl   = tr.querySelector('input[data-key="sku"]');
+  const qtyEl   = tr.querySelector('input[data-key="qty"]');
+  const priceEl = tr.querySelector('input[data-key="sell"]');
 
   if (descEl) descEl.value = map.desc;
   if (skuEl)  skuEl.value  = map.sku;
+
+  // default to 1 if qty is blank
   if (qtyEl && !qtyEl.value) qtyEl.value = '1';
 
-  [descEl, skuEl, qtyEl].forEach(el => el && el.dispatchEvent(new Event('input', { bubbles:true })));
+  // force SIM card lines to be $0 unless you change the map
+  if (priceEl) priceEl.value = map.price ?? '0';
+
+  [descEl, skuEl, qtyEl, priceEl].forEach(el => {
+    if (el) el.dispatchEvent(new Event('input', { bubbles:true }));
+  });
+
 }
 
 // Wire up on page load
