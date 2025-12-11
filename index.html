@@ -3205,15 +3205,55 @@ function applyPastedCustomer(textareaId){
   const resEl = document.getElementById('resShip');
   if (resEl) resEl.checked = !!data.shipping?.residence;
 
-  // Payment & options
+    // Payment & options
   const pm = pick(data.payment?.method); if (pm) selectByTextExact('payMethod', pm);
   setVal('payTerms', pick(data.payment?.terms));
   const tax = document.getElementById('taxExempt');    if (tax) tax.checked = !!data.payment?.taxExempt;
   const agr = document.getElementById('hasAgreement'); if (agr) agr.checked = !!data.payment?.agreement;
 
-  if (data.shippingOptions?.pay)   selectByTextExact('shipPay',   data.shippingOptions.pay);
-  if (data.shippingOptions?.speed) selectByTextExact('shipSpeed', data.shippingOptions.speed);
-  if (data.shippingOptions?.shortShip) selectByTextExact('shortShip', data.shippingOptions.shortShip);
+  // ---- Shipping Options (wired to new UI fields) ----
+  const so = data.shippingOptions || {};
+
+  // 1) Ship Method – prefer explicit shipMethod, fall back to speed if needed
+  const shipMethodVal = pick(so.shipMethod, so.speed);
+  if (shipMethodVal) {
+    selectByTextExact('shipMethod', shipMethodVal);
+  }
+
+  // 2) Shipping Payment Method – prefer payMethod, fall back to pay
+  const payMethodVal = pick(so.payMethod, so.pay);
+  if (payMethodVal) {
+    selectByTextExact('shipPayMethod', payMethodVal);
+  }
+
+  // 3) Freight Type
+  if (so.freightType) {
+    selectByTextExact('freightType', so.freightType);
+  }
+
+  // 4) Allow Partial Ship – mapping from shortShip (string or boolean)
+  const allowEl = document.getElementById('allowPartial');
+  if (allowEl && so.shortShip !== undefined) {
+    if (typeof so.shortShip === 'boolean') {
+      allowEl.checked = so.shortShip;
+    } else if (typeof so.shortShip === 'string') {
+      const s = so.shortShip.toLowerCase();
+      allowEl.checked =
+        s === 'yes' || s === 'y' || s === 'true' || s === 'allow';
+    }
+  }
+
+  // 5) Blind Ship – mapping from blindShip (string or boolean)
+  const blindEl = document.getElementById('blindShip');
+  if (blindEl && so.blindShip !== undefined) {
+    if (typeof so.blindShip === 'boolean') {
+      blindEl.checked = so.blindShip;
+    } else if (typeof so.blindShip === 'string') {
+      const s = so.blindShip.toLowerCase();
+      blindEl.checked = s === 'yes' || s === 'y' || s === 'true';
+    }
+  }
+
 
   // Reps / carrier
   if (pick(data.rep?.primary))   selectByTextExact('rep1', pick(data.rep?.primary));
