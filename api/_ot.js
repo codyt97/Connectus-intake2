@@ -246,10 +246,35 @@ export async function getCustomerById(id) {
     method: 'GET',
     headers: authHeaders(),
   });
-  const txt = await res.text();
+    const txt = await res.text();
   if (DEBUG) console.log(`[OT] GET /customer?id=${id} -> ${res.status} ${txt.slice(0,220)}`);
   if (!res.ok) throw new Error(`/customer ${res.status}: ${txt.slice(0,300)}`);
   const x = safeJSON(txt) || {};
+
+  // Helper: OT CustomFields[] lookup by caption or name
+  const getCF = (captionOrName) => {
+    try {
+      const list = x.CustomFields || [];
+      const row = list.find(cf =>
+        cf?.Caption === captionOrName ||
+        cf?.Name === captionOrName
+      );
+      return row?.Value ?? '';
+    } catch {
+      return '';
+    }
+  };
+
+  // Helper: coerce strings like "True", "Yes", "1" into boolean
+  const toBool = (v) => {
+    if (typeof v === 'boolean') return v;
+    if (v == null) return false;
+    const s = String(v).trim().toLowerCase();
+    return s === 'yes' || s === 'true' || s === 'y' || s === '1';
+  };
+
+  // Normalize to the structure your UI expects (per OT Customer docs)
+
 
   // Normalize to the structure your UI expects (per OT Customer docs)
 return {
@@ -297,22 +322,51 @@ zip:     x.PrimaryShipAddress?.Zip || '',
     agreement: false
   },
 
-    // Shipping tab defaults from the OT Customer record
-  shippingOptions: {
+    shippingOptions: {
     // Carrier method, e.g. "FedEx Ground Home Delivery - RPHD"
-    shipMethod:  x.ShipMethodRef?.Name || '',
+    shipMethod:
+      x.ShipMethodRef?.Name ||
+      getCF('Ship Method') ||
+      '',
 
     // How freight is paid, e.g. "Customer FedEx Account"
-    payMethod:   x.ShipPayMethod || '',
+    payMethod:
+      x.ShipPayMethod ||
+      getCF('Shipping Payment Method') ||
+      '',
 
     // Freight type, e.g. "[TPB] Third Party Billing, to the account number supplied below"
-    freightType: x.FreightTypeRef?.Name || x.FreightType || '',
+    freightType:
+      x.FreightTypeRef?.Name ||
+      x.FreightType ||
+      getCF('Freight Type') ||
+      '',
 
     // OT "ShortShip" usually holds "MustShipComplete"/"MayShipPartial"
-    shortShip:   x.ShortShip || '',
+    // UI will interpret this into the Allow Partial Ship checkbox
+    shortShip:
+      x.ShortShip ||
+      getCF('Allow Ship Partial') ||
+      '',
 
-    // Blind Ship flag if your tenant exposes it
-    blindShip:   !!x.BlindShip,
+    // Blind Ship flag (customer default)
+    blindShip:
+      toBool(
+        x.BlindShip ??
+        getCF('Blind Ship')
+      ),
+
+    // Optional: account numbers if you decide to surface them later
+    fedexAccount:
+      getCF('FedEx Account #') ||
+      x.FedExAccount ||
+      '',
+
+    upsAccount:
+      getCF('UPS Account #') ||
+      x.UPSAccount ||
+      ''
+
 
     // Legacy fields kept so older JSON doesn’t explode
     pay:   x.ShipPayMethod || '',
