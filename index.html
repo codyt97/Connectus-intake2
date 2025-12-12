@@ -1444,9 +1444,26 @@ function buildHeaderCSV() {
   const shipState   = get('shipState');
   const shipZip     = get('shipZip');
 
-  // Internal Notes
-  const notesVal = (document.getElementById('notes')?.value || '').trim();
+    // Internal Notes + Primary Contact (from billing fields)
+  const notesRaw = (document.getElementById('notes')?.value || '').trim();
+
+  const pcName  = (document.getElementById('billContact')?.value || '').trim();
+  const pcPhone = (document.getElementById('billPhone')?.value   || '').trim();
+  const pcEmail = (document.getElementById('billEmail')?.value   || '').trim();
+
+  const extraPieces = [];
+  if (pcName || pcPhone || pcEmail) {
+    const joined = [pcName, pcPhone, pcEmail].filter(Boolean).join(' | ');
+    extraPieces.push(`Primary Contact: ${joined}`);
+  }
+
+  const notesParts = [];
+  if (notesRaw) notesParts.push(notesRaw);
+  if (extraPieces.length) notesParts.push(extraPieces.join(' '));
+
+  const notesVal = notesParts.join(' || ');
   const oiType = getSelText('oiType');
+
 
 
   const row = [
